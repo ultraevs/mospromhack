@@ -159,3 +159,27 @@ def test_backend_restart_does_not_close_events_of_running_worker(settings):
     with TestClient(create_app(settings, run_sources=False)) as c:
         c.post("/internal/stats", headers=INTERNAL, json=stats)
         assert c.get(f"/api/events/{ev['id']}").json()["status"] == "open"
+
+
+def test_stats_report_capture_to_event_latency(client, camera):
+    import time
+
+    assert client.get("/api/stats").json()["latency"] == {"capture_to_event": None}
+    now = int(time.time() * 1000)
+    for age in (100, 200, 300):
+        post_event(client, camera["id"], captured_ts=now - age)
+    post_event(client, camera["id"])
+    lat = client.get("/api/stats").json()["latency"]["capture_to_event"]
+    assert lat["events"] == 3 and 190 <= lat["avg_ms"] <= 400 and lat["p95_ms"] >= 290
+
+
+def test_stats_merge_worker_report(client):
+    assert client.get("/api/stats").json()["worker_alive"] is False
+    client.post("/internal/stats", headers=INTERNAL, json={
+        "detector": "onnx", "device": "cuda", "streams": 4, "crops_per_s": 2.4,
+        "inference": {"ppe": {"avg_ms": 27.1, "p95_ms": 31.0, "batch": 4}},
+        "cameras": {"1": {"online": True, "read_fps": 25.0, "proc_fps": 6.0}}})
+    s = client.get("/api/stats").json()
+    assert s["worker_alive"] is True and s["device"] == "cuda" and s["streams"] == 4
+    assert s["inference"]["ppe"]["batch"] == 4 and s["cameras"]["1"]["proc_fps"] == 6.0
+    assert s["subscribers"] == {"detections": 0, "events": 0}

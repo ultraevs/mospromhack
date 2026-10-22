@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from backend.app.state import AppState, get_state, get_state_ws
+from backend.app.db.models import EventRow
+
+from backend.app.state import AppState, get_db, get_state, get_state_ws
 
 router = APIRouter(tags=["public"])
+
+LATENCY_SAMPLE = 100
 
 
 @router.get("/api/health")
@@ -34,9 +40,20 @@ async def health(state: AppState = Depends(get_state)) -> dict:
     }
 
 
+def _summary(values: list[int]) -> dict | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    return {"avg_ms": round(sum(ordered) / len(ordered)), "p95_ms": ordered[min(len(ordered) - 1, int(len(ordered) * 0.95))],
+            "events": len(ordered)}
+
+
 @router.get("/api/stats")
-async def stats(state: AppState = Depends(get_state)) -> dict:
+async def stats(db: Session = Depends(get_db), state: AppState = Depends(get_state)) -> dict:
+    recent = db.execute(select(EventRow.latency_ms).where(EventRow.latency_ms.is_not(None))
+                        .order_by(EventRow.started_at.desc()).limit(LATENCY_SAMPLE)).scalars().all()
     return {"worker_alive": state.worker_alive(), **(state.worker_stats if state.worker_alive() else {}),
+            "latency": {"capture_to_event": _summary(list(recent))},
             "subscribers": state.hub.counts()}
 
 
