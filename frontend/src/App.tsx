@@ -4,6 +4,7 @@ import { api } from "./api";
 import { CameraPage } from "./pages/CameraPage";
 import { CamerasPage } from "./pages/CamerasPage";
 import { JournalPage } from "./pages/JournalPage";
+import { PerformancePage } from "./pages/PerformancePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { ClientConfig } from "./types";
 
@@ -11,6 +12,7 @@ const NAV: [string, string][] = [
   ["/", "Камеры"],
   ["/journal", "Журнал"],
   ["/settings", "Настройки"],
+  ["/performance", "Производительность"],
 ];
 
 function HealthBar() {
@@ -61,10 +63,11 @@ export function App() {
           <div className="p-6 text-muted">{error ? `Сервер не отвечает (${error}). Повторяю…` : "Загрузка…"}</div>
         ) : (
           <Routes>
-            <Route path="/" element={<CamerasPage />} />
+            <Route path="/" element={<CamerasPage config={config} />} />
             <Route path="/cameras/:id" element={<CameraPage config={config} />} />
             <Route path="/journal" element={<JournalPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/performance" element={<PerformancePage />} />
           </Routes>
         )}
       </main>
