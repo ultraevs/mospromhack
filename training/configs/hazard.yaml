@@ -1,0 +1,14 @@
+output: merged/hazard
+val_fraction: 0.1
+classes: [fire, smoke, cigarette]
+
+sources:
+  - name: dfire
+    path: datasets/dfire
+    names: [smoke, fire]
+    map: {smoke: smoke, fire: fire}
+    max_images: 8000
+
+  - name: smoker
+    path: datasets/smoker
+    map: {rokok: cigarette}

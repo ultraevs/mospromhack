@@ -1,0 +1,30 @@
+output: merged/ppe
+val_fraction: 0.1
+classes: [person, helmet, no_helmet, vest, mask, no_mask, vehicle]
+
+sources:
+  - name: css
+    path: datasets/css
+    map:
+      Person: person
+      Hardhat: helmet
+      NO-Hardhat: no_helmet
+      Safety Vest: vest
+      Mask: mask
+      NO-Mask: no_mask
+      machinery: vehicle
+      vehicle: vehicle
+
+  - name: sh17
+    path: datasets/sh17
+    split_files: {train: train_files.txt, val: val_files.txt}
+    names: [person, ear, ear-mufs, face, face-guard, face-mask-medical, foot, tools, glasses,
+            gloves, helmet, hands, head, medical-suit, shoes, safety-suit, safety-vest]
+    map:
+      person: person
+      helmet: helmet
+      safety-vest: vest
+      face-mask-medical: mask
+    derive:
+      - {from: head, unless_overlaps: [helmet], to: no_helmet, keep_top: 0.8}
+      - {from: face, unless_overlaps: [face-mask-medical, face-guard], to: no_mask, keep_bottom: 0.55}

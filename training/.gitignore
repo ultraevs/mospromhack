@@ -1,0 +1,17 @@
+datasets/
+merged/
+runs/
+logs/
+*.log
+*.pt
+*.onnx
+*.zip
+
+*.env
+.env*
+kaggle.json
+access_token
+
+__pycache__/
+*.pyc
+.venv/
