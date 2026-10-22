@@ -1,4 +1,5 @@
 import { applyEventMessage } from "../hooks/useEvents";
+import { freshByCamera } from "../pages/CamerasPage";
 import type { DetectionsMessage, PersonBox, SafetyEvent } from "../types";
 import { DEFAULT_LAYERS, drawDetections, isStale, personColor, personLabel, worstSeverity } from "./overlay";
 
@@ -107,5 +108,17 @@ describe("applyEventMessage", () => {
     const list = [ev("a"), ev("b")];
     expect(applyEventMessage(list, { type: "event_updated", event: ev("b", { status: "closed" }) })[1].status).toBe("closed");
     expect(applyEventMessage(list, { type: "event_updated", event: ev("zzz") })).toHaveLength(2);
+  });
+});
+
+describe("подсветка плитки при новом событии", () => {
+  const ev = (id: string, camera_id: number, ageMs: number) =>
+    ({ id, camera_id, started_at: new Date(1_000_000 - ageMs).toISOString() }) as SafetyEvent;
+  it("подсвечиваются камеры с событием не старше 6 секунд", () => {
+    const fresh = freshByCamera([ev("a", 1, 500), ev("b", 2, 7000), ev("c", 3, 5999)], 1_000_000);
+    expect([...fresh.keys()].sort()).toEqual([1, 3]);
+  });
+  it("для камеры берётся самое новое событие", () => {
+    expect(freshByCamera([ev("new", 1, 100), ev("old", 1, 3000)], 1_000_000).get(1)!.id).toBe("new");
   });
 });

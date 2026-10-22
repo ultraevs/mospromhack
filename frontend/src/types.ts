@@ -106,6 +106,21 @@ export interface EventPage {
   offset: number;
 }
 
+export interface Stats {
+  worker_alive: boolean;
+  detector?: string;
+  device?: string;
+  warnings?: string[];
+  streams?: number;
+  crops_per_s?: number;
+  crop_pass?: { cigarette: boolean; head: boolean };
+  target_fps?: Record<string, number>;
+  actual_fps?: Record<string, number>;
+  inference?: Record<string, { avg_ms: number; p95_ms: number; batch: number }>;
+  cameras?: Record<string, { online: boolean; error: string | null; read_fps: number; proc_fps: number }>;
+  latency?: { capture_to_event: { avg_ms: number; p95_ms: number; events: number } | null };
+}
+
 export interface ClientConfig {
   webrtc_port: number;
   overlay_delay_ms: number;

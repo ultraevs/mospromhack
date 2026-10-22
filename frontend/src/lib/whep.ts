@@ -22,11 +22,7 @@ export async function connectWhep(url: string, onStream: (stream: MediaStream) =
   pc.addTransceiver("video", { direction: "recvonly" });
   pc.ontrack = (e) => onStream(e.streams[0] ?? new MediaStream([e.track]));
 
-  let resource: string | null = null;
-  const close = () => {
-    pc.close();
-    if (resource) fetch(resource, { method: "DELETE" }).catch(() => undefined);
-  };
+  const close = () => pc.close();
 
   try {
     await pc.setLocalDescription(await pc.createOffer());
@@ -37,8 +33,6 @@ export async function connectWhep(url: string, onStream: (stream: MediaStream) =
       body: pc.localDescription!.sdp,
     });
     if (!res.ok) throw new Error(res.status === 404 ? "поток не публикуется" : `MediaMTX ответил ${res.status}`);
-    const location = res.headers.get("Location");
-    if (location) resource = new URL(location, url).toString();
     await pc.setRemoteDescription({ type: "answer", sdp: await res.text() });
   } catch (e) {
     close();

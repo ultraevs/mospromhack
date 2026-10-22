@@ -1,4 +1,4 @@
-import type { Camera, ClientConfig, EventPage, RuleSettings, SafetyEvent, Zone, ZoneInput } from "./types";
+import type { Camera, ClientConfig, EventPage, RuleSettings, SafetyEvent, Stats, Zone, ZoneInput } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
@@ -37,6 +37,7 @@ export const api = {
   },
   reviewEvent: (id: string, review: SafetyEvent["review"]) =>
     request<SafetyEvent>(`/api/events/${id}`, { method: "PATCH", body: JSON.stringify({ review }) }),
+  stats: () => request<Stats>("/api/stats"),
   clientConfig: () => request<ClientConfig>("/api/client-config"),
   health: () => request<{ status: string; problems: string[] }>("/api/health"),
 };
