@@ -1,0 +1,10 @@
+# Библиотеки CUDA и cuDNN ставятся колёсами nvidia-* через extras, системная установка CUDA не нужна.
+onnxruntime-gpu[cuda,cudnn]
+numpy
+opencv-python
+supervision
+PyYAML
+pydantic
+pydantic-settings
+httpx
+websockets

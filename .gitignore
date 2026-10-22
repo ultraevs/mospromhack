@@ -218,3 +218,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- проект ---
+.env.*
+!.env.example
+
+# данные, модели, внешние бинарники
+/data/
+/models/
+/tools/
+/logs/
+*.onnx
+*.pt
+
+# frontend
+node_modules/
+frontend/dist/

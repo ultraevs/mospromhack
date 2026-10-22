@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["worker/tests", "backend/tests"]
+asyncio_mode = "auto"
+markers = [
+    "models: нужны файлы моделей в models/ (scripts/sync_models.ps1)",
+    "reference: сверка с ultralytics на best.pt; нужны папка обучения и пакет ultralytics",
+    "gpu: нужна видеокарта с рабочим провайдером CUDA",
+    "network: нужна сеть или внешние процессы (MediaMTX, ffmpeg)",
+]
+# По умолчанию идут только тесты без видеокарты, сети и папки обучения.
+addopts = "-m 'not reference and not gpu and not network' -q"
