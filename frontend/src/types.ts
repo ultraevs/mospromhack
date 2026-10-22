@@ -42,6 +42,7 @@ export interface TelegramSettings {
 
 export interface TelegramStatus {
   enabled: boolean;
+  reason: "switched_off" | "no_token" | null;
   running: boolean;
   username: string | null;
   error: string | null;

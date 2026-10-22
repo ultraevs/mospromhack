@@ -11,7 +11,10 @@ const NUMBERS: [keyof TelegramSettings, string, string][] = [
 
 function statusLine(s: TelegramStatus): { text: string; cls: string } {
   if (s.error) return { text: `▲ ошибка: ${s.error}`, cls: "text-high" };
-  if (!s.enabled) return { text: "○ бот выключен: в .env нет TELEGRAM_BOT_TOKEN", cls: "text-muted" };
+  if (!s.enabled) {
+    const why = s.reason === "switched_off" ? "в .env стоит TELEGRAM_ENABLED=false" : "в .env нет TELEGRAM_BOT_TOKEN";
+    return { text: `○ бот выключен: ${why}`, cls: "text-muted" };
+  }
   if (!s.running) return { text: "◆ бот запускается или не на связи", cls: "text-medium" };
   return { text: `● работает${s.username ? `, @${s.username}` : ""}`, cls: "text-ok" };
 }

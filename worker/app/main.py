@@ -372,7 +372,7 @@ def build(settings: Settings, config: AppConfig) -> Worker:
         raise SystemExit(f"нет модели ppe в {settings.models_dir}; запусти scripts/sync_models.ps1")
     check_classes(specs["ppe"], specs.get("hazard"))
     detector = create_detector(config.worker.detector, specs, config.worker.fake_scenario)
-    base = f"http://127.0.0.1:{settings.backend_port}"
+    base = f"http://{settings.backend_host}:{settings.backend_port}"
     client = BackendClient(base, settings.internal_token)
     sender = DetectionsSender(base, settings.internal_token).start()
     return Worker(config, specs, detector, client, sender)

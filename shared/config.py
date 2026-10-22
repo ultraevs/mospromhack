@@ -59,8 +59,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", env_file_encoding="utf-8", extra="ignore")
 
     telegram_bot_token: str = ""
+    telegram_enabled: bool = True
     internal_token: str = "change-me"
     train_runs_dir: str = ""
+
+    backend_host: str = "127.0.0.1"
+    mediamtx_host: str = "127.0.0.1"
 
     backend_port: int = 8000
     frontend_port: int = 5173

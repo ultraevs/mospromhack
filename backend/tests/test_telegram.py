@@ -291,8 +291,8 @@ async def test_settings_from_db_override_defaults(tmp_path):
 
 def test_backend_without_token_has_bot_disabled(client):
     tg = client.get("/api/telegram").json()
-    assert tg == {"enabled": False, "running": False, "username": None, "error": None, "subscribers": 0, "sent": 0,
-                  "errors": 0, "pending": 0}
+    assert tg == {"enabled": False, "reason": "no_token", "running": False, "username": None, "error": None,
+                  "subscribers": 0, "sent": 0, "errors": 0, "pending": 0}
     assert client.get("/api/stats").json()["latency"]["capture_to_telegram"] is None
 
 
@@ -321,6 +321,31 @@ def test_backend_sends_event_to_subscribed_chat(settings):
         while c.get("/api/telegram").json()["pending"] == 0 and time.monotonic() < end:
             time.sleep(0.02)
         assert c.get("/api/telegram").json()["pending"] == 1 and len(sender.calls) == 1
+
+
+def test_switch_turns_bot_off_even_with_token_and_sender(settings, monkeypatch):
+    sender = FakeSender()
+    off = settings.model_copy(update={"telegram_enabled": False, "telegram_bot_token": "123456:AAH-fake-token"})
+    with TestClient(create_app(off, run_sources=False, telegram_sender=sender)) as c:
+        assert c.app.state.app.notifier is None
+        tg = c.get("/api/telegram").json()
+        assert (tg["enabled"], tg["reason"], tg["error"]) == (False, "switched_off", None)
+        cam = c.post("/api/cameras", json={"name": "Цех", "source_type": "file", "source": "demo.mp4"}).json()
+        body = event_body(cam["id"], type="fire", severity="high", track_id=None)
+        assert c.post("/internal/events", headers=INTERNAL, json=body).status_code == 201
+        time.sleep(0.3)
+        assert sender.calls == [] and c.get("/api/events").json()["total"] == 1
+        assert not any("телеграм" in p for p in c.get("/api/health").json()["problems"])
+    from shared.config import Settings
+    for raw, expected in (("false", False), ("0", False), ("off", False), ("true", True), ("1", True)):
+        monkeypatch.setenv("TELEGRAM_ENABLED", raw)
+        assert Settings(_env_file=None).telegram_enabled is expected
+
+
+def test_enabled_bot_reports_no_reason(settings):
+    with TestClient(create_app(settings, run_sources=False, telegram_sender=FakeSender())) as c:
+        tg = c.get("/api/telegram").json()
+        assert (tg["enabled"], tg["reason"]) == (True, None)
 
 
 def test_telegram_settings_api(client):

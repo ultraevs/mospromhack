@@ -127,7 +127,8 @@ async def list_deliveries(webhook_id: int, limit: int = Query(default=50, ge=1, 
 async def telegram_status(db: Session = Depends(get_db), state: AppState = Depends(get_state)) -> dict:
     subscribers = db.execute(select(func.count()).select_from(TelegramChatRow)).scalar_one()
     tg = state.telegram_state
-    return {"enabled": tg["enabled"], "running": tg["running"], "username": tg["username"], "error": tg["error"],
+    return {"enabled": tg["enabled"], "reason": tg["reason"], "running": tg["running"], "username": tg["username"],
+            "error": tg["error"],
             "subscribers": subscribers, "sent": state.notifier.sent if state.notifier else 0,
             "errors": state.notifier.errors if state.notifier else 0,
             "pending": state.notifier.pending if state.notifier else 0}

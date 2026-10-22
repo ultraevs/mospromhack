@@ -36,11 +36,13 @@ class _Proc:
 
 
 class SourceManager:
-    def __init__(self, videos_dir: Path, logs_dir: Path, rtsp_port: int, api_port: int, active: bool = True):
+    def __init__(self, videos_dir: Path, logs_dir: Path, rtsp_port: int, api_port: int, active: bool = True,
+                 host: str = "127.0.0.1"):
         self.videos_dir = videos_dir
         self.logs_dir = logs_dir
         self.rtsp_port = rtsp_port
-        self.api = f"http://127.0.0.1:{api_port}"
+        self.host = host
+        self.api = f"http://{host}:{api_port}"
         self.active = active  # в тестах False
         self._desired: dict[int, Desired] = {}
         self._procs: dict[int, _Proc] = {}
@@ -73,7 +75,7 @@ class SourceManager:
             self._kill(cam_id)
 
     def rtsp_url(self, camera_id: int) -> str:
-        return f"rtsp://127.0.0.1:{self.rtsp_port}/{path_name(camera_id)}"
+        return f"rtsp://{self.host}:{self.rtsp_port}/{path_name(camera_id)}"
 
     def status(self) -> dict:
         with self._lock:
@@ -94,7 +96,7 @@ class SourceManager:
         while not self._stop.is_set():
             try:
                 self._tick(client)
-            except Exception:  # noqa: BLE001 - наблюдатель не должен умирать
+            except Exception:  # noqa: BLE001
                 log.exception("ошибка в наблюдателе источников")
             self._stop.wait(1.0)
         client.close()

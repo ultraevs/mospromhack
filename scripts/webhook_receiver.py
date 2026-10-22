@@ -13,6 +13,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--secret", required=True)
     ap.add_argument("--port", type=int, default=9100)
+    ap.add_argument("--host", default="127.0.0.1", help="0.0.0.0, если вебхук шлёт сервис из Docker")
     args = ap.parse_args()
 
     class Handler(BaseHTTPRequestHandler):
@@ -35,8 +36,8 @@ def main() -> None:
         def log_message(self, *a):
             pass
 
-    print(f"слушаю http://127.0.0.1:{args.port}/hook", flush=True)
-    HTTPServer(("127.0.0.1", args.port), Handler).serve_forever()
+    print(f"слушаю http://{args.host}:{args.port}/hook", flush=True)
+    HTTPServer((args.host, args.port), Handler).serve_forever()
 
 
 if __name__ == "__main__":

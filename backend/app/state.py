@@ -27,8 +27,8 @@ class AppState:
     bus: EventBus = field(default_factory=EventBus)
     webhooks: Any = None
     notifier: Any = None
-    telegram_state: dict = field(default_factory=lambda: {"enabled": False, "running": False,
-                                                          "username": None, "error": None})
+    telegram_state: dict = field(default_factory=lambda: {"enabled": False, "running": False, "username": None,
+                                                          "error": None, "reason": "no_token"})
     worker_stats: dict[str, Any] = field(default_factory=dict)
     worker_seen: float = 0.0  # monotonic последнего /internal/stats
     worker_session: str | None = None
