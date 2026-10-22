@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import deque
+
 import numpy as np
 
 from shared.schemas import (DetectionsMessage, EventType, FrameSize, ObjectBox, PersonBox, PpeItem, PpeStatus,
@@ -7,9 +9,11 @@ from shared.schemas import (DetectionsMessage, EventType, FrameSize, ObjectBox, 
 from worker.app.association import anchor, assign_items, point_in_polygon
 from worker.app.model_spec import ModelSpec
 from worker.app.postprocess import Detections
-from worker.app.rules.checks import in_window
+from worker.app.crops import crop_box
+from worker.app.rules.checks import check_k_of_m, in_window
 from worker.app.rules.engine import Candidate, RuleEngine
-from worker.app.rules.state import ATTACHABLE, HEAD_CLASSES, PERSON, PPE_CLASSES, Observation, TrackState
+from worker.app.rules.state import (ATTACHABLE, CIGARETTE, HAZARD_EVENTS, HEAD_CLASSES, PERSON, PPE_CLASSES,
+                                    Observation, TrackState)
 from worker.app.rules.types import EventClose, EventOpen
 from worker.app.tracking import IouTracker
 
@@ -21,9 +25,17 @@ def norm_box(xyxy: np.ndarray, w: int, h: int) -> tuple[float, float, float, flo
     return round(x1 / w, 4), round(y1 / h, 4), round((x2 - x1) / w, 4), round((y2 - y1) / h, 4)
 
 
-def check_classes(spec: ModelSpec) -> None:
+def check_classes(spec: ModelSpec, hazard: ModelSpec | None = None) -> None:
     for name in (PERSON, *sorted(ATTACHABLE)):
         spec.class_id(name)
+    if hazard is not None:
+        for name in (CIGARETTE, *HAZARD_EVENTS):
+            hazard.class_id(name)
+
+
+CHECKS_KEPT = 30
+HAZARD_VISIBLE_S = 2.5  # сколько держим рамки огня/дыма на плеере
+RECENT_S = 0.6
 
 
 def ppe_status(track: TrackState, t: float, item: PpeItem, candidates: list[Candidate],
@@ -47,6 +59,61 @@ class CameraPipeline:
         self.tracker = IouTracker()
         self.tracks: dict[int, TrackState] = {}
         self.engine = RuleEngine()
+        self.hazard_checks = {name: deque(maxlen=CHECKS_KEPT) for name in HAZARD_EVENTS}
+        self._hazard_objects: list[ObjectBox] = []
+        self._cigarette_objects: dict[int, ObjectBox] = {}
+        self._hazard_t = 0.0
+        self._crop_cursor = 0
+
+
+    def process_hazard(self, dets: Detections, spec: ModelSpec, w: int, h: int, ts_ms: int,
+                       rules: RuleSettings) -> list[EventOpen | EventClose]:
+        t = ts_ms / 1000
+        names = [spec.classes[c] for c in dets.cls]
+        self._hazard_t = t
+        self._hazard_objects = []
+        actions: list[EventOpen | EventClose] = []
+        for name, event_type in HAZARD_EVENTS.items():
+            found = [i for i, n in enumerate(names) if n == name]
+            best = max(found, key=lambda i: dets.conf[i], default=None)
+            self.hazard_checks[name].append((t, best is not None, float(dets.conf[best]) if best is not None else 0.0))
+            bbox = norm_box(dets.xyxy[best], w, h) if best is not None else None
+            for i in found:
+                self._hazard_objects.append(ObjectBox(cls=name, bbox=list(norm_box(dets.xyxy[i], w, h)),
+                                                      conf=round(float(dets.conf[i]), 3)))
+            params = getattr(rules, event_type.value)
+            actions += self.engine.step_camera(t, event_type, check_k_of_m(self.hazard_checks[name], params), bbox, rules)
+        return actions
+
+
+    def select_crops(self, t: float, w: int, h: int, max_per_tick: int, top_fraction: float,
+                     margin: float) -> list[tuple[int, tuple[int, int, int, int]]]:
+        ids = sorted(tid for tid, tr in self.tracks.items() if tr.obs and t - tr.last.t <= RECENT_S)
+        if not ids or max_per_tick <= 0:
+            return []
+        start = self._crop_cursor % len(ids)
+        chosen = (ids[start:] + ids[:start])[:max_per_tick]
+        self._crop_cursor = (start + len(chosen)) % len(ids)
+        out = []
+        for track_id in chosen:
+            x, y, bw, bh = self.tracks[track_id].last.bbox
+            box = crop_box((x * w, y * h, (x + bw) * w, (y + bh) * h), top_fraction, margin, w, h)
+            if box is not None:
+                out.append((track_id, box))
+        return out
+
+    def apply_cigarette(self, track_id: int, t: float, conf: float, bbox: tuple[float, float, float, float] | None) -> None:
+        track = self.tracks.get(track_id)
+        if track is None:
+            return
+        track.checks.append((t, bbox is not None, conf))
+        while len(track.checks) > CHECKS_KEPT:
+            track.checks.popleft()
+        if bbox is not None:
+            self._cigarette_objects[track_id] = ObjectBox(cls=CIGARETTE, bbox=list(bbox), conf=round(conf, 3), track_id=track_id)
+        else:
+            self._cigarette_objects.pop(track_id, None)
+
 
     def process_ppe(self, dets: Detections, spec: ModelSpec, w: int, h: int, ts_ms: int, camera: WorkerCamera,
                     rules: RuleSettings) -> tuple[DetectionsMessage, list[EventOpen | EventClose]]:
@@ -98,6 +165,11 @@ class CameraPipeline:
             own = owner_of.get(i, -1)
             objects.append(ObjectBox(cls=name, bbox=list(norm_box(dets.xyxy[i], w, h)), conf=round(float(dets.conf[i]), 3),
                                      track_id=int(track_ids[own]) if own >= 0 else None))
+
+        if t - self._hazard_t <= HAZARD_VISIBLE_S:
+            objects += self._hazard_objects
+            objects += [o for tid, o in self._cigarette_objects.items() if tid in self.tracks]
+        self._cigarette_objects = {tid: o for tid, o in self._cigarette_objects.items() if tid in self.tracks}
 
         msg = DetectionsMessage(camera_id=camera.id, ts=ts_ms, frame=FrameSize(w=w, h=h), people=people, objects=objects)
         return msg, actions

@@ -17,7 +17,9 @@ from worker.app.capture import CameraReader
 from worker.app.client import BackendClient, DetectionsSender
 from worker.app.detector import Detector, create_detector
 from worker.app.model_spec import ModelSpec, load_all_specs
-from worker.app.pipeline import CameraPipeline, check_classes
+from worker.app.crops import crop_box, merge, only_classes, shift
+from worker.app.pipeline import CameraPipeline, check_classes, norm_box
+from worker.app.rules.state import CIGARETTE, HEAD_CLASSES, PERSON
 from worker.app.postprocess import Detections, decode, preprocess
 from worker.app.rules.types import EventClose, EventOpen
 
@@ -34,6 +36,7 @@ class CameraState:
     reader: CameraReader
     pipeline: CameraPipeline = field(default_factory=CameraPipeline)
     last_seq: int = 0
+    next_due: float = 0.0
     processed: deque = field(default_factory=lambda: deque(maxlen=120))
 
     def proc_fps(self) -> float:
@@ -58,8 +61,12 @@ class Worker:
         self._captured: dict[int, int] = {}
         self._infer_ms: dict[str, deque] = {name: deque(maxlen=300) for name in specs}
         self._batch: dict[str, int] = {}
+        self._crop_times: deque = deque(maxlen=2000)
+        self._ticks: dict[str, deque] = {name: deque(maxlen=120) for name in specs}
         self._config_error: str | None = None
         self._running = True
+        self.period_s = 0.0
+        self._busy: deque = deque(maxlen=600)  # доля занятости цикла, около 1 = не вывозим
         self.session = uuid.uuid4().hex
 
 
@@ -81,7 +88,7 @@ class Worker:
         for cam_id in list(self.cameras):
             cam = wanted.get(cam_id)
             if cam is None or cam.rtsp_url != self.cameras[cam_id].reader.url:
-                self.cameras.pop(cam_id).reader.stop()
+                self.cameras.pop(cam_id).reader.stop(wait=False)
         for cam_id, cam in wanted.items():
             if cam_id in self.cameras:
                 self.cameras[cam_id].camera = cam  # зоны/сизы меняются на лету без переоткрытия потока
@@ -92,35 +99,100 @@ class Worker:
     def tick_ppe(self) -> int:
         spec = self.specs["ppe"]
         fresh = []
+        now = time.monotonic()
         for state in self.cameras.values():
             frame = state.reader.latest()
-            if frame is not None and frame.seq != state.last_seq:
+            if frame is not None and frame.seq != state.last_seq and now >= state.next_due:
                 state.last_seq = frame.seq
+                state.next_due = max(state.next_due + self.period_s, now + self.period_s / 2)
                 fresh.append((state, frame))
         if not fresh:
             return 0
 
-        prepared = [preprocess(frame.image, spec.input_size) for _, frame in fresh]
-        batch = np.stack([chw for chw, _ in prepared])
-        t0 = time.perf_counter()
-        outputs = self.detector.infer("ppe", batch)
-        self._infer_ms["ppe"].append((time.perf_counter() - t0) * 1000)
-        self._batch["ppe"] = len(batch)
-
-        for (state, frame), (_, info), output in zip(fresh, prepared, outputs):
-            dets = decode(output, spec, info)
+        all_dets = self._infer_frames("ppe", [frame.image for _, frame in fresh])
+        head = self.config.worker.crop_pass.head
+        for (state, frame), dets in zip(fresh, all_dets):
+            if head.enabled:
+                dets = self._head_pass(frame.image, dets, spec)
             self._handle(state, frame.ts_ms, frame.image.shape[1], frame.image.shape[0], dets, spec)
             state.processed.append(time.monotonic())
         return len(fresh)
+
+    def _infer_frames(self, model: str, images: list[np.ndarray]) -> list[Detections]:
+        spec = self.specs[model]
+        batch = np.empty((len(images), 3, spec.input_size, spec.input_size), dtype=np.float32)
+        infos = [preprocess(image, spec.input_size, out=batch[i])[1] for i, image in enumerate(images)]
+        t0 = time.perf_counter()
+        outputs = self.detector.infer(model, batch)
+        self._infer_ms[model].append((time.perf_counter() - t0) * 1000)
+        self._batch[model] = len(batch)
+        return [decode(output, spec, info) for output, info in zip(outputs, infos)]
+
+    def _head_pass(self, image: np.ndarray, dets: Detections, spec: ModelSpec) -> Detections:
+        cfg = self.config.worker.crop_pass.head
+        h, w = image.shape[:2]
+        person = spec.class_id(PERSON)
+        small = [i for i in np.argsort(-dets.conf) if dets.cls[i] == person
+                 and dets.xyxy[i][3] - dets.xyxy[i][1] < cfg.max_person_height_px][:cfg.max_per_frame]
+        boxes = [b for b in (crop_box(dets.xyxy[i], cfg.top_fraction, cfg.margin, w, h) for i in small) if b]
+        if not boxes:
+            return dets
+        self._crop_times.extend([time.monotonic()] * len(boxes))
+        head_ids = {spec.class_id(name) for name in HEAD_CLASSES}
+        for (x1, y1, x2, y2), found in zip(boxes, self._infer_frames("ppe", [image[y1:y2, x1:x2] for x1, y1, x2, y2 in boxes])):
+            dets = merge(dets, shift(only_classes(found, head_ids), x1, y1), spec.nms_iou)
+        return dets
+
+    def tick_hazard(self) -> int:
+        if "hazard" not in self.specs or self.remote is None:
+            return 0
+        spec = self.specs["hazard"]
+        current = [(state, frame) for state in self.cameras.values() if (frame := state.reader.latest()) is not None
+                   and time.time() * 1000 - frame.ts_ms < 2000]
+        if not current:
+            return 0
+
+        for (state, frame), dets in zip(current, self._infer_frames("hazard", [f.image for _, f in current])):
+            h, w = frame.image.shape[:2]
+            self._queue(state.camera.id, frame.ts_ms,
+                        state.pipeline.process_hazard(dets, spec, w, h, frame.ts_ms, self.remote.rules))
+
+        cfg = self.config.worker.crop_pass.cigarette
+        if cfg.enabled:
+            jobs = []
+            for state, frame in current:
+                h, w = frame.image.shape[:2]
+                for track_id, box in state.pipeline.select_crops(frame.ts_ms / 1000, w, h, cfg.max_per_tick,
+                                                                 cfg.top_fraction, cfg.margin):
+                    jobs.append((state.pipeline, track_id, frame, box))
+            if jobs:
+                self._crop_times.extend([time.monotonic()] * len(jobs))
+                cigarette = spec.class_id(CIGARETTE)
+                images = [frame.image[y1:y2, x1:x2] for _, _, frame, (x1, y1, x2, y2) in jobs]
+                for (pipeline, track_id, frame, (x1, y1, _, _)), found in zip(jobs, self._infer_frames("hazard", images)):
+                    found = shift(only_classes(found, {cigarette}), x1, y1)
+                    h, w = frame.image.shape[:2]
+                    if len(found):
+                        best = int(np.argmax(found.conf))
+                        pipeline.apply_cigarette(track_id, frame.ts_ms / 1000, float(found.conf[best]),
+                                                 norm_box(found.xyxy[best], w, h))
+                    else:
+                        pipeline.apply_cigarette(track_id, frame.ts_ms / 1000, 0.0, None)
+        self._ticks["hazard"].append(time.monotonic())
+        self.flush_events()
+        return len(current)
+
+    def _queue(self, camera_id: int, ts_ms: int, actions) -> None:
+        for action in actions:
+            if isinstance(action, EventOpen):
+                self._captured[action.key] = ts_ms
+            self._pending.append((camera_id, action))
 
     def _handle(self, state: CameraState, ts_ms: int, w: int, h: int, dets: Detections, spec: ModelSpec) -> None:
         assert self.remote is not None
         msg, actions = state.pipeline.process_ppe(dets, spec, w, h, ts_ms, state.camera, self.remote.rules)
         self.sender.send(msg.model_dump_json())
-        for action in actions:
-            if isinstance(action, EventOpen):
-                self._captured[action.key] = ts_ms
-            self._pending.append((state.camera.id, action))
+        self._queue(state.camera.id, ts_ms, actions)
         self.flush_events()
 
     def flush_events(self) -> None:
@@ -155,6 +227,8 @@ class Worker:
                 arr = np.array(values)
                 infer[name] = {"avg_ms": round(float(arr.mean()), 1), "p95_ms": round(float(np.percentile(arr, 95)), 1),
                                "batch": self._batch.get(name, 0)}
+        now = time.monotonic()
+        online_fps = [s.proc_fps() for s in self.cameras.values() if s.reader.online]
         warnings = list(getattr(self.detector, "warnings", []))
         if not self.sender.connected:
             warnings.append("нет соединения для отправки рамок в backend")
@@ -165,6 +239,12 @@ class Worker:
             "warnings": warnings,
             "target_fps": {"ppe": self.config.worker.ppe_fps, "hazard": self.config.worker.hazard_fps},
             "inference": infer,
+            "actual_fps": {"ppe": round(float(np.mean(online_fps)), 1) if online_fps else 0.0,
+                           "hazard": round(sum(1 for t in self._ticks.get("hazard", ()) if now - t <= 5.0) / 5.0, 1)},
+            "crops_per_s": round(sum(1 for t in self._crop_times if now - t <= 5.0) / 5.0, 1),
+            "crop_pass": {"cigarette": self.config.worker.crop_pass.cigarette.enabled,
+                          "head": self.config.worker.crop_pass.head.enabled},
+            "loop_load": round(min(1.0, sum(b for t, b in self._busy if now - t <= 5.0) / 5.0), 2),
             "streams": len(self.cameras),
             "cameras": {str(cam_id): {"online": s.reader.online, "error": s.reader.error,
                                       "read_fps": s.reader.read_fps(), "proc_fps": s.proc_fps()}
@@ -173,8 +253,11 @@ class Worker:
 
 
     def run(self) -> None:
-        period = 1.0 / self.config.worker.ppe_fps
-        next_ppe = next_config = next_stats = time.monotonic()
+        self.period_s = 1.0 / self.config.worker.ppe_fps
+        # опрашиваем в 3 раза чаще чем fps, иначе кадры теряются (было 3.4 вместо 6)
+        period = self.period_s / 3
+        hazard_period = 1.0 / self.config.worker.hazard_fps
+        next_ppe = next_hazard = next_config = next_stats = time.monotonic()
         while self._running:
             now = time.monotonic()
             if now >= next_config:
@@ -184,6 +267,9 @@ class Worker:
                 if self.remote:
                     self.tick_ppe()
                 next_ppe = max(next_ppe + period, time.monotonic())
+            if now >= next_hazard:
+                self.tick_hazard()
+                next_hazard = max(next_hazard + hazard_period, time.monotonic())
             if now >= next_stats:
                 try:
                     self.flush_events()
@@ -191,7 +277,9 @@ class Worker:
                 except Exception:  # noqa: BLE001
                     pass
                 next_stats = now + STATS_PERIOD_S
-            time.sleep(max(0.0, min(next_ppe, next_config, next_stats) - time.monotonic()))
+            done = time.monotonic()
+            self._busy.append((done, done - now))
+            time.sleep(max(0.0, min(next_ppe, next_hazard, next_config, next_stats) - done))
 
     def stop(self) -> None:
         self._running = False
@@ -207,7 +295,7 @@ def build(settings: Settings, config: AppConfig) -> Worker:
     specs = load_all_specs(settings.models_dir)
     if "ppe" not in specs:
         raise SystemExit(f"нет модели ppe в {settings.models_dir}; запусти scripts/sync_models.ps1")
-    check_classes(specs["ppe"])
+    check_classes(specs["ppe"], specs.get("hazard"))
     detector = create_detector(config.worker.detector, specs, config.worker.fake_scenario)
     base = f"http://127.0.0.1:{settings.backend_port}"
     client = BackendClient(base, settings.internal_token)

@@ -61,9 +61,10 @@ class CameraReader:
         self._thread.start()
         return self
 
-    def stop(self) -> None:
+    def stop(self, wait: bool = True) -> None:
         self._stop.set()
-        self._thread.join(timeout=7)
+        if wait:
+            self._thread.join(timeout=7)
 
     def latest(self) -> Frame | None:
         with self._lock:
@@ -102,7 +103,7 @@ class CameraReader:
             while not self._stop.is_set():
                 try:
                     ok, image = cap.read()
-                except Exception as e:  # noqa: BLE001 - поток камеры не должен умирать молча
+                except Exception as e:  # noqa: BLE001
                     self.error = f"ошибка чтения: {e}"
                     log.exception("камера %s: ошибка чтения, переподключение", self.camera_id)
                     break

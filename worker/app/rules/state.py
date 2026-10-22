@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from shared.schemas import EventType, PpeItem, Severity
 
 PERSON = "person"
+CIGARETTE = "cigarette"
+HAZARD_EVENTS = {"fire": EventType.fire, "smoke": EventType.smoke}
 
 PPE_CLASSES: dict[PpeItem, tuple[str, str | None, bool]] = {
     PpeItem.helmet: ("helmet", "no_helmet", True),

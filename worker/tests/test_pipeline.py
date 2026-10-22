@@ -125,8 +125,8 @@ class FakeReader:
     def start(self):
         return self
 
-    def stop(self):
-        pass
+    def stop(self, wait=True):
+        self.stopped_with_wait = wait
 
     def latest(self):
         return self.frame
@@ -241,6 +241,7 @@ def test_config_change_replaces_readers_without_restart(worker):
     worker.client.config = WorkerConfig(version=3, cameras=[])
     worker.sync_config()
     assert worker.cameras == {}
+    assert first.stopped_with_wait is False
 
 
 def test_stats_shape(worker):
