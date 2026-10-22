@@ -1,0 +1,55 @@
+name: safety
+
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.1
+    restart: unless-stopped
+    volumes:
+      - ./docker/mediamtx.yml:/mediamtx.yml:ro
+    environment:
+      MTX_WEBRTCADDITIONALHOSTS: ${WEBRTC_HOST:-127.0.0.1}
+    ports:
+      - "${MEDIAMTX_WEBRTC_PORT:-8889}:8889"
+      - "8189:8189/udp"
+      - "8189:8189/tcp"
+      - "${MEDIAMTX_RTSP_PORT:-8554}:8554"
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    restart: unless-stopped
+    depends_on: [mediamtx]
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-true}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me}
+      MEDIAMTX_HOST: mediamtx
+      MEDIAMTX_WEBRTC_PORT: ${MEDIAMTX_WEBRTC_PORT:-8889}
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me}
+      BACKEND_HOST: backend
+    volumes:
+      - ./models:/app/models:ro
+      - ./config.yaml:/app/config.yaml:ro
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"

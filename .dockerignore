@@ -1,0 +1,16 @@
+# В образы идёт только код. Данные и модели подключаются томами, секреты — переменными.
+.git
+.venv
+.env
+.env.*
+data
+models
+tools
+logs
+docs
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+frontend/dist
+*.onnx
+*.pt
