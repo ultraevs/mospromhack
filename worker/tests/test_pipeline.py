@@ -260,3 +260,16 @@ def test_stats_shape(worker):
     s = worker.stats()
     assert s["detector"] == "fake" and s["streams"] == 1 and s["warnings"] == []
     assert s["cameras"]["3"]["online"] is True and s["inference"]["ppe"]["batch"] == 1
+
+
+def test_pixel_thresholds_use_source_frame_pixels(spec):
+    small = ("person", 100, 100, 150, 190, 0.9)
+    for scale, expected in ((1.0, 0), (1.5, 1)):
+        pipe = CameraPipeline()
+        opened = []
+        for i in range(40):
+            _, actions = pipe.process_ppe(dets(spec, small), spec, 1000, 1000, 1_000_000 + i * 167, cam(required=("vest",)),
+                                          RULES, px_scale=scale)
+            opened += actions
+        assert len(opened) == expected, scale
+        assert pipe.tracks[next(iter(pipe.tracks))].last.height_px == pytest.approx(90 * scale)

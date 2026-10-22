@@ -88,6 +88,7 @@ class CameraEvidence:
         self.clip_width = clip_width
         self._pool = pool
         self._frames: deque[tuple[int, bytes]] = deque()
+        self._newest_ms = 0
         self._lock = threading.Lock()
         self._jobs: list[_ClipJob] = []
 
@@ -102,9 +103,10 @@ class CameraEvidence:
             return
         with self._lock:
             self._frames.append((ts_ms, jpeg))
-            keep_from = min([ts_ms - self.pre_ms] + [j.start_ms for j in self._jobs])
-            while self._frames and self._frames[0][0] < keep_from:
-                self._frames.popleft()
+            self._newest_ms = max(self._newest_ms, ts_ms)
+            keep_from = min([self._newest_ms - self.pre_ms] + [j.start_ms for j in self._jobs])
+            if self._frames[0][0] < keep_from:
+                self._frames = deque(f for f in self._frames if f[0] >= keep_from)
 
     def start_clip(self, key: int, event_ms: int) -> None:
         with self._lock:

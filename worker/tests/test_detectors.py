@@ -94,11 +94,40 @@ def test_dynamic_onnx_matches_static(real_specs):
     static = OnnxDetector(real_specs, allow_cuda=False, prefer_dynamic=False)
     dynamic = OnnxDetector(real_specs, allow_cuda=False)
     rng = np.random.default_rng(1)
-    batch = np.clip(rng.random((6, 3, 20, 20), dtype=np.float32).repeat(32, axis=2).repeat(32, axis=3), 0, 1)
+    batch = np.clip(rng.random((13, 3, 20, 20), dtype=np.float32).repeat(32, axis=2).repeat(32, axis=3), 0, 1)
     for name in real_specs:
-        assert static.batch_limit(name) == 1 and dynamic.batch_limit(name) == 4
+        assert static.batch_limit(name) == 1 and dynamic.batch_limit(name) == 8
         a, b = static.infer(name, batch), dynamic.infer(name, batch)
-        assert a.shape == b.shape == (6, 4 + real_specs[name].nc, 8400)
+        assert a.shape == b.shape == (13, 4 + real_specs[name].nc, 8400)
         np.testing.assert_allclose(a, b, atol=1e-2, rtol=1e-3)
         assert dynamic.infer(name, batch[:1]).shape == (1, 4 + real_specs[name].nc, 8400)
         assert dynamic.infer(name, batch[:4]).shape == (4, 4 + real_specs[name].nc, 8400)
+
+
+@pytest.mark.gpu
+def test_fp16_file_is_used_for_batches_and_matches_fp32(real_specs):
+    from worker.app.detector.onnx_detector import FP16_NAME, OnnxDetector
+
+    if not all(s.onnx_path.with_name(FP16_NAME).exists() for s in real_specs.values()):
+        pytest.skip("нет best.fp16.onnx; запусти scripts/make_fp16.py")
+    full = OnnxDetector(real_specs, precision="fp32")
+    half = OnnxDetector(real_specs, precision="auto")
+    if half.device != "cuda":
+        pytest.skip("нет видеокарты")
+    rng = np.random.default_rng(1)
+    batch = np.clip(rng.random((8, 3, 20, 20), dtype=np.float32).repeat(32, axis=2).repeat(32, axis=3), 0, 1)
+    for name in real_specs:
+        assert full.precision[name] == "fp32" and half.precision[name] == "fp16"
+        a, b = full.infer(name, batch), half.infer(name, batch)
+        assert a.shape == b.shape and b.dtype == np.float32
+        np.testing.assert_allclose(a[:, 4:], b[:, 4:], atol=0.02)
+        diff = np.abs(a[:, :4] - b[:, :4])
+        assert np.quantile(diff, 0.999) < 2.0 and diff.max() < 8.0
+
+
+@pytest.mark.models
+def test_fp16_is_not_used_on_cpu(real_specs):
+    from worker.app.detector.onnx_detector import OnnxDetector
+
+    detector = OnnxDetector(real_specs, allow_cuda=False, precision="auto")
+    assert set(detector.precision.values()) == {"fp32"}

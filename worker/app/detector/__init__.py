@@ -8,11 +8,12 @@ from worker.app.model_spec import ModelSpec
 __all__ = ["Detector", "create_detector"]
 
 
-def create_detector(kind: str, specs: dict[str, ModelSpec], fake_scenario: str | Path | None = None) -> Detector:
+def create_detector(kind: str, specs: dict[str, ModelSpec], fake_scenario: str | Path | None = None,
+                    precision: str = "fp32") -> Detector:
     # импорты внутри чтобы fake работал без onnxruntime
     if kind == "onnx":
         from worker.app.detector.onnx_detector import OnnxDetector
-        return OnnxDetector(specs)
+        return OnnxDetector(specs, precision=precision)
     if kind == "fake":
         from worker.app.detector.fake import FakeDetector
         return FakeDetector.from_yaml(specs, Path(fake_scenario)) if fake_scenario else FakeDetector(specs)

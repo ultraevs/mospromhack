@@ -77,7 +77,7 @@ def main() -> int:
             proc = [statistics.mean(s["cameras"][i]["proc_fps"] for s in samples if i in s.get("cameras", {})) for i in ids]
             read = [statistics.mean(s["cameras"][i]["read_fps"] for s in samples if i in s.get("cameras", {})) for i in ids]
             target = samples[-1]["target_fps"]["ppe"]
-            goal = min(target, statistics.mean(read))
+            goal = target
             ppe = [s["inference"]["ppe"] for s in samples if "ppe" in s.get("inference", {})]
             hazard = [s["inference"]["hazard"] for s in samples if "hazard" in s.get("inference", {})]
             ok = min(proc) >= goal * PASS_SHARE
@@ -89,6 +89,9 @@ def main() -> int:
                 "hazard_fps": statistics.mean(s.get("actual_fps", {}).get("hazard", 0) for s in samples),
                 "crops": statistics.mean(s.get("crops_per_s", 0) for s in samples),
                 "load": statistics.mean(s.get("loop_load", 0) for s in samples),
+                "cpu_worker": statistics.mean(s.get("cpu_cores", {}).get("worker", 0) for s in samples),
+                "cpu_decoders": statistics.mean(s.get("cpu_cores", {}).get("decoders", 0) for s in samples),
+                "decode": samples[-1].get("decode", {}),
                 "device": samples[-1].get("device"), "goal": goal,
             })
             print(f"{n} потоков: обработка мин. {min(proc):.1f} / средн. {statistics.mean(proc):.1f} кадров/с "
@@ -105,12 +108,16 @@ def main() -> int:
     print(f"\nвидео {args.video}, устройство {rows[-1]['device']}, замер {args.seconds:.0f} с на уровень, "
           f"{'свой ffmpeg на каждую камеру' if args.separate_encoders else 'один ffmpeg на все камеры'}\n")
     print("| потоков | обработка мин., к/с | обработка средн., к/с | чтение, к/с | ppe средн., мс | ppe p95, мс | "
-          "hazard средн., мс | hazard, тиков/с | вырезок/с | загрузка цикла | держит |")
-    print("|---|---|---|---|---|---|---|---|---|---|---|")
+          "hazard средн., мс | hazard, тиков/с | вырезок/с | загрузка цикла | ядер: воркер | ядер: декодеры | держит |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for r in rows:
         print(f"| {r['n']} | {r['proc_min']:.1f} | {r['proc_avg']:.1f} | {r['read']:.1f} | {r['ppe_avg']:.0f} | "
               f"{r['ppe_p95']:.0f} | {r['hazard_avg']:.0f} | {r['hazard_fps']:.1f} | {r['crops']:.1f} | {r['load']:.2f} | "
+              f"{r['cpu_worker']:.1f} | {r['cpu_decoders']:.1f} | "
               f"{'да' if r['ok'] else 'нет'} |")
+    print()
+    print(f"чтение камер: {rows[-1]['decode']}; цель {rows[-1]['goal']:g} кадров/с на камеру "
+          f"(меняется переменной PPE_FPS при запуске сервиса, например PPE_FPS=4)")
     held = [r for r in rows if r["ok"]]
     if not held:
         print("\nИтог: сервис не держит ни один из проверенных уровней")

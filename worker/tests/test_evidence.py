@@ -69,7 +69,7 @@ def test_buffer_keeps_only_pre_seconds(pool):
     ev = CameraEvidence(pre_seconds=2, post_seconds=1, clip_width=640, pool=pool)
     for i in range(40):
         ev.add_frame(frame(i), 1_000_000 + i * 200)
-    assert wait_for(lambda: len(ev._frames) > 0 and ev._frames[-1][0] == 1_000_000 + 39 * 200)
+    assert wait_for(lambda: len(ev._frames) == 11 and max(t for t, _ in ev._frames) == 1_000_000 + 39 * 200)
     times = [t for t, _ in ev._frames]
     assert min(times) >= 1_000_000 + 39 * 200 - 2000 and len(times) == 11
     jpeg = ev._frames[-1][1]

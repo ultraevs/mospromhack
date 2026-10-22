@@ -317,3 +317,34 @@ def test_per_camera_rate_limit(specs, monkeypatch):
     clock["t"] += 0.20
     push(worker, 3, 1_000_300, cameras=[2])
     assert worker.tick_ppe() == 1
+
+
+def test_hazard_checks_are_spread_over_ppe_ticks(specs, monkeypatch):
+    clock = {"t": 500.0}
+    monkeypatch.setattr("worker.app.main.time.monotonic", lambda: clock["t"])
+    worker = make_worker(specs, {"ppe": [[PERSON]]}, cameras=tuple(range(1, 13)))
+    worker.config.worker.crop_pass.cigarette.enabled = False
+    worker.period_s = 1 / 6
+    seen = []
+    for i in range(12):
+        push(worker, i + 1, 1_000_000 + i * 167)
+        before = worker.detector._calls.get("hazard", 0)
+        n = worker.tick_hazard_due()
+        seen.append(n)
+        assert worker.detector._calls.get("hazard", 0) - before == (1 if n else 0)
+        clock["t"] += 1 / 6
+    assert seen == [4, 4, 4, 0, 0, 0, 4, 4, 4, 0, 0, 0]
+    assert worker.stats()["actual_fps"]["hazard"] == pytest.approx(24 / 5.0 / 12, abs=0.05)
+
+
+def test_paced_mode_takes_every_new_frame_without_camera_schedule(specs, monkeypatch):
+    clock = {"t": 100.0}
+    monkeypatch.setattr("worker.app.main.time.monotonic", lambda: clock["t"])
+    worker = make_worker(specs, {"ppe": [[PERSON]]}, cameras=(1, 2))
+    worker.period_s, worker.paced = 0.15, True
+    push(worker, 1, 1_000_000)
+    assert worker.tick_ppe() == 2
+    clock["t"] += 0.01
+    push(worker, 2, 1_000_010)
+    assert worker.tick_ppe() == 2
+    assert worker.tick_ppe() == 0

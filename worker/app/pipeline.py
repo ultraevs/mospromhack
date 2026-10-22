@@ -120,7 +120,7 @@ class CameraPipeline:
 
 
     def process_ppe(self, dets: Detections, spec: ModelSpec, w: int, h: int, ts_ms: int, camera: WorkerCamera,
-                    rules: RuleSettings) -> tuple[DetectionsMessage, list[EventOpen | EventClose]]:
+                    rules: RuleSettings, px_scale: float = 1.0) -> tuple[DetectionsMessage, list[EventOpen | EventClose]]:
         t = ts_ms / 1000
         names = [spec.classes[c] for c in dets.cls]
         person_idx = [i for i, n in enumerate(names) if n == PERSON]
@@ -144,7 +144,7 @@ class CameraPipeline:
                 if own == p:
                     seen[names[i]] = max(seen.get(names[i], 0.0), float(dets.conf[i]))
             track = self.tracks.setdefault(int(track_ids[p]), TrackState(int(track_ids[p])))
-            track.add(Observation(t=t, bbox=bbox, height_px=float(dets.xyxy[det_i][3] - dets.xyxy[det_i][1]),
+            track.add(Observation(t=t, bbox=bbox, height_px=float(dets.xyxy[det_i][3] - dets.xyxy[det_i][1]) * px_scale,
                                   conf=float(dets.conf[det_i]), seen=seen, zones=zones, required=frozenset(required)))
 
         actions, evaluated = self.engine.step(t, self.tracks, camera, rules)
