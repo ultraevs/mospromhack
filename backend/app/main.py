@@ -3,11 +3,16 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import asyncio
 
-from backend.app.api import cameras, events, internal, public, zones
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+from backend.app.api import cameras, events, internal, notifications, public, zones
 from backend.app.db.session import make_engine, make_session_factory
 from backend.app.services.hub import Hub
+from backend.app.services.telegram import AiogramSender, TelegramNotifier, run_bot
+from backend.app.services.webhooks import WebhookDispatcher
 from backend.app.services.rules import seed_rules
 from backend.app.services.sources import SourceManager
 from backend.app.state import AppState
@@ -16,13 +21,16 @@ from shared.config import ROOT, Settings, get_settings, load_config
 log = logging.getLogger("backend")
 
 
-def create_app(settings: Settings | None = None, run_sources: bool = True) -> FastAPI:
+def create_app(settings: Settings | None = None, run_sources: bool = True, telegram_sender=None,
+               webhook_retry_pauses: tuple[float, ...] | None = None) -> FastAPI:
     settings = settings or get_settings()
     config = load_config(settings.config_path)
     engine = make_engine(settings.data_dir / "db.sqlite")
     sources = SourceManager(videos_dir=settings.data_dir / "videos", logs_dir=ROOT / "logs",
                             rtsp_port=settings.mediamtx_rtsp_port, api_port=settings.mediamtx_api_port,
                             active=run_sources)
+    media_dir = settings.data_dir / "media"
+    media_dir.mkdir(parents=True, exist_ok=True)
     state = AppState(settings=settings, config=config, session_factory=make_session_factory(engine),
                      hub=Hub(), sources=sources)
 
@@ -32,15 +40,45 @@ def create_app(settings: Settings | None = None, run_sources: bool = True) -> Fa
             seed_rules(db, config)
             cameras.sync_sources(db, state)
         sources.start()
+
+        state.webhooks = (WebhookDispatcher(state.session_factory, retry_pauses=webhook_retry_pauses)
+                          if webhook_retry_pauses is not None else WebhookDispatcher(state.session_factory))
+        state.bus.subscribe("webhooks", state.webhooks.handle)
+        bot_task = None
+        sender = telegram_sender
+        if sender is None and settings.telegram_bot_token:
+            try:
+                sender = AiogramSender(settings.telegram_bot_token)
+            except Exception as e:  # noqa: BLE001
+                state.telegram_state["error"] = f"токен бота не принят: {e}"
+                log.error(state.telegram_state["error"])
+        if sender is not None:
+            state.notifier = TelegramNotifier(state.session_factory, sender, media_dir)
+            state.bus.subscribe("telegram", state.notifier.handle)
+            state.telegram_state["enabled"] = True
+            if isinstance(sender, AiogramSender):
+                bot_task = asyncio.create_task(run_bot(sender, state.notifier, state.telegram_state), name="telegram-bot")
+        else:
+            log.info("телеграм-бот выключен: TELEGRAM_BOT_TOKEN пуст")
+        state.bus.start()
+
         log.info("backend запущен, порт %s", settings.backend_port)
         yield
+        if bot_task:
+            bot_task.cancel()
+            await asyncio.gather(bot_task, return_exceptions=True)
+        await state.bus.stop()
+        await state.webhooks.close()
+        if state.notifier:
+            await state.notifier.close()
         sources.stop()
         engine.dispose()
 
     app = FastAPI(title="Контроль нарушений по видео", lifespan=lifespan)
     app.state.app = state
-    for module in (cameras, zones, events, internal, public):
+    for module in (cameras, zones, events, notifications, internal, public):
         app.include_router(module.router)
+    app.mount("/media", StaticFiles(directory=media_dir), name="media")
     return app
 
 
