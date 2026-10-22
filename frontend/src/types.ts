@@ -4,6 +4,37 @@ export type EventType = "no_helmet" | "no_mask" | "no_vest" | "zone_intrusion" |
 export type Severity = "low" | "medium" | "high";
 export type Review = "none" | "confirmed" | "false_positive";
 export type PpeItem = "helmet" | "mask" | "vest";
+export type Point = [number, number];
+export type ZoneType = "restricted" | "ppe_required" | "flammable";
+
+export interface Zone {
+  id: number;
+  camera_id: number;
+  name: string;
+  type: ZoneType;
+  polygon: Point[];
+  required_ppe: PpeItem[];
+}
+
+export type ZoneInput = Omit<Zone, "id" | "camera_id">;
+
+export interface FractionRule { window_s: number; min_observations: number; fraction: number }
+export interface RuleSettings {
+  no_helmet: FractionRule;
+  no_mask: FractionRule;
+  no_vest: { window_s: number; min_observations: number; max_fraction: number; min_person_height_px: number };
+  zone_intrusion: { window_s: number; fraction: number; min_observations: number };
+  smoking: { k: number; m: number };
+  fire: { k: number; m: number };
+  smoke: { k: number; m: number };
+  lifecycle: {
+    close_after_s: number; cooldown_s: number; retrack_iou: number; retrack_window_s: number;
+    camera_cooldown_s: number; track_lost_s: number;
+  };
+}
+
+export const PPE_LABEL: Record<PpeItem, string> = { helmet: "каска", mask: "маска", vest: "жилет" };
+
 export type PpeStatus = "ok" | "violation" | "unknown" | "not_required";
 
 export interface SafetyEvent {
