@@ -12,13 +12,16 @@ from sqlalchemy.orm import Session
 from backend.app.db.models import CameraRow, EventRow
 from backend.app.services import events as svc
 from backend.app.services.rules import load_rules
-from backend.app.state import AppState, get_config_version, get_db, get_state, get_state_ws, require_internal
+from backend.app.state import (AppState, get_config_version, get_db, get_setting, get_state, get_state_ws,
+                               require_internal, set_setting)
 from shared.schemas import Event, EventCreate, EventUpdate, WorkerCamera, WorkerConfig, Zone
 
 log = logging.getLogger("backend.internal")
 
 # все для воркера, с X-Internal-Token
 router = APIRouter(prefix="/internal", tags=["internal"])
+
+WORKER_SESSION_KEY = "worker_session"
 
 
 @router.get("/config", response_model=WorkerConfig, dependencies=[Depends(require_internal)])
@@ -56,7 +59,16 @@ async def update_event(event_id: str, body: EventUpdate, db: Session = Depends(g
 
 
 @router.post("/stats", status_code=204, dependencies=[Depends(require_internal)])
-async def post_stats(body: dict[str, Any], state: AppState = Depends(get_state)):
+async def post_stats(body: dict[str, Any], db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+    session = body.get("session")
+    if session and session != state.worker_session:
+        if session != get_setting(db, WORKER_SESSION_KEY):
+            for row in svc.close_orphans(db):
+                log.warning("событие %s закрыто: воркер перезапущен", row.id)
+                await state.hub.send_event(svc.message("event_updated", row))
+            set_setting(db, WORKER_SESSION_KEY, session)
+            db.commit()
+        state.worker_session = session
     state.worker_stats = body
     state.worker_seen = time.monotonic()
 

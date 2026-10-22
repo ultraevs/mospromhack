@@ -25,6 +25,7 @@ class AppState:
     sources: SourceManager
     worker_stats: dict[str, Any] = field(default_factory=dict)
     worker_seen: float = 0.0  # monotonic последнего /internal/stats
+    worker_session: str | None = None
 
     def worker_alive(self) -> bool:
         return bool(self.worker_seen) and time.monotonic() - self.worker_seen < WORKER_TIMEOUT_S

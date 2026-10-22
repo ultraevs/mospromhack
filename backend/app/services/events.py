@@ -4,6 +4,7 @@ import secrets
 import time
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.db.models import CameraRow, EventRow, ZoneRow
@@ -53,6 +54,17 @@ def create_event(db: Session, body: EventCreate) -> EventRow:
     db.add(row)
     db.commit()
     return row
+
+
+def close_orphans(db: Session) -> list[EventRow]:
+    rows = db.execute(select(EventRow).where(EventRow.status == EventStatus.open.value)).scalars().all()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    for row in rows:
+        row.status = EventStatus.closed.value
+        row.ended_at = now
+        row.details = {**(row.details or {}), "closed_by": "worker_restart"}
+    db.commit()
+    return list(rows)
 
 
 def message(kind: str, row: EventRow) -> str:

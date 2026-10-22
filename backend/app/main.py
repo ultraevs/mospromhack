@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from backend.app.api import cameras, events, internal, public
+from backend.app.api import cameras, events, internal, public, zones
 from backend.app.db.session import make_engine, make_session_factory
 from backend.app.services.hub import Hub
 from backend.app.services.rules import seed_rules
@@ -39,7 +39,7 @@ def create_app(settings: Settings | None = None, run_sources: bool = True) -> Fa
 
     app = FastAPI(title="Контроль нарушений по видео", lifespan=lifespan)
     app.state.app = state
-    for module in (cameras, events, internal, public):
+    for module in (cameras, zones, events, internal, public):
         app.include_router(module.router)
     return app
 

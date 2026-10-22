@@ -124,3 +124,38 @@ def test_internal_detections_requires_token(client):
         with client.websocket_connect("/internal/detections"):
             pass
     assert e.value.code == 4401
+
+
+def test_events_left_open_are_closed_when_worker_restarts(client, camera):
+    stats = {"detector": "fake", "device": "fake", "cameras": {}}
+    client.post("/internal/stats", headers=INTERNAL, json={**stats, "session": "run-1"})
+    ev = post_event(client, camera["id"])
+    client.post("/internal/stats", headers=INTERNAL, json={**stats, "session": "run-1"})
+    assert client.get(f"/api/events/{ev['id']}").json()["status"] == "open"
+
+    with client.websocket_connect("/ws/events") as ws:
+        client.post("/internal/stats", headers=INTERNAL, json={**stats, "session": "run-2"})
+        msg = ws.receive_json()
+    assert msg["type"] == "event_updated" and msg["event"]["id"] == ev["id"]
+    closed = client.get(f"/api/events/{ev['id']}").json()
+    assert closed["status"] == "closed" and closed["ended_at"] is not None
+    assert closed["details"]["closed_by"] == "worker_restart"
+
+    fresh = post_event(client, camera["id"])
+    client.post("/internal/stats", headers=INTERNAL, json={**stats, "session": "run-2"})
+    assert client.get(f"/api/events/{fresh['id']}").json()["status"] == "open"
+
+
+def test_backend_restart_does_not_close_events_of_running_worker(settings):
+    from fastapi.testclient import TestClient
+
+    from backend.app.main import create_app
+
+    stats = {"detector": "fake", "device": "fake", "cameras": {}, "session": "run-1"}
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        cam = c.post("/api/cameras", json={"name": "A", "source_type": "file", "source": "demo.mp4"}).json()
+        c.post("/internal/stats", headers=INTERNAL, json=stats)
+        ev = post_event(c, cam["id"])
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        c.post("/internal/stats", headers=INTERNAL, json=stats)
+        assert c.get(f"/api/events/{ev['id']}").json()["status"] == "open"
