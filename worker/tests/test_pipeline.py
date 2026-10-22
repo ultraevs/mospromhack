@@ -138,18 +138,26 @@ class FakeReader:
 class FakeClient:
     def __init__(self, config):
         self.config, self.events, self.closed, self.fail = config, [], [], False
+        self.snapshots, self.clips = [], []
 
     def get_config(self):
         return self.config
 
-    def post_event(self, body):
+    def post_event(self, body, snapshot=None, clean=None):
         if self.fail:
             raise ConnectionError("backend down")
         self.events.append(body)
+        self.snapshots.append((snapshot, clean))
         return Event(id=f"evt_{len(self.events):010d}", camera_name="c", **body.model_dump(exclude={"captured_ts"}))
 
     def close_event(self, event_id, ended_at):
         self.closed.append(event_id)
+
+    def upload_clip(self, event_id, path):
+        self.clips.append((event_id, path.read_bytes()))
+
+    def close(self):
+        pass
 
 
 class FakeSender:
@@ -160,6 +168,9 @@ class FakeSender:
 
     def send(self, text):
         self.sent.append(json.loads(text))
+
+    def stop(self):
+        pass
 
 
 @pytest.fixture

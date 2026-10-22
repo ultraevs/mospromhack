@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+import queue
 import signal
 import time
 import uuid
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable
@@ -16,6 +18,7 @@ from shared.schemas import EventCreate, WorkerCamera, WorkerConfig
 from worker.app.capture import CameraReader
 from worker.app.client import BackendClient, DetectionsSender
 from worker.app.detector import Detector, create_detector
+from worker.app.evidence import (JPEG_QUALITY_SNAPSHOT, CameraEvidence, ClipBuilder, annotate, encode_jpeg)
 from worker.app.model_spec import ModelSpec, load_all_specs
 from worker.app.crops import crop_box, merge, only_classes, shift
 from worker.app.pipeline import CameraPipeline, check_classes, norm_box
@@ -34,6 +37,7 @@ MAX_PENDING = 200
 class CameraState:
     camera: WorkerCamera
     reader: CameraReader
+    evidence: CameraEvidence
     pipeline: CameraPipeline = field(default_factory=CameraPipeline)
     last_seq: int = 0
     next_due: float = 0.0
@@ -57,6 +61,13 @@ class Worker:
         self.remote: WorkerConfig | None = None
         self.cameras: dict[int, CameraState] = {}
         self._event_ids: dict[int, str] = {}
+        self._snapshots: dict[int, tuple[bytes, bytes]] = {}
+        self._clip_ids: dict[int, str | None] = {}
+        self._clips_done: queue.Queue = queue.Queue()
+        self._pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="evidence")
+        self._clips = ClipBuilder(self._pool, lambda key, path: self._clips_done.put((key, path)))
+        self.clips_built = 0
+        self.clips_failed = 0
         self._pending: deque[EventOpen | EventClose] = deque()  # то что не ушло из-за обрыва
         self._captured: dict[int, int] = {}
         self._infer_ms: dict[str, deque] = {name: deque(maxlen=300) for name in specs}
@@ -93,11 +104,14 @@ class Worker:
             if cam_id in self.cameras:
                 self.cameras[cam_id].camera = cam  # зоны/сизы меняются на лету без переоткрытия потока
             else:
-                self.cameras[cam_id] = CameraState(cam, self._make_reader(cam_id, cam.rtsp_url).start())
+                ev = self.config.evidence
+                self.cameras[cam_id] = CameraState(cam, self._make_reader(cam_id, cam.rtsp_url).start(),
+                                                   CameraEvidence(ev.pre_seconds, ev.post_seconds, ev.clip_width, self._pool))
 
 
     def tick_ppe(self) -> int:
         spec = self.specs["ppe"]
+        self._collect_clips()
         fresh = []
         now = time.monotonic()
         for state in self.cameras.values():
@@ -114,9 +128,52 @@ class Worker:
         for (state, frame), dets in zip(fresh, all_dets):
             if head.enabled:
                 dets = self._head_pass(frame.image, dets, spec)
-            self._handle(state, frame.ts_ms, frame.image.shape[1], frame.image.shape[0], dets, spec)
+            state.evidence.add_frame(frame.image, frame.ts_ms)
+            self._handle(state, frame, dets, spec)
             state.processed.append(time.monotonic())
         return len(fresh)
+
+    def _collect_clips(self) -> None:
+        now_ms = int(time.time() * 1000)
+        for state in self.cameras.values():
+            for key, frames in state.evidence.ready_clips(now_ms):
+                if len(frames) >= 2:
+                    self._clips.submit(key, frames)
+                else:
+                    log.error("клип события %s не собран: в буфере %s кадров", self._clip_ids.get(key) or key, len(frames))
+                    self._clip_ids.pop(key, None)
+                    self.clips_failed += 1
+        waiting = []
+        while True:
+            try:
+                key, path = self._clips_done.get_nowait()
+            except queue.Empty:
+                break
+            if path is None:
+                self._clip_ids.pop(key, None)
+                self.clips_failed += 1
+                continue
+            event_id = self._clip_ids.get(key)
+            if event_id is None:
+                if key in self._clip_ids:
+                    waiting.append((key, path))
+                continue
+            try:
+                self.client.upload_clip(event_id, path)
+                self.clips_built += 1
+                self._clip_ids.pop(key, None)
+                log.info("событие %s: клип догружен", event_id)
+            except Exception as e:  # noqa: BLE001
+                log.error("событие %s: клип не догружен: %s", event_id, e)
+                self.clips_failed += 1
+                self._clip_ids.pop(key, None)
+            finally:
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+        for item in waiting:
+            self._clips_done.put(item)
 
     def _infer_frames(self, model: str, images: list[np.ndarray]) -> list[Detections]:
         spec = self.specs[model]
@@ -154,8 +211,7 @@ class Worker:
 
         for (state, frame), dets in zip(current, self._infer_frames("hazard", [f.image for _, f in current])):
             h, w = frame.image.shape[:2]
-            self._queue(state.camera.id, frame.ts_ms,
-                        state.pipeline.process_hazard(dets, spec, w, h, frame.ts_ms, self.remote.rules))
+            self._queue(state, frame, state.pipeline.process_hazard(dets, spec, w, h, frame.ts_ms, self.remote.rules))
 
         cfg = self.config.worker.crop_pass.cigarette
         if cfg.enabled:
@@ -182,17 +238,27 @@ class Worker:
         self.flush_events()
         return len(current)
 
-    def _queue(self, camera_id: int, ts_ms: int, actions) -> None:
+    def _queue(self, state: CameraState, frame, actions) -> None:
         for action in actions:
             if isinstance(action, EventOpen):
-                self._captured[action.key] = ts_ms
-            self._pending.append((camera_id, action))
+                self._captured[action.key] = frame.ts_ms
+                try:
+                    zone = next((z for z in state.camera.zones if z.id == action.zone_id), None)
+                    marked = annotate(frame.image, action.bbox, action.type.value, zone.polygon if zone else None)
+                    self._snapshots[action.key] = (encode_jpeg(marked, JPEG_QUALITY_SNAPSHOT),
+                                                   encode_jpeg(frame.image, JPEG_QUALITY_SNAPSHOT))
+                except Exception:  # noqa: BLE001
+                    log.exception("не удалось подготовить стоп-кадры события")
+                self._clip_ids[action.key] = None
+                state.evidence.start_clip(action.key, frame.ts_ms)
+            self._pending.append((state.camera.id, action))
 
-    def _handle(self, state: CameraState, ts_ms: int, w: int, h: int, dets: Detections, spec: ModelSpec) -> None:
+    def _handle(self, state: CameraState, frame, dets: Detections, spec: ModelSpec) -> None:
         assert self.remote is not None
-        msg, actions = state.pipeline.process_ppe(dets, spec, w, h, ts_ms, state.camera, self.remote.rules)
+        h, w = frame.image.shape[:2]
+        msg, actions = state.pipeline.process_ppe(dets, spec, w, h, frame.ts_ms, state.camera, self.remote.rules)
         self.sender.send(msg.model_dump_json())
-        self._queue(state.camera.id, ts_ms, actions)
+        self._queue(state, frame, actions)
         self.flush_events()
 
     def flush_events(self) -> None:
@@ -200,12 +266,17 @@ class Worker:
             camera_id, action = self._pending[0]
             try:
                 if isinstance(action, EventOpen):
+                    snapshot, clean = self._snapshots.get(action.key, (None, None))
                     event = self.client.post_event(EventCreate(
                         type=action.type, severity=action.severity, camera_id=camera_id, zone_id=action.zone_id,
                         track_id=action.track_id, started_at=datetime.fromtimestamp(action.t, timezone.utc),
                         confidence=action.confidence, bbox=list(action.bbox) if action.bbox else None,
-                        details=action.details, captured_ts=self._captured.pop(action.key, None)))
+                        details=action.details, captured_ts=self._captured.get(action.key)), snapshot, clean)
+                    self._captured.pop(action.key, None)
+                    self._snapshots.pop(action.key, None)
                     self._event_ids[action.key] = event.id
+                    if action.key in self._clip_ids:
+                        self._clip_ids[action.key] = event.id
                     log.info("событие %s открыто: %s, камера %s", event.id, action.type.value, camera_id)
                 else:
                     event_id = self._event_ids.pop(action.key, None)
@@ -246,6 +317,8 @@ class Worker:
                           "head": self.config.worker.crop_pass.head.enabled},
             "loop_load": round(min(1.0, sum(b for t, b in self._busy if now - t <= 5.0) / 5.0), 2),
             "streams": len(self.cameras),
+            "clips": {"built": self.clips_built, "failed": self.clips_failed,
+                      "pending": sum(s.evidence.pending() for s in self.cameras.values())},
             "cameras": {str(cam_id): {"online": s.reader.online, "error": s.reader.error,
                                       "read_fps": s.reader.read_fps(), "proc_fps": s.proc_fps()}
                         for cam_id, s in self.cameras.items()},
@@ -289,6 +362,8 @@ class Worker:
             state.reader.stop()
         self.sender.stop()
         self.client.close()
+        self._pool.shutdown(wait=False, cancel_futures=True)
+        self._clips.cleanup()
 
 
 def build(settings: Settings, config: AppConfig) -> Worker:

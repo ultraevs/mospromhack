@@ -23,11 +23,21 @@ class BackendClient:
         r.raise_for_status()
         return WorkerConfig.model_validate(r.json())
 
-    def post_event(self, body: EventCreate) -> Event:
-        r = self._http.post("/internal/events", content=body.model_dump_json(),
-                            headers={"Content-Type": "application/json"})
+    def post_event(self, body: EventCreate, snapshot: bytes | None = None, clean: bytes | None = None) -> Event:
+        files = {name: (f"{name}.jpg", data, "image/jpeg") for name, data in (("snapshot", snapshot), ("clean", clean)) if data}
+        if files:
+            r = self._http.post("/internal/events", data={"event": body.model_dump_json()}, files=files)
+        else:
+            r = self._http.post("/internal/events", content=body.model_dump_json(),
+                                headers={"Content-Type": "application/json"})
         r.raise_for_status()
         return Event.model_validate(r.json())
+
+    def upload_clip(self, event_id: str, path) -> None:
+        with open(path, "rb") as f:
+            r = self._http.post(f"/internal/events/{event_id}/clip", files={"clip": ("clip.mp4", f, "video/mp4")},
+                                timeout=30.0)
+        r.raise_for_status()
 
     def close_event(self, event_id: str, ended_at: datetime) -> None:
         r = self._http.patch(f"/internal/events/{event_id}",
