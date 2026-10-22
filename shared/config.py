@@ -1,4 +1,3 @@
-"""Конфигурация: config.yaml (не секреты) и .env (секреты, порты, пути)."""
 from __future__ import annotations
 
 from functools import lru_cache
@@ -68,7 +67,6 @@ class Settings(BaseSettings):
     mediamtx_webrtc_port: int = 8889
     mediamtx_api_port: int = 9997
 
-    # Пути можно переопределить переменными окружения (нужно тестам и Docker).
     config_path: Path = ROOT / "config.yaml"
     models_dir: Path = ROOT / "models"
     data_dir: Path = ROOT / "data"

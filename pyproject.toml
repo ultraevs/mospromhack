@@ -8,5 +8,4 @@ markers = [
     "gpu: нужна видеокарта с рабочим провайдером CUDA",
     "network: нужна сеть или внешние процессы (MediaMTX, ffmpeg)",
 ]
-# По умолчанию идут только тесты без видеокарты, сети и папки обучения.
 addopts = "-m 'not reference and not gpu and not network' -q"

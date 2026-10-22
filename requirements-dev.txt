@@ -2,5 +2,4 @@
 -r worker/requirements.txt
 pytest
 pytest-asyncio
-# Нужен только эталонному тесту постобработки (маркер reference); версия та же, что при обучении.
 ultralytics==8.4.164
