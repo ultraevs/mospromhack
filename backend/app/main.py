@@ -8,7 +8,7 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from backend.app.api import cameras, events, internal, notifications, public, zones
+from backend.app.api import analytics, cameras, events, internal, notifications, public, zones
 from backend.app.db.session import make_engine, make_session_factory
 from backend.app.services.hub import Hub
 from backend.app.services.telegram import AiogramSender, TelegramNotifier, run_bot
@@ -53,7 +53,7 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
                 state.telegram_state["error"] = f"токен бота не принят: {e}"
                 log.error(state.telegram_state["error"])
         if sender is not None:
-            state.notifier = TelegramNotifier(state.session_factory, sender, media_dir)
+            state.notifier = TelegramNotifier(state.session_factory, sender, media_dir, config.telegram)
             state.bus.subscribe("telegram", state.notifier.handle)
             state.telegram_state["enabled"] = True
             if isinstance(sender, AiogramSender):
@@ -76,7 +76,7 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
 
     app = FastAPI(title="Контроль нарушений по видео", lifespan=lifespan)
     app.state.app = state
-    for module in (cameras, zones, events, notifications, internal, public):
+    for module in (cameras, zones, events, analytics, notifications, internal, public):
         app.include_router(module.router)
     app.mount("/media", StaticFiles(directory=media_dir), name="media")
     return app
