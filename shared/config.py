@@ -33,11 +33,19 @@ class CropPass(BaseModel):
     head: HeadCrop = Field(default_factory=HeadCrop)
 
 
+class DecodeSection(BaseModel):
+    backend: Literal["ffmpeg", "opencv"] = "ffmpeg"
+    width: int = 1280
+    hwaccel: Literal["auto", "none"] = "auto"
+
+
 class WorkerSection(BaseModel):
     detector: Literal["onnx", "linq", "fake"] = "onnx"
+    precision: Literal["auto", "fp32", "fp16"] = "auto"
     ppe_fps: float = 6
     hazard_fps: float = 1
     crop_pass: CropPass = Field(default_factory=CropPass)
+    decode: DecodeSection = Field(default_factory=DecodeSection)
     overlay_delay_ms: int = 0
     fake_scenario: str | None = None
 
@@ -59,6 +67,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", env_file_encoding="utf-8", extra="ignore")
 
     telegram_bot_token: str = ""
+    ppe_fps: float | None = None
     telegram_enabled: bool = True
     internal_token: str = "change-me"
     train_runs_dir: str = ""
