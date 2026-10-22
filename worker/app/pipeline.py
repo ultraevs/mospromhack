@@ -10,7 +10,7 @@ from worker.app.association import anchor, assign_items, point_in_polygon
 from worker.app.model_spec import ModelSpec
 from worker.app.postprocess import Detections
 from worker.app.crops import crop_box
-from worker.app.rules.checks import check_k_of_m, in_window
+from worker.app.rules.checks import check_k_of_m, in_upper_part, in_window
 from worker.app.rules.engine import Candidate, RuleEngine
 from worker.app.rules.state import (ATTACHABLE, CIGARETTE, HAZARD_EVENTS, HEAD_CLASSES, PERSON, PPE_CLASSES,
                                     Observation, TrackState)
@@ -86,9 +86,10 @@ class CameraPipeline:
         return actions
 
 
-    def select_crops(self, t: float, w: int, h: int, max_per_tick: int, top_fraction: float,
-                     margin: float) -> list[tuple[int, tuple[int, int, int, int]]]:
-        ids = sorted(tid for tid, tr in self.tracks.items() if tr.obs and t - tr.last.t <= RECENT_S)
+    def select_crops(self, t: float, w: int, h: int, max_per_tick: int, top_fraction: float, margin: float,
+                     zones: frozenset[int] | None = None) -> list[tuple[int, tuple[int, int, int, int]]]:
+        ids = sorted(tid for tid, tr in self.tracks.items() if tr.obs and t - tr.last.t <= RECENT_S
+                     and (zones is None or tr.last.zones & zones))
         if not ids or max_per_tick <= 0:
             return []
         start = self._crop_cursor % len(ids)
@@ -102,10 +103,13 @@ class CameraPipeline:
                 out.append((track_id, box))
         return out
 
-    def apply_cigarette(self, track_id: int, t: float, conf: float, bbox: tuple[float, float, float, float] | None) -> None:
+    def apply_cigarette(self, track_id: int, t: float, found: list[tuple[float, tuple[float, float, float, float]]],
+                        upper_fraction: float) -> None:
         track = self.tracks.get(track_id)
-        if track is None:
+        if track is None or not track.obs:
             return
+        near_face = [f for f in found if in_upper_part(track.last.bbox, f[1], upper_fraction)]
+        conf, bbox = max(near_face, key=lambda f: f[0], default=(0.0, None))
         track.checks.append((t, bbox is not None, conf))
         while len(track.checks) > CHECKS_KEPT:
             track.checks.popleft()

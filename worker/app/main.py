@@ -14,7 +14,7 @@ from typing import Callable
 import numpy as np
 
 from shared.config import AppConfig, Settings, get_settings, load_config
-from shared.schemas import EventCreate, WorkerCamera, WorkerConfig
+from shared.schemas import EventCreate, WorkerCamera, WorkerConfig, ZoneType
 from worker.app.capture import CameraReader
 from worker.app.client import BackendClient, DetectionsSender
 from worker.app.detector import Detector, create_detector
@@ -216,10 +216,13 @@ class Worker:
         cfg = self.config.worker.crop_pass.cigarette
         if cfg.enabled:
             jobs = []
+            smoking = self.remote.rules.smoking
             for state, frame in current:
                 h, w = frame.image.shape[:2]
+                zones = None if smoking.everywhere else frozenset(
+                    z.id for z in state.camera.zones if z.type == ZoneType.flammable)
                 for track_id, box in state.pipeline.select_crops(frame.ts_ms / 1000, w, h, cfg.max_per_tick,
-                                                                 cfg.top_fraction, cfg.margin):
+                                                                 cfg.top_fraction, cfg.margin, zones):
                     jobs.append((state.pipeline, track_id, frame, box))
             if jobs:
                 self._crop_times.extend([time.monotonic()] * len(jobs))
@@ -228,12 +231,9 @@ class Worker:
                 for (pipeline, track_id, frame, (x1, y1, _, _)), found in zip(jobs, self._infer_frames("hazard", images)):
                     found = shift(only_classes(found, {cigarette}), x1, y1)
                     h, w = frame.image.shape[:2]
-                    if len(found):
-                        best = int(np.argmax(found.conf))
-                        pipeline.apply_cigarette(track_id, frame.ts_ms / 1000, float(found.conf[best]),
-                                                 norm_box(found.xyxy[best], w, h))
-                    else:
-                        pipeline.apply_cigarette(track_id, frame.ts_ms / 1000, 0.0, None)
+                    pipeline.apply_cigarette(track_id, frame.ts_ms / 1000,
+                                             [(float(c), norm_box(b, w, h)) for c, b in zip(found.conf, found.xyxy)],
+                                             smoking.upper_fraction)
         self._ticks["hazard"].append(time.monotonic())
         self.flush_events()
         return len(current)

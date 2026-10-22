@@ -62,8 +62,8 @@ def evaluate_track(track: TrackState, t: float, camera: WorkerCamera, rules: Rul
     if best is not None:
         out.append(best)
 
-    if track.checks:
-        flammable = {z.id for z in camera.zones if z.type == ZoneType.flammable}
+    flammable = {z.id for z in camera.zones if z.type == ZoneType.flammable}
+    if track.checks and (rules.smoking.everywhere or track.last.zones & flammable):
         severity = Severity.high if track.last.zones & flammable else SEVERITY[EventType.smoking]
         zone_id = next(iter(sorted(track.last.zones & flammable)), None)
         out.append(Candidate(EventType.smoking, check_k_of_m(track.checks, rules.smoking), severity, bbox, zone_id))

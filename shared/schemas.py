@@ -217,7 +217,7 @@ class NoVestRule(BaseModel):
 class ZoneIntrusionRule(BaseModel):
     window_s: Seconds = 1.5
     fraction: Share = 0.7
-    min_observations: Count = 1
+    min_observations: Count = 4
 
 
 class KofMRule(BaseModel):
@@ -229,6 +229,13 @@ class KofMRule(BaseModel):
         if self.k > self.m:
             raise ValueError("k не может быть больше m")
         return self
+
+
+class SmokingRule(KofMRule):
+    k: Count = 3
+    m: Count = 5
+    upper_fraction: Share = 0.33
+    everywhere: bool = False
 
 
 class LifecycleRule(BaseModel):
@@ -245,10 +252,17 @@ class RuleSettings(BaseModel):
     no_mask: FractionRule = Field(default_factory=FractionRule)
     no_vest: NoVestRule = Field(default_factory=NoVestRule)
     zone_intrusion: ZoneIntrusionRule = Field(default_factory=ZoneIntrusionRule)
-    smoking: KofMRule = Field(default_factory=lambda: KofMRule(k=2, m=5))
+    smoking: SmokingRule = Field(default_factory=SmokingRule)
     fire: KofMRule = Field(default_factory=lambda: KofMRule(k=3, m=5))
     smoke: KofMRule = Field(default_factory=lambda: KofMRule(k=3, m=5))
     lifecycle: LifecycleRule = Field(default_factory=LifecycleRule)
+
+
+class TelegramSettings(BaseModel):
+    instant_min_severity: Severity = Severity.high
+    min_interval_s: Annotated[float, Field(ge=0.05, le=60)] = 1
+    summary_interval_s: Annotated[float, Field(ge=1, le=86_400)] = 60
+    repeat_interval_s: Annotated[float, Field(ge=0, le=86_400)] = 300
 
 
 class WorkerCamera(BaseModel):

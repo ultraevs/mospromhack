@@ -18,8 +18,8 @@ rules:
   no_helmet: {window_s: 4, min_observations: 8, fraction: 0.35}
   no_mask: {window_s: 4, min_observations: 8, fraction: 0.35}
   no_vest: {window_s: 6, min_observations: 15, max_fraction: 0.1, min_person_height_px: 120}
-  zone_intrusion: {window_s: 1.5, fraction: 0.7, min_observations: 1}
-  smoking: {k: 2, m: 5}
+  zone_intrusion: {window_s: 1.5, fraction: 0.7, min_observations: 4}
+  smoking: {k: 3, m: 5, upper_fraction: 0.33, everywhere: false}
   fire: {k: 3, m: 5}
   smoke: {k: 3, m: 5}
   lifecycle:
@@ -29,3 +29,9 @@ rules:
     retrack_window_s: 10
     camera_cooldown_s: 60
     track_lost_s: 2
+
+telegram:
+  instant_min_severity: high
+  min_interval_s: 1
+  summary_interval_s: 60
+  repeat_interval_s: 300

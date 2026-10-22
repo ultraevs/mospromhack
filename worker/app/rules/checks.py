@@ -66,6 +66,13 @@ def check_zone(obs: Sequence[Observation], t: float, zone_id: int, p: ZoneIntrus
     return RuleResult(active, fraction, n, fraction, p.window_s)
 
 
+def in_upper_part(person: tuple[float, float, float, float], box: tuple[float, float, float, float],
+                  upper_fraction: float) -> bool:
+    px, py, pw, ph = person
+    cx, cy = box[0] + box[2] / 2, box[1] + box[3] / 2
+    return px <= cx <= px + pw and py <= cy <= py + ph * upper_fraction
+
+
 # smoking/fire/smoke: k из последних m проверок
 def check_k_of_m(checks: Sequence[tuple[float, bool, float]], p: KofMRule) -> RuleResult:
     last = list(checks)[-p.m:]

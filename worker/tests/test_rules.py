@@ -1,7 +1,7 @@
 import pytest
 
-from shared.schemas import EventType, PpeItem, RuleSettings, Severity, WorkerCamera, Zone, ZoneType
-from worker.app.rules.checks import check_head_ppe, check_k_of_m, check_no_vest, check_zone
+from shared.schemas import EventType, PpeItem, RuleSettings, Severity, SmokingRule, WorkerCamera, Zone, ZoneType
+from worker.app.rules.checks import check_head_ppe, check_k_of_m, check_no_vest, check_zone, in_upper_part
 from worker.app.rules.engine import RuleEngine
 from worker.app.rules.state import Observation, TrackState
 from worker.app.rules.types import EventClose, EventOpen
@@ -116,11 +116,34 @@ def test_zone_fraction_boundary():
     assert not check_zone(inside7, inside7[-1].t, 4, p).active
 
 
-def test_zone_min_observations_is_configurable():
-    one = [obs(0.0, zones=(3,))]
-    assert check_zone(one, 0.0, 3, RULES.zone_intrusion).active
-    strict = RULES.zone_intrusion.model_copy(update={"min_observations": 4})
-    assert not check_zone(one, 0.0, 3, strict).active
+def test_zone_min_observations_boundary():
+    three = [obs(i / FPS, zones=(3,)) for i in range(3)]
+    assert not check_zone(three, three[-1].t, 3, RULES.zone_intrusion).active
+    four = three + [obs(3 / FPS, zones=(3,))]
+    r = check_zone(four, four[-1].t, 3, RULES.zone_intrusion)
+    assert r.active and r.observations == 4
+    loose = RULES.zone_intrusion.model_copy(update={"min_observations": 1})
+    assert check_zone(three[:1], 0.0, 3, loose).active
+    old = [obs(0.0, zones=(3,)), obs(0.1, zones=(3,)), obs(5.0, zones=(3,)), obs(5.1, zones=(3,))]
+    assert not check_zone(old, 5.1, 3, RULES.zone_intrusion).active
+
+
+def test_default_smoking_rule_is_3_of_5_in_flammable_zones_only():
+    p = RULES.smoking
+    assert (p.k, p.m, p.upper_fraction, p.everywhere) == (3, 5, 0.33, False)
+    hits = lambda n: [(i, i < n, 0.5) for i in range(5)]      # noqa: E731
+    assert not check_k_of_m(hits(2), p).active and check_k_of_m(hits(3), p).active
+
+
+def test_in_upper_part():
+    person = (0.4, 0.2, 0.1, 0.6)
+    assert in_upper_part(person, (0.44, 0.25, 0.02, 0.02), 0.33)
+    assert in_upper_part(person, (0.44, 0.387, 0.02, 0.02), 0.33)
+    assert not in_upper_part(person, (0.44, 0.39, 0.02, 0.02), 0.33)
+    assert not in_upper_part(person, (0.44, 0.6, 0.02, 0.02), 0.33)
+    assert not in_upper_part(person, (0.44, 0.15, 0.02, 0.02), 0.33)
+    assert not in_upper_part(person, (0.55, 0.25, 0.02, 0.02), 0.33)
+    assert in_upper_part(person, (0.44, 0.6, 0.02, 0.02), 1.0)
 
 
 def test_k_of_m():
@@ -285,15 +308,33 @@ def test_camera_requirement_has_no_zone():
     assert sim.opens()[0].zone_id is None
 
 
-def test_smoking_severity_is_high_in_flammable_zone():
-    cam = camera(required=(), zones=[zone(9, ZoneType.flammable)])
-    for zones, severity, zone_id in (((9,), Severity.high, 9), ((), Severity.medium, None)):
-        sim = Sim(cam)
-        sim.tracks[7] = TrackState(7)
-        sim.tracks[7].checks.extend([(100.0, True, 0.5), (101.0, True, 0.6)])
-        sim.frame(101.0, {7: {"required": (), "zones": zones}})
-        ev = sim.opens()[0]
-        assert (ev.type, ev.severity, ev.zone_id) == (EventType.smoking, severity, zone_id)
+def smoking_sim(zones, rules=RULES, hits=3):
+    sim = Sim(camera(required=(), zones=[zone(9, ZoneType.flammable)]), rules)
+    sim.tracks[7] = TrackState(7)
+    sim.tracks[7].checks.extend([(100.0 + i, True, 0.5) for i in range(hits)])
+    sim.frame(102.0, {7: {"required": (), "zones": zones}})
+    return sim
+
+
+def test_smoking_in_flammable_zone_is_high():
+    ev = smoking_sim((9,)).opens()[0]
+    assert (ev.type, ev.severity, ev.zone_id) == (EventType.smoking, Severity.high, 9)
+    assert not smoking_sim((9,), hits=2).opens()
+
+
+def test_smoking_outside_flammable_zone_needs_everywhere():
+    assert not smoking_sim(()).opens()
+    everywhere = RuleSettings(smoking=SmokingRule(everywhere=True))
+    ev = smoking_sim((), everywhere).opens()[0]
+    assert (ev.type, ev.severity, ev.zone_id) == (EventType.smoking, Severity.medium, None)
+    assert smoking_sim((9,), everywhere).opens()[0].severity == Severity.high
+
+
+def test_smoking_event_closes_after_person_leaves_flammable_zone():
+    sim = smoking_sim((9,))
+    sim.run(102.2, 7, {7: {"required": (), "zones": ()}})
+    assert len(sim.opens()) == 1 and len(sim.closes()) == 1
+    assert sim.closes()[0].t == pytest.approx(107.0, abs=0.35)
 
 
 def test_fire_event_lifecycle_and_camera_cooldown():

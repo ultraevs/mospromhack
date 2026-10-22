@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from shared.config import AppConfig
-from shared.schemas import RuleSettings, WorkerCamera, WorkerConfig, Zone
+from shared.schemas import RuleSettings, SmokingRule, WorkerCamera, WorkerConfig, Zone
 from worker.app.capture import Frame
 from worker.app.crops import crop_box, merge, only_classes, shift
 from worker.app.detector.fake import FakeBox, FakeDetector
@@ -14,6 +14,8 @@ from worker.tests.conftest import write_model_yaml
 from worker.tests.test_pipeline import THRESHOLDS, FakeClient, FakeReader, FakeSender
 
 RULES = RuleSettings()
+EVERYWHERE = RuleSettings(smoking=SmokingRule(everywhere=True))
+FLAMMABLE = Zone(id=9, camera_id=3, name="Склад ГСМ", type="flammable", polygon=[[0, 0], [1, 0], [1, 1], [0, 1]])
 HAZARD = {"fire": 0.34, "smoke": 0.31, "cigarette": 0.36}
 PERSON = FakeBox("person", (0.25, 0.25, 0.25, 0.5), 0.9)
 
@@ -24,8 +26,8 @@ def specs(tmp_path):
             "hazard": load_model_spec(write_model_yaml(tmp_path / "hazard", "hazard", HAZARD))}
 
 
-def make_worker(specs, scenario, cameras=(3,), config=None, zones=()):
-    remote = WorkerConfig(version=1, cameras=[
+def make_worker(specs, scenario, cameras=(3,), config=None, zones=(), rules=RULES):
+    remote = WorkerConfig(version=1, rules=rules, cameras=[
         WorkerCamera(id=i, name=f"c{i}", rtsp_url=f"rtsp://x/cam-{i}", zones=list(zones)) for i in cameras])
     w = Worker(config or AppConfig(), specs, FakeDetector(specs, scenario), FakeClient(remote), FakeSender(),
                reader_factory=FakeReader)
@@ -112,12 +114,12 @@ def test_hazard_boxes_are_added_to_detections_for_the_player(specs):
     assert worker.sender.sent[-1]["objects"] == []
 
 
-def cigarette_scenario(found_on_crop):
+def cigarette_scenario(found_on_crop, box=(0.45, 0.45, 0.1, 0.1)):
     def fn(model, call, item):
         if model == "ppe":
             return [PERSON]
         if call % 2 == 1 and found_on_crop(call // 2, item):
-            return [FakeBox("cigarette", (0.45, 0.45, 0.1, 0.1), 0.6)]
+            return [FakeBox("cigarette", box, 0.6)]
         return []
     return fn
 
@@ -134,18 +136,53 @@ def run_ticks(worker, n, start_ms=1_000_000, clock=None):
         worker.tick_ppe()
 
 
-def test_smoking_opens_after_2_of_5_crop_checks(specs, frozen_clock):
-    worker = make_worker(specs, cigarette_scenario(lambda tick, item: tick in (1, 3)))
-    run_ticks(worker, 5, clock=frozen_clock)
+def test_smoking_opens_after_3_of_5_crop_checks(specs, frozen_clock):
+    worker = make_worker(specs, cigarette_scenario(lambda tick, item: tick in (1, 3, 4)), rules=EVERYWHERE)
+    run_ticks(worker, 4, clock=frozen_clock)
+    assert worker.client.events == []
+    run_ticks(worker, 1, start_ms=1_004_000, clock=frozen_clock)
     assert [e.type.value for e in worker.client.events] == ["smoking"]
     ev = worker.client.events[0]
     track_id = worker.sender.sent[-1]["people"][0]["track_id"]
     assert ev.track_id == track_id and ev.severity.value == "medium" and ev.zone_id is None
-    assert ev.started_at.timestamp() == pytest.approx(1003.5)
+    assert ev.started_at.timestamp() == pytest.approx(1004.5)
+
+
+def test_smoking_two_of_five_is_not_enough(specs, frozen_clock):
+    worker = make_worker(specs, cigarette_scenario(lambda tick, item: tick in (1, 3)), rules=EVERYWHERE)
+    run_ticks(worker, 8, clock=frozen_clock)
+    assert worker.client.events == []
+
+
+def test_smoking_by_default_works_only_in_flammable_zones(specs, frozen_clock):
+    always = cigarette_scenario(lambda tick, item: True)
+    worker = make_worker(specs, always)
+    run_ticks(worker, 6, clock=frozen_clock)
+    assert worker.client.events == [] and worker.stats()["crops_per_s"] == 0
+    far = Zone(id=9, camera_id=3, name="Склад ГСМ", type="flammable", polygon=[[0.6, 0], [1, 0], [1, 1], [0.6, 1]])
+    worker = make_worker(specs, always, zones=[far])
+    run_ticks(worker, 6, clock=frozen_clock)
+    assert worker.client.events == [] and worker.stats()["crops_per_s"] == 0
+    restricted = FLAMMABLE.model_copy(update={"type": "restricted"})
+    worker = make_worker(specs, always, zones=[restricted])
+    run_ticks(worker, 6, clock=frozen_clock)
+    assert [e.type.value for e in worker.client.events] == ["zone_intrusion"]
+
+
+def test_cigarette_below_upper_third_of_person_does_not_count(specs, frozen_clock):
+    low = cigarette_scenario(lambda tick, item: True, box=(0.45, 0.85, 0.1, 0.1))
+    worker = make_worker(specs, low, rules=EVERYWHERE)
+    run_ticks(worker, 6, clock=frozen_clock)
+    assert worker.client.events == []
+    assert [o for o in worker.sender.sent[-1]["objects"] if o["cls"] == "cigarette"] == []
+    loose = RuleSettings(smoking=SmokingRule(everywhere=True, upper_fraction=0.7))
+    worker = make_worker(specs, low, rules=loose)
+    run_ticks(worker, 6, clock=frozen_clock)
+    assert [e.type.value for e in worker.client.events] == ["smoking"]
 
 
 def test_cigarette_box_is_mapped_from_crop_to_frame(specs, frozen_clock):
-    worker = make_worker(specs, cigarette_scenario(lambda tick, item: True))
+    worker = make_worker(specs, cigarette_scenario(lambda tick, item: True), rules=EVERYWHERE)
     run_ticks(worker, 1, clock=frozen_clock)
     assert crop_box((160, 160, 320, 480), 0.6, 0.2, 640, 640) == (128, 121, 352, 390)
     cig = [o for o in worker.sender.sent[-1]["objects"] if o["cls"] == "cigarette"][0]
@@ -159,14 +196,13 @@ def test_cigarette_on_full_frame_is_ignored(specs, frozen_clock):
         if model == "ppe":
             return [PERSON]
         return [FakeBox("cigarette", (0.3, 0.3, 0.05, 0.05), 0.9)] if call % 2 == 0 else []
-    worker = make_worker(specs, fn)
+    worker = make_worker(specs, fn, rules=EVERYWHERE)
     run_ticks(worker, 6, clock=frozen_clock)
     assert worker.client.events == []
 
 
 def test_smoking_in_flammable_zone_is_high(specs, frozen_clock):
-    zone = Zone(id=9, camera_id=3, name="Склад ГСМ", type="flammable", polygon=[[0, 0], [1, 0], [1, 1], [0, 1]])
-    worker = make_worker(specs, cigarette_scenario(lambda tick, item: True), zones=[zone])
+    worker = make_worker(specs, cigarette_scenario(lambda tick, item: True), zones=[FLAMMABLE])
     run_ticks(worker, 3, clock=frozen_clock)
     ev = worker.client.events[0]
     assert (ev.type.value, ev.severity.value, ev.zone_id) == ("smoking", "high", 9)
@@ -185,10 +221,11 @@ def test_crops_are_limited_per_tick_and_rotate_between_ticks(specs):
     assert all(len(p) == 6 for p in picked)
     assert pipe.select_crops(1005.0, 1000, 1000, 6, 0.6, 0.2) == []
     assert pipe.select_crops(1000.0, 1000, 1000, 0, 0.6, 0.2) == []
+    assert pipe.select_crops(1000.0, 1000, 1000, 6, 0.6, 0.2, frozenset({9})) == []
 
 
 def test_cigarette_pass_can_be_disabled(specs, frozen_clock):
-    worker = make_worker(specs, cigarette_scenario(lambda tick, item: True))
+    worker = make_worker(specs, cigarette_scenario(lambda tick, item: True), rules=EVERYWHERE)
     worker.config.worker.crop_pass.cigarette.enabled = False
     run_ticks(worker, 4, clock=frozen_clock)
     assert worker.client.events == [] and worker.stats()["crops_per_s"] == 0
@@ -255,7 +292,7 @@ def test_only_cameras_with_new_frames_are_processed(specs):
 
 
 def test_stats_have_stage3_fields(specs, frozen_clock):
-    worker = make_worker(specs, cigarette_scenario(lambda tick, item: False), cameras=(1, 2))
+    worker = make_worker(specs, cigarette_scenario(lambda tick, item: False), cameras=(1, 2), rules=EVERYWHERE)
     run_ticks(worker, 2, clock=frozen_clock)
     s = worker.stats()
     assert s["streams"] == 2 and set(s["inference"]) == {"ppe", "hazard"}

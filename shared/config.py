@@ -8,7 +8,7 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from shared.schemas import RuleSettings
+from shared.schemas import RuleSettings, TelegramSettings
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -52,6 +52,7 @@ class AppConfig(BaseModel):
     worker: WorkerSection = Field(default_factory=WorkerSection)
     evidence: EvidenceSection = Field(default_factory=EvidenceSection)
     rules: RuleSettings = Field(default_factory=RuleSettings)
+    telegram: TelegramSettings = Field(default_factory=TelegramSettings)
 
 
 class Settings(BaseSettings):
