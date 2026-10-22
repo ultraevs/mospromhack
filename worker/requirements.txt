@@ -1,7 +1,6 @@
 onnxruntime-gpu[cuda,cudnn]
 numpy
 opencv-python
-supervision
 PyYAML
 pydantic
 pydantic-settings

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import signal
 import time
+import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -11,14 +12,13 @@ from typing import Callable
 import numpy as np
 
 from shared.config import AppConfig, Settings, get_settings, load_config
-from shared.schemas import (DetectionsMessage, EventCreate, EventType, FrameSize, ObjectBox, PersonBox, PpeItem,
-                            PpeStatus, WorkerCamera, WorkerConfig)
+from shared.schemas import EventCreate, WorkerCamera, WorkerConfig
 from worker.app.capture import CameraReader
 from worker.app.client import BackendClient, DetectionsSender
 from worker.app.detector import Detector, create_detector
 from worker.app.model_spec import ModelSpec, load_all_specs
+from worker.app.pipeline import CameraPipeline, check_classes
 from worker.app.postprocess import Detections, decode, preprocess
-from worker.app.rules.simple import SimpleNoHelmet
 from worker.app.rules.types import EventClose, EventOpen
 
 log = logging.getLogger("worker")
@@ -28,16 +28,11 @@ STATS_PERIOD_S = 1.0
 MAX_PENDING = 200
 
 
-def norm_box(xyxy: np.ndarray, w: int, h: int) -> list[float]:
-    x1, y1, x2, y2 = (float(v) for v in xyxy)
-    return [round(x1 / w, 4), round(y1 / h, 4), round((x2 - x1) / w, 4), round((y2 - y1) / h, 4)]
-
-
 @dataclass
 class CameraState:
     camera: WorkerCamera
     reader: CameraReader
-    rule: SimpleNoHelmet = field(default_factory=SimpleNoHelmet)
+    pipeline: CameraPipeline = field(default_factory=CameraPipeline)
     last_seq: int = 0
     processed: deque = field(default_factory=lambda: deque(maxlen=120))
 
@@ -65,6 +60,7 @@ class Worker:
         self._batch: dict[str, int] = {}
         self._config_error: str | None = None
         self._running = True
+        self.session = uuid.uuid4().hex
 
 
     def sync_config(self) -> None:
@@ -119,26 +115,8 @@ class Worker:
 
     def _handle(self, state: CameraState, ts_ms: int, w: int, h: int, dets: Detections, spec: ModelSpec) -> None:
         assert self.remote is not None
-        person_id = spec.class_id("person")
-        no_helmet_id = spec.class_id("no_helmet")
-
-        people, objects, no_helmet = [], [], []
-        for xyxy, conf, cls in zip(dets.xyxy, dets.conf, dets.cls):
-            box = norm_box(xyxy, w, h)
-            if cls == person_id:
-                people.append(PersonBox(track_id=len(people) + 1, bbox=box, conf=round(float(conf), 3)))
-            else:
-                objects.append(ObjectBox(cls=spec.classes[cls], bbox=box, conf=round(float(conf), 3)))
-                if cls == no_helmet_id:
-                    no_helmet.append((float(conf), tuple(box)))
-
-        actions = state.rule.update(ts_ms / 1000, no_helmet, self.remote.rules)
-        if state.rule.is_open:
-            for p in people:
-                p.violations = [EventType.no_helmet]
-                p.ppe = {PpeItem.helmet: PpeStatus.violation}
-        self.sender.send(DetectionsMessage(camera_id=state.camera.id, ts=ts_ms, frame=FrameSize(w=w, h=h),
-                                           people=people, objects=objects).model_dump_json())
+        msg, actions = state.pipeline.process_ppe(dets, spec, w, h, ts_ms, state.camera, self.remote.rules)
+        self.sender.send(msg.model_dump_json())
         for action in actions:
             if isinstance(action, EventOpen):
                 self._captured[action.key] = ts_ms
@@ -181,6 +159,7 @@ class Worker:
         if not self.sender.connected:
             warnings.append("нет соединения для отправки рамок в backend")
         return {
+            "session": self.session,
             "detector": self.detector.name,
             "device": self.detector.device,
             "warnings": warnings,
@@ -228,6 +207,7 @@ def build(settings: Settings, config: AppConfig) -> Worker:
     specs = load_all_specs(settings.models_dir)
     if "ppe" not in specs:
         raise SystemExit(f"нет модели ppe в {settings.models_dir}; запусти scripts/sync_models.ps1")
+    check_classes(specs["ppe"])
     detector = create_detector(config.worker.detector, specs, config.worker.fake_scenario)
     base = f"http://127.0.0.1:{settings.backend_port}"
     client = BackendClient(base, settings.internal_token)
