@@ -14,5 +14,5 @@ COPY config.yaml config.yaml
 
 ENV PYTHONUNBUFFERED=1 \
     NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
 CMD ["python", "-m", "worker.app.main"]

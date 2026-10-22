@@ -48,7 +48,7 @@ $seed = {
         try { Invoke-RestMethod "$api/api/health" -TimeoutSec 2 | Out-Null; $ready = $true; break } catch { Start-Sleep -Seconds 1 }
     }
     if (-not $ready) { return "backend did not answer on $api in 3 minutes" }
-    $existing = @(Invoke-RestMethod "$api/api/cameras")
+    $existing = @((Invoke-RestMethod "$api/api/cameras") | Where-Object { $_ -and $_.id })
     $added = 0
     if ($existing.Count -eq 0) {
         foreach ($name in $names) {
