@@ -1,4 +1,7 @@
-import type { Camera, ClientConfig, EventPage, RuleSettings, SafetyEvent, Stats, Zone, ZoneInput } from "./types";
+import type {
+  AnalyticsSummary, Camera, ClientConfig, Delivery, EventPage, RuleSettings, SafetyEvent, Stats, TelegramSettings,
+  TelegramStatus, Webhook, WebhookInput, Zone, ZoneInput,
+} from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
@@ -12,6 +15,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(detail);
   }
   return res.status === 204 ? (undefined as T) : res.json();
+}
+
+type Query = Record<string, string | number | undefined>;
+
+function query(params: Query): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") q.set(k, String(v));
+  return q.toString();
 }
 
 export const api = {
@@ -29,12 +40,21 @@ export const api = {
   deleteZone: (id: number) => request<void>(`/api/zones/${id}`, { method: "DELETE" }),
   rules: () => request<RuleSettings>("/api/settings/rules"),
   saveRules: (body: RuleSettings) => request<RuleSettings>("/api/settings/rules", { method: "PUT", body: JSON.stringify(body) }),
+  telegram: () => request<TelegramStatus>("/api/telegram"),
+  telegramSettings: () => request<TelegramSettings>("/api/settings/telegram"),
+  saveTelegramSettings: (body: TelegramSettings) =>
+    request<TelegramSettings>("/api/settings/telegram", { method: "PUT", body: JSON.stringify(body) }),
   videos: () => request<{ name: string; size: number }[]>("/api/videos"),
-  events: (params: Record<string, string | number | undefined> = {}) => {
-    const q = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") q.set(k, String(v));
-    return request<EventPage>(`/api/events?${q}`);
-  },
+  events: (params: Query = {}) => request<EventPage>(`/api/events?${query(params)}`),
+  event: (id: string) => request<SafetyEvent>(`/api/events/${id}`),
+  analytics: (params: Query = {}) => request<AnalyticsSummary>(`/api/analytics/summary?${query(params)}`),
+  webhooks: () => request<Webhook[]>("/api/webhooks"),
+  createWebhook: (body: WebhookInput) => request<Webhook>("/api/webhooks", { method: "POST", body: JSON.stringify(body) }),
+  updateWebhook: (id: number, body: Partial<WebhookInput>) =>
+    request<Webhook>(`/api/webhooks/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteWebhook: (id: number) => request<void>(`/api/webhooks/${id}`, { method: "DELETE" }),
+  testWebhook: (id: number) => request<Delivery>(`/api/webhooks/${id}/test`, { method: "POST" }),
+  deliveries: (id: number, limit = 30) => request<Delivery[]>(`/api/webhooks/${id}/deliveries?limit=${limit}`),
   reviewEvent: (id: string, review: SafetyEvent["review"]) =>
     request<SafetyEvent>(`/api/events/${id}`, { method: "PATCH", body: JSON.stringify({ review }) }),
   stats: () => request<Stats>("/api/stats"),

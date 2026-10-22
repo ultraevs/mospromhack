@@ -24,13 +24,31 @@ export interface RuleSettings {
   no_mask: FractionRule;
   no_vest: { window_s: number; min_observations: number; max_fraction: number; min_person_height_px: number };
   zone_intrusion: { window_s: number; fraction: number; min_observations: number };
-  smoking: { k: number; m: number };
+  smoking: { k: number; m: number; upper_fraction: number; everywhere: boolean };
   fire: { k: number; m: number };
   smoke: { k: number; m: number };
   lifecycle: {
     close_after_s: number; cooldown_s: number; retrack_iou: number; retrack_window_s: number;
     camera_cooldown_s: number; track_lost_s: number;
   };
+}
+
+export interface TelegramSettings {
+  instant_min_severity: Severity;
+  min_interval_s: number;
+  summary_interval_s: number;
+  repeat_interval_s: number;
+}
+
+export interface TelegramStatus {
+  enabled: boolean;
+  running: boolean;
+  username: string | null;
+  error: string | null;
+  subscribers: number;
+  sent: number;
+  errors: number;
+  pending: number;
 }
 
 export const PPE_LABEL: Record<PpeItem, string> = { helmet: "каска", mask: "маска", vest: "жилет" };
@@ -125,6 +143,49 @@ export interface Stats {
   };
 }
 
+export interface Webhook {
+  id: number;
+  url: string;
+  secret: string;
+  event_types: EventType[];
+  min_severity: Severity;
+  send_closed: boolean;
+  enabled: boolean;
+}
+
+export type WebhookInput = Omit<Webhook, "id">;
+
+export interface Delivery {
+  id: number;
+  webhook_id: number;
+  event_id: string;
+  action: string;
+  attempt: number;
+  status_code: number | null;
+  ok: boolean;
+  error: string | null;
+  duration_ms: number;
+  created_at: string;
+}
+
+export interface ReviewCounts {
+  total: number;
+  confirmed: number;
+  false_positive: number;
+  unreviewed: number;
+  false_share: number | null;
+}
+
+export interface AnalyticsSummary extends ReviewCounts {
+  by_type: ({ type: EventType } & ReviewCounts)[];
+  by_severity: { severity: Severity; total: number }[];
+  by_camera: { camera_id: number; camera_name: string; total: number }[];
+  by_zone: { zone_id: number; zone_name: string | null; camera_name: string; total: number }[];
+  without_zone: number;
+  by_hour: { hour: number; total: number }[];
+  by_day: { day: string; total: number }[];
+}
+
 export interface ClientConfig {
   webrtc_port: number;
   overlay_delay_ms: number;
@@ -139,6 +200,9 @@ export const EVENT_LABEL: Record<EventType, string> = {
   fire: "огонь",
   smoke: "дым",
 };
+
+export const EVENT_TYPES = Object.keys(EVENT_LABEL) as EventType[];
+export const REVIEW_LABEL: Record<Review, string> = { none: "не размечено", confirmed: "подтверждено", false_positive: "ложное" };
 
 export const SEVERITY_LABEL: Record<Severity, string> = { high: "высокая", medium: "средняя", low: "низкая" };
 export const SEVERITY_ICON: Record<Severity, string> = { high: "▲", medium: "◆", low: "●" };
