@@ -142,3 +142,112 @@ class DetectionsMessage(BaseModel):
     frame: FrameSize
     people: list[PersonBox] = Field(default_factory=list)
     objects: list[ObjectBox] = Field(default_factory=list)
+
+
+class CameraBase(BaseModel):
+    name: str
+    source_type: SourceType
+    source: str
+    required_ppe: list[PpeItem] = Field(default_factory=list)
+    enabled: bool = True
+
+
+class CameraCreate(CameraBase):
+    pass
+
+
+class CameraUpdate(BaseModel):
+    name: str | None = None
+    source_type: SourceType | None = None
+    source: str | None = None
+    required_ppe: list[PpeItem] | None = None
+    enabled: bool | None = None
+
+
+class Camera(CameraBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    status: Literal["online", "offline"] = "offline"
+    open_events: int = 0
+
+
+class ZoneBase(BaseModel):
+    name: str
+    type: ZoneType
+    polygon: list[Point] = Field(min_length=3)
+    required_ppe: list[PpeItem] = Field(default_factory=list)
+
+
+class ZoneCreate(ZoneBase):
+    pass
+
+
+class ZoneUpdate(BaseModel):
+    name: str | None = None
+    type: ZoneType | None = None
+    polygon: list[Point] | None = Field(default=None, min_length=3)
+    required_ppe: list[PpeItem] | None = None
+
+
+class Zone(ZoneBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    camera_id: int
+
+
+# дефолты должны совпадать с config.yaml!!
+class FractionRule(BaseModel):
+    window_s: float = 4
+    min_observations: int = 8
+    fraction: float = 0.35
+
+
+class NoVestRule(BaseModel):
+    window_s: float = 6
+    min_observations: int = 15
+    max_fraction: float = 0.1
+    min_person_height_px: int = 120
+
+
+class ZoneIntrusionRule(BaseModel):
+    window_s: float = 1.5
+    fraction: float = 0.7
+
+
+class KofMRule(BaseModel):
+    k: int
+    m: int
+
+
+class LifecycleRule(BaseModel):
+    close_after_s: float = 5
+    cooldown_s: float = 60
+    retrack_iou: float = 0.3
+    retrack_window_s: float = 10
+    camera_cooldown_s: float = 60
+
+
+class RuleSettings(BaseModel):
+    no_helmet: FractionRule = Field(default_factory=FractionRule)
+    no_mask: FractionRule = Field(default_factory=FractionRule)
+    no_vest: NoVestRule = Field(default_factory=NoVestRule)
+    zone_intrusion: ZoneIntrusionRule = Field(default_factory=ZoneIntrusionRule)
+    smoking: KofMRule = Field(default_factory=lambda: KofMRule(k=2, m=5))
+    fire: KofMRule = Field(default_factory=lambda: KofMRule(k=3, m=5))
+    smoke: KofMRule = Field(default_factory=lambda: KofMRule(k=3, m=5))
+    lifecycle: LifecycleRule = Field(default_factory=LifecycleRule)
+
+
+class WorkerCamera(BaseModel):
+    id: int
+    name: str
+    rtsp_url: str
+    required_ppe: list[PpeItem] = Field(default_factory=list)
+    zones: list[Zone] = Field(default_factory=list)
+
+
+# отдаем воркеру через /internal/config
+class WorkerConfig(BaseModel):
+    version: int
+    cameras: list[WorkerCamera] = Field(default_factory=list)
+    rules: RuleSettings = Field(default_factory=RuleSettings)
