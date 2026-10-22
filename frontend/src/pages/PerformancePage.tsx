@@ -34,6 +34,7 @@ export function PerformancePage() {
   const names = new Map(cameras.map((c) => [String(c.id), c.name]));
   const target = stats.target_fps?.ppe;
   const lat = stats.latency?.capture_to_event;
+  const tg = stats.latency?.capture_to_telegram;
   const onCpu = stats.device === "cpu";
 
   return (
@@ -50,7 +51,10 @@ export function PerformancePage() {
               hint={`сигарета: ${stats.crop_pass?.cigarette ? "вкл" : "выкл"}, головы: ${stats.crop_pass?.head ? "вкл" : "выкл"}`} />
         <Card title="От кадра до события" value={lat ? `${lat.avg_ms} мс` : "—"}
               hint={lat ? `p95 ${lat.p95_ms} мс, по ${lat.events} событиям` : "событий со временем кадра ещё нет"} />
-        <Card title="От кадра до телеграма" value="—" hint="появится на этапе 4" />
+        <Card title="От кадра до телеграма" value={tg ? `${tg.avg_ms} мс` : "—"}
+              hint={tg ? `p95 ${tg.p95_ms} мс, по ${tg.events} сообщениям` : "сообщений ещё не было или бот выключен"} />
+        <Card title="Клипы" value={`${stats.clips?.built ?? 0} собрано`}
+              hint={`в работе ${stats.clips?.pending ?? 0}, с ошибкой ${stats.clips?.failed ?? 0}`} warn={(stats.clips?.failed ?? 0) > 0} />
       </div>
 
       <h2 className="mb-2 mt-5 font-semibold">Инференс</h2>

@@ -28,6 +28,13 @@ export function EventRow({ event }: { event: SafetyEvent }) {
         {formatTime(event.started_at)} · {event.camera_name}
         {event.zone_name ? ` · ${event.zone_name}` : ""}
       </div>
+      {event.snapshot_url && (
+        <a href={event.clip_url ?? event.snapshot_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+           title={event.clip_url ? "Открыть клип" : "Открыть стоп-кадр"} className="relative mt-1 block">
+          <img src={event.snapshot_url} alt="Стоп-кадр нарушения" loading="lazy" className="w-full rounded border border-line" />
+          {event.clip_url && <span className="absolute bottom-1 right-1 rounded bg-bg/80 px-1 text-xs">▶ клип</span>}
+        </a>
+      )}
     </div>
   );
 }

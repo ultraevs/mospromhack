@@ -118,7 +118,11 @@ export interface Stats {
   actual_fps?: Record<string, number>;
   inference?: Record<string, { avg_ms: number; p95_ms: number; batch: number }>;
   cameras?: Record<string, { online: boolean; error: string | null; read_fps: number; proc_fps: number }>;
-  latency?: { capture_to_event: { avg_ms: number; p95_ms: number; events: number } | null };
+  clips?: { built: number; failed: number; pending: number };
+  latency?: {
+    capture_to_event: { avg_ms: number; p95_ms: number; events: number } | null;
+    capture_to_telegram?: { avg_ms: number; p95_ms: number; events: number } | null;
+  };
 }
 
 export interface ClientConfig {

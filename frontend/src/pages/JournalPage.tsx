@@ -20,6 +20,7 @@ export function JournalPage() {
             <th className="px-2 py-2 font-normal">Зона</th>
             <th className="px-2 py-2 font-normal">Состояние</th>
             <th className="px-2 py-2 font-normal">Уверенность</th>
+            <th className="px-2 py-2 font-normal">Доказательства</th>
           </tr>
         </thead>
         <tbody>
@@ -32,6 +33,10 @@ export function JournalPage() {
               <td className="px-2 py-2 text-muted">{e.zone_name ?? "—"}</td>
               <td className="px-2 py-2">{e.status === "open" ? "идёт" : "закрыто"}</td>
               <td className="px-2 py-2 text-muted">{e.confidence.toFixed(2)}</td>
+              <td className="px-2 py-2">
+                {e.snapshot_url ? <a className="underline" href={e.snapshot_url} target="_blank" rel="noreferrer">стоп-кадр</a> : <span className="text-muted">—</span>}
+                {e.clip_url && <a className="ml-3 underline" href={e.clip_url} target="_blank" rel="noreferrer">клип</a>}
+              </td>
             </tr>
           ))}
         </tbody>
