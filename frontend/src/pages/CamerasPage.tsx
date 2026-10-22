@@ -20,9 +20,6 @@ export function freshByCamera(events: SafetyEvent[], now: number, windowMs = HIG
 
 export function CamerasPage({ config }: { config: ClientConfig }) {
   const [cameras, setCameras] = useState<Camera[]>([]);
-  const [videos, setVideos] = useState<string[]>([]);
-  const [name, setName] = useState("");
-  const [source, setSource] = useState("");
   const [error, setError] = useState("");
   const [now, setNow] = useState(Date.now());
   const { events } = useEvents(undefined, 50);
@@ -32,24 +29,11 @@ export function CamerasPage({ config }: { config: ClientConfig }) {
 
   useEffect(() => {
     load();
-    api.videos().then((v) => { setVideos(v.map((x) => x.name)); setSource((s) => s || v[0]?.name || ""); }).catch(() => undefined);
     const timer = setInterval(() => { load(); setNow(Date.now()); }, 2000);
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => { load(); setNow(Date.now()); }, [events]);
-
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.createCamera({ name: name || source, source_type: "file", source, required_ppe: ["helmet"] });
-      setName("");
-      setError("");
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
 
   const fresh = freshByCamera(events, now);
   const enabled = cameras.filter((c) => c.enabled);
@@ -87,32 +71,24 @@ export function CamerasPage({ config }: { config: ClientConfig }) {
             );
           })}
         </div>
-        {loaded.current && enabled.length === 0 && <div className="text-muted">Камер нет. Добавь первую ниже.</div>}
+        {loaded.current && enabled.length === 0 && (
+          <div className="text-muted">
+            {cameras.length ? "Все камеры выключены." : "Камер нет."}{" "}
+            <Link className="text-accent underline" to="/settings/cameras">Открыть настройки камер</Link>
+          </div>
+        )}
 
-        <form onSubmit={add} className="mt-4 flex max-w-2xl items-end gap-2 rounded border border-line bg-panel p-3">
-          <label className="flex flex-1 flex-col gap-1 text-xs text-muted">
-            Название
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Цех 2, ворота"
-                   className="rounded border border-line bg-bg px-2 py-1 text-sm text-text" />
-          </label>
-          <label className="flex flex-1 flex-col gap-1 text-xs text-muted">
-            Видеофайл из data/videos
-            <select value={source} onChange={(e) => setSource(e.target.value)}
-                    className="rounded border border-line bg-bg px-2 py-1 text-sm text-text">
-              {videos.map((v) => <option key={v}>{v}</option>)}
-            </select>
-          </label>
-          <button disabled={!source} className="rounded bg-accent px-3 py-1 text-sm font-medium text-bg disabled:opacity-40">
-            Добавить камеру
-          </button>
-        </form>
       </div>
 
       <aside className="flex w-80 flex-col border-l border-line bg-panel">
         <div className="border-b border-line px-3 py-2 font-semibold">Последние события</div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {events.length === 0 && <div className="p-3 text-muted">Нарушений пока нет</div>}
-          {events.map((e) => <EventRow key={e.id} event={e} />)}
+          {events.map((e) => (
+            <Link key={e.id} to={`/journal?event=${e.id}`} className="block hover:bg-panel-2" title="Открыть в журнале">
+              <EventRow event={e} />
+            </Link>
+          ))}
         </div>
       </aside>
     </div>

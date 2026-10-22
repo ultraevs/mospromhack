@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { api } from "./api";
 import { CameraPage } from "./pages/CameraPage";
@@ -8,9 +8,12 @@ import { PerformancePage } from "./pages/PerformancePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { ClientConfig } from "./types";
 
+const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage })));
+
 const NAV: [string, string][] = [
   ["/", "Камеры"],
   ["/journal", "Журнал"],
+  ["/analytics", "Аналитика"],
   ["/settings", "Настройки"],
   ["/performance", "Производительность"],
 ];
@@ -51,7 +54,7 @@ export function App() {
         <span className="font-semibold">Контроль безопасности</span>
         <nav className="flex gap-4">
           {NAV.map(([to, text]) => (
-            <NavLink key={to} to={to} end className={({ isActive }) => (isActive ? "text-accent" : "text-muted hover:text-text")}>
+            <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => (isActive ? "text-accent" : "text-muted hover:text-text")}>
               {text}
             </NavLink>
           ))}
@@ -66,7 +69,8 @@ export function App() {
             <Route path="/" element={<CamerasPage config={config} />} />
             <Route path="/cameras/:id" element={<CameraPage config={config} />} />
             <Route path="/journal" element={<JournalPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/analytics" element={<Suspense fallback={<div className="p-6 text-muted">Загрузка…</div>}><AnalyticsPage /></Suspense>} />
+            <Route path="/settings/*" element={<SettingsPage />} />
             <Route path="/performance" element={<PerformancePage />} />
           </Routes>
         )}
