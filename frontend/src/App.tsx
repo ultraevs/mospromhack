@@ -4,11 +4,13 @@ import { api } from "./api";
 import { CameraPage } from "./pages/CameraPage";
 import { CamerasPage } from "./pages/CamerasPage";
 import { JournalPage } from "./pages/JournalPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import type { ClientConfig } from "./types";
 
 const NAV: [string, string][] = [
   ["/", "Камеры"],
   ["/journal", "Журнал"],
+  ["/settings", "Настройки"],
 ];
 
 function HealthBar() {
@@ -62,6 +64,7 @@ export function App() {
             <Route path="/" element={<CamerasPage />} />
             <Route path="/cameras/:id" element={<CameraPage config={config} />} />
             <Route path="/journal" element={<JournalPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         )}
       </main>

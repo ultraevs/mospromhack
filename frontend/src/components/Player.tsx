@@ -15,10 +15,11 @@ interface Props {
   config: ClientConfig;
   layers?: Layers;
   drawExtra?: (ctx: CanvasRenderingContext2D, rect: ReturnType<typeof videoRect>) => void;
+  rectRef?: React.MutableRefObject<ReturnType<typeof videoRect> | null>;
   children?: React.ReactNode;
 }
 
-export function Player({ cameraId, config, layers = DEFAULT_LAYERS, drawExtra, children }: Props) {
+export function Player({ cameraId, config, layers = DEFAULT_LAYERS, drawExtra, rectRef, children }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const queue = useRef<DetectionsMessage[]>([]);
@@ -108,12 +109,13 @@ export function Player({ cameraId, config, layers = DEFAULT_LAYERS, drawExtra, c
       }
       const frame = msg?.frame ?? { w: video.videoWidth, h: video.videoHeight };
       const rect = videoRect(cw, ch, frame.w, frame.h);
+      if (rectRef) rectRef.current = rect;
       extraRef.current?.(ctx, rect);
       if (msg && !isStale(msg, now, config.overlay_delay_ms)) drawDetections(ctx, msg, rect, layersRef.current);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [config.overlay_delay_ms]);
+  }, [config.overlay_delay_ms, rectRef]);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
