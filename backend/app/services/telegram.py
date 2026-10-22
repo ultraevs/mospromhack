@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections import Counter, deque
+from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -13,11 +14,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.app.db.models import CameraRow, EventRow, TelegramChatRow
 from backend.app.services.bus import BusMessage
 from backend.app.services.media import path_for_url
-from shared.schemas import Event, EventStatus, EventType, Severity
+from backend.app.state import get_setting, set_setting
+from shared.schemas import Event, EventStatus, EventType, Severity, TelegramSettings
 
 log = logging.getLogger("backend.telegram")
 
-MIN_INTERVAL_S = 1.0
+TELEGRAM_KEY = "telegram"
 
 EVENT_TEXT = {
     EventType.no_helmet: "Без каски", EventType.no_mask: "Без маски", EventType.no_vest: "Без жилета",
@@ -26,20 +28,33 @@ EVENT_TEXT = {
 }
 SEVERITY_TEXT = {Severity.high: "🔴 высокая", Severity.medium: "🟠 средняя", Severity.low: "🟡 низкая"}
 
+Key = tuple[int, EventType]
 
-def caption(event: Event) -> str:
+
+def load_settings(db: Session, default: TelegramSettings) -> TelegramSettings:
+    raw = get_setting(db, TELEGRAM_KEY)
+    return TelegramSettings.model_validate(raw) if raw else default
+
+
+def save_settings(db: Session, value: TelegramSettings) -> None:
+    set_setting(db, TELEGRAM_KEY, value.model_dump(mode="json"))
+
+
+def caption(event: Event, skipped: int = 0) -> str:
     local = event.started_at.astimezone().strftime("%d.%m %H:%M:%S")
     lines = [f"{EVENT_TEXT[event.type]} · важность {SEVERITY_TEXT[event.severity]}", f"Камера: {event.camera_name}"]
     if event.zone_name:
         lines.append(f"Зона: {event.zone_name}")
     lines.append(f"Время: {local}")
+    if skipped:
+        lines.append(f"Пропущено таких же с прошлого сообщения: {skipped}")
     return "\n".join(lines)
 
 
-def summary(events: list[Event]) -> str:
-    counts = Counter((e.camera_name, e.type) for e in events)
-    lines = [f"Нарушений за последние секунды: {len(events)}"]
-    lines += [f"• {EVENT_TEXT[typ]} — {cam}" + (f" ×{n}" if n > 1 else "") for (cam, typ), n in counts.most_common()]
+def summary(counts: dict[tuple[str, EventType], int]) -> str:
+    lines = [f"Сводка нарушений: {sum(counts.values())}"]
+    lines += [f"• {EVENT_TEXT[typ]} — {cam}" + (f" ×{n}" if n > 1 else "")
+              for (cam, typ), n in sorted(counts.items(), key=lambda kv: -kv[1])]
     return "\n".join(lines)
 
 
@@ -49,19 +64,40 @@ class Sender(Protocol):
     async def send_video(self, chat_id: int, video: Path, caption: str, reply_to: int | None) -> int: ...
 
 
+@dataclass
+class _Out:
+    kind: str
+    message: BusMessage | None = None
+    text: str = ""
+    skipped: int = 0
+
+
 class TelegramNotifier:
+
     def __init__(self, session_factory: sessionmaker[Session], sender: Sender, media_root: Path,
-                 min_interval_s: float = MIN_INTERVAL_S):
+                 defaults: TelegramSettings | None = None):
         self._sessions = session_factory
         self._sender = sender
         self._media = media_root
-        self._interval = min_interval_s
-        self._queues: dict[int, asyncio.Queue[BusMessage]] = {}
+        self._defaults = defaults or TelegramSettings()
+        self._queues: dict[int, asyncio.Queue[_Out]] = {}
         self._tasks: dict[int, asyncio.Task] = {}
         self._photo_message: dict[tuple[int, str], int] = {}
+        self._pending: dict[Key, int] = {}
+        self._names: dict[int, str] = {}
+        self._last: dict[Key, float] = {}
+        self._flush_task: asyncio.Task | None = None
         self.latency_ms: deque[int] = deque(maxlen=100)
         self.sent = 0
         self.errors = 0
+
+    def settings(self) -> TelegramSettings:
+        with self._sessions() as db:
+            return load_settings(db, self._defaults)
+
+    @property
+    def pending(self) -> int:
+        return sum(self._pending.values())
 
 
     def chats(self) -> list[int]:
@@ -75,7 +111,8 @@ class TelegramNotifier:
                 if row is None:
                     db.add(TelegramChatRow(chat_id=chat_id))
                     db.commit()
-                return "Подписка включена. Сюда будут приходить нарушения со стоп-кадром и клипом.\n/stop — отписаться, /status — состояние."
+                return ("Подписка включена. Важные нарушения приходят сразу со стоп-кадром и клипом, остальные сводкой."
+                        "\n/stop — отписаться, /status — состояние.")
             if name == "stop":
                 if row is not None:
                     db.delete(row)
@@ -93,50 +130,98 @@ class TelegramNotifier:
     async def handle(self, message: BusMessage) -> None:
         if message.action == "closed":
             return
-        for chat_id in self.chats():
-            queue = self._queues.setdefault(chat_id, asyncio.Queue())
-            queue.put_nowait(message)
-            if chat_id not in self._tasks or self._tasks[chat_id].done():
-                self._tasks[chat_id] = asyncio.create_task(self._chat_loop(chat_id, queue), name=f"tg-{chat_id}")
+        chats = self.chats()
+        if not chats:
+            return
+        event = message.event
+        if message.action == "clip_added":
+            for chat_id in chats:
+                if (chat_id, event.id) in self._photo_message:
+                    self._enqueue(chat_id, _Out("clip", message))
+            return
 
-    async def _chat_loop(self, chat_id: int, queue: asyncio.Queue[BusMessage]) -> None:
+        cfg = self.settings()
+        key = (event.camera_id, event.type)
+        self._names[event.camera_id] = event.camera_name
+        now = time.monotonic()
+        instant = event.severity.rank >= cfg.instant_min_severity.rank
+        if instant and now - self._last.get(key, float("-inf")) >= cfg.repeat_interval_s:
+            self._last[key] = now
+            skipped = self._pending.pop(key, 0)
+            for chat_id in chats:
+                self._enqueue(chat_id, _Out("photo", message, skipped=skipped))
+        else:
+            self._pending[key] = self._pending.get(key, 0) + 1
+            self._schedule_flush(cfg.summary_interval_s)
+
+    def _enqueue(self, chat_id: int, item: _Out) -> None:
+        queue = self._queues.setdefault(chat_id, asyncio.Queue())
+        queue.put_nowait(item)
+        if chat_id not in self._tasks or self._tasks[chat_id].done():
+            self._tasks[chat_id] = asyncio.create_task(self._chat_loop(chat_id, queue), name=f"tg-{chat_id}")
+
+    def _schedule_flush(self, delay_s: float) -> None:
+        if self._flush_task is None or self._flush_task.done():
+            self._flush_task = asyncio.create_task(self._flush_later(delay_s), name="tg-summary")
+
+    async def _flush_later(self, delay_s: float) -> None:
+        await asyncio.sleep(delay_s)
+        self._flush_task = None
+        self.flush()
+
+    def flush(self) -> None:
+        cfg = self.settings()
+        now = time.monotonic()
+        ready = {k: n for k, n in self._pending.items() if now - self._last.get(k, float("-inf")) >= cfg.repeat_interval_s}
+        if ready:
+            counts: dict[tuple[str, EventType], int] = {}
+            for (camera_id, typ), n in ready.items():
+                del self._pending[(camera_id, typ)]
+                self._last[(camera_id, typ)] = now
+                name = (self._names.get(camera_id, f"камера {camera_id}"), typ)
+                counts[name] = counts.get(name, 0) + n
+            text = summary(counts)
+            for chat_id in self.chats():
+                self._enqueue(chat_id, _Out("text", text=text))
+        if self._pending:
+            self._schedule_flush(cfg.summary_interval_s)
+
+    async def _chat_loop(self, chat_id: int, queue: asyncio.Queue[_Out]) -> None:
         while not queue.empty():
-            batch = [queue.get_nowait() for _ in range(queue.qsize())]
-            opened = [m for m in batch if m.action == "opened"]
-            clips = [m for m in batch if m.action == "clip_added"]
+            item = queue.get_nowait()
+            interval = self.settings().min_interval_s
             try:
-                if len(opened) == 1:
-                    await self._send_opened(chat_id, opened[0])
-                    await asyncio.sleep(self._interval)
-                elif opened:
-                    await self._sender.send_message(chat_id, summary([m.event for m in opened]))
+                if item.kind == "text":
+                    await self._sender.send_message(chat_id, item.text)
                     self.sent += 1
-                    await asyncio.sleep(self._interval)
-                for m in clips:
-                    reply_to = self._photo_message.pop((chat_id, m.event.id), None)
-                    video = path_for_url(self._media, m.event.clip_url)
+                elif item.kind == "photo":
+                    await self._send_opened(chat_id, item.message, item.skipped)
+                else:
+                    event = item.message.event
+                    reply_to = self._photo_message.pop((chat_id, event.id), None)
+                    video = path_for_url(self._media, event.clip_url)
                     if reply_to is None or video is None:
                         continue
-                    await self._sender.send_video(chat_id, video, f"Клип: {EVENT_TEXT[m.event.type]}, {m.event.camera_name}", reply_to)
+                    await self._sender.send_video(chat_id, video, f"Клип: {EVENT_TEXT[event.type]}, {event.camera_name}", reply_to)
                     self.sent += 1
-                    await asyncio.sleep(self._interval)
+                await asyncio.sleep(interval)
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001
                 self.errors += 1
                 log.error("телеграм, чат %s: отправка не удалась: %s", chat_id, e)
-                await asyncio.sleep(self._interval)
+                await asyncio.sleep(interval)
 
-    async def _send_opened(self, chat_id: int, message: BusMessage) -> None:
+    async def _send_opened(self, chat_id: int, message: BusMessage, skipped: int) -> None:
         event = message.event
         photo = path_for_url(self._media, event.snapshot_url)
         if photo is not None:
-            message_id = await self._sender.send_photo(chat_id, photo, caption(event))
+            message_id = await self._sender.send_photo(chat_id, photo, caption(event, skipped))
             self._photo_message[(chat_id, event.id)] = message_id
             if len(self._photo_message) > 2000:
                 self._photo_message.pop(next(iter(self._photo_message)))
         else:
-            await self._sender.send_message(chat_id, caption(event) + "\n(стоп-кадра нет)")
+            await self._sender.send_message(chat_id, caption(event, skipped) + "\n(стоп-кадра нет)")
         self.sent += 1
         if message.captured_ts:
             self.latency_ms.append(int(time.time() * 1000) - message.captured_ts)
@@ -146,9 +231,10 @@ class TelegramNotifier:
             await asyncio.gather(*[t for t in self._tasks.values() if not t.done()], return_exceptions=True)
 
     async def close(self) -> None:
-        for task in self._tasks.values():
+        tasks = list(self._tasks.values()) + ([self._flush_task] if self._flush_task else [])
+        for task in tasks:
             task.cancel()
-        await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 class AiogramSender:

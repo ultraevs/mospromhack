@@ -79,8 +79,8 @@ def test_rules_defaults_come_from_config_yaml(client):
     assert rules["no_helmet"] == {"window_s": 4, "min_observations": 8, "fraction": 0.35}
     assert rules["no_mask"] == {"window_s": 4, "min_observations": 8, "fraction": 0.35}
     assert rules["no_vest"] == {"window_s": 6, "min_observations": 15, "max_fraction": 0.1, "min_person_height_px": 120}
-    assert rules["zone_intrusion"] == {"window_s": 1.5, "fraction": 0.7, "min_observations": 1}
-    assert rules["smoking"] == {"k": 2, "m": 5}
+    assert rules["zone_intrusion"] == {"window_s": 1.5, "fraction": 0.7, "min_observations": 4}
+    assert rules["smoking"] == {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": False}
     assert rules["fire"] == rules["smoke"] == {"k": 3, "m": 5}
     assert rules["lifecycle"] == {"close_after_s": 5, "cooldown_s": 60, "retrack_iou": 0.3, "retrack_window_s": 10,
                                   "camera_cooldown_s": 60, "track_lost_s": 2}
@@ -115,7 +115,52 @@ def test_rules_survive_restart(settings):
 
     with TestClient(create_app(settings, run_sources=False)) as c:
         rules = c.get("/api/settings/rules").json()
-        rules["zone_intrusion"]["min_observations"] = 4
+        rules["zone_intrusion"]["min_observations"] = 9
+        rules["smoking"]["everywhere"] = True
         c.put("/api/settings/rules", json=rules)
     with TestClient(create_app(settings, run_sources=False)) as c:
-        assert c.get("/api/settings/rules").json()["zone_intrusion"]["min_observations"] == 4
+        stored = c.get("/api/settings/rules").json()
+        assert stored["zone_intrusion"]["min_observations"] == 9 and stored["smoking"]["everywhere"] is True
+
+
+def test_old_defaults_in_db_are_upgraded_once(settings):
+    from fastapi.testclient import TestClient
+
+    from backend.app.db.models import SettingRow
+    from backend.app.main import create_app
+
+    def rewrite(c, change):
+        with c.app.state.app.session_factory() as db:
+            row = db.get(SettingRow, "rules")
+            raw = {k: dict(v) for k, v in row.value.items()}
+            change(raw)
+            row.value = raw
+            db.get(SettingRow, "rules_defaults_version").value = 1
+            db.commit()
+
+    def old(raw):
+        raw["zone_intrusion"] = {"window_s": 1.5, "fraction": 0.7, "min_observations": 1}
+        raw["smoking"] = {"k": 2, "m": 5}
+        raw["no_helmet"]["fraction"] = 0.5
+
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        rewrite(c, old)
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        rules = c.get("/api/settings/rules").json()
+        assert rules["zone_intrusion"]["min_observations"] == 4
+        assert rules["smoking"] == {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": False}
+        assert rules["no_helmet"]["fraction"] == 0.5
+        rules["zone_intrusion"]["min_observations"] = 1
+        c.put("/api/settings/rules", json=rules)
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        assert c.get("/api/settings/rules").json()["zone_intrusion"]["min_observations"] == 1
+
+    def custom(raw):
+        raw["zone_intrusion"]["min_observations"] = 2
+        raw["smoking"] = {"k": 1, "m": 3}
+
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        rewrite(c, custom)
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        rules = c.get("/api/settings/rules").json()
+        assert rules["zone_intrusion"]["min_observations"] == 2 and (rules["smoking"]["k"], rules["smoking"]["m"]) == (1, 3)

@@ -8,9 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.db.models import DeliveryRow, TelegramChatRow, WebhookRow
+from backend.app.services.telegram import load_settings, save_settings
 from backend.app.services.webhooks import sample_event
 from backend.app.state import AppState, get_db, get_state
-from shared.schemas import EventType, Severity
+from shared.schemas import EventType, Severity, TelegramSettings
 
 router = APIRouter(prefix="/api", tags=["notifications"])
 
@@ -128,4 +129,17 @@ async def telegram_status(db: Session = Depends(get_db), state: AppState = Depen
     tg = state.telegram_state
     return {"enabled": tg["enabled"], "running": tg["running"], "username": tg["username"], "error": tg["error"],
             "subscribers": subscribers, "sent": state.notifier.sent if state.notifier else 0,
-            "errors": state.notifier.errors if state.notifier else 0}
+            "errors": state.notifier.errors if state.notifier else 0,
+            "pending": state.notifier.pending if state.notifier else 0}
+
+
+@router.get("/settings/telegram", response_model=TelegramSettings)
+async def get_telegram_settings(db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+    return load_settings(db, state.config.telegram)
+
+
+@router.put("/settings/telegram", response_model=TelegramSettings)
+async def put_telegram_settings(body: TelegramSettings, db: Session = Depends(get_db)):
+    save_settings(db, body)
+    db.commit()
+    return body
