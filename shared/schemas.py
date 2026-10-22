@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 BBox = Annotated[list[float], Field(min_length=4, max_length=4)]
 Point = Annotated[list[float], Field(min_length=2, max_length=2)]
@@ -195,36 +195,49 @@ class Zone(ZoneBase):
     camera_id: int
 
 
+Seconds = Annotated[float, Field(gt=0, le=600)]
+Share = Annotated[float, Field(ge=0, le=1)]
+Count = Annotated[int, Field(ge=1, le=10_000)]
+
+
 # дефолты должны совпадать с config.yaml!!
 class FractionRule(BaseModel):
-    window_s: float = 4
-    min_observations: int = 8
-    fraction: float = 0.35
+    window_s: Seconds = 4
+    min_observations: Count = 8
+    fraction: Share = 0.35
 
 
 class NoVestRule(BaseModel):
-    window_s: float = 6
-    min_observations: int = 15
-    max_fraction: float = 0.1
-    min_person_height_px: int = 120
+    window_s: Seconds = 6
+    min_observations: Count = 15
+    max_fraction: Share = 0.1
+    min_person_height_px: Annotated[int, Field(ge=0, le=10_000)] = 120
 
 
 class ZoneIntrusionRule(BaseModel):
-    window_s: float = 1.5
-    fraction: float = 0.7
+    window_s: Seconds = 1.5
+    fraction: Share = 0.7
+    min_observations: Count = 1
 
 
 class KofMRule(BaseModel):
-    k: int
-    m: int
+    k: Count
+    m: Count
+
+    @model_validator(mode="after")
+    def _k_not_above_m(self):
+        if self.k > self.m:
+            raise ValueError("k не может быть больше m")
+        return self
 
 
 class LifecycleRule(BaseModel):
-    close_after_s: float = 5
-    cooldown_s: float = 60
-    retrack_iou: float = 0.3
-    retrack_window_s: float = 10
-    camera_cooldown_s: float = 60
+    close_after_s: Seconds = 5
+    cooldown_s: Annotated[float, Field(ge=0, le=86_400)] = 60
+    retrack_iou: Share = 0.3
+    retrack_window_s: Annotated[float, Field(ge=0, le=600)] = 10
+    camera_cooldown_s: Annotated[float, Field(ge=0, le=86_400)] = 60
+    track_lost_s: Seconds = 2
 
 
 class RuleSettings(BaseModel):

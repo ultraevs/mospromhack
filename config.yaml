@@ -18,7 +18,7 @@ rules:
   no_helmet: {window_s: 4, min_observations: 8, fraction: 0.35}
   no_mask: {window_s: 4, min_observations: 8, fraction: 0.35}
   no_vest: {window_s: 6, min_observations: 15, max_fraction: 0.1, min_person_height_px: 120}
-  zone_intrusion: {window_s: 1.5, fraction: 0.7}
+  zone_intrusion: {window_s: 1.5, fraction: 0.7, min_observations: 1}
   smoking: {k: 2, m: 5}
   fire: {k: 3, m: 5}
   smoke: {k: 3, m: 5}
@@ -28,3 +28,4 @@ rules:
     retrack_iou: 0.3  # чтоб не плодить события когда трекер теряет id
     retrack_window_s: 10
     camera_cooldown_s: 60
+    track_lost_s: 2
