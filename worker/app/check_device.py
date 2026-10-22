@@ -25,7 +25,16 @@ def main() -> int:
         for _ in range(20):
             out = detector.infer(name, batch)
         ms = (time.perf_counter() - t) / 20 * 1000
-        print(f"{name}: выход {out.shape}, {ms:.1f} мс на кадр")
+        line = f"{name}: выход {out.shape}, {ms:.1f} мс на кадр"
+        if detector.batch_limit(name) != 1:
+            for n in (4, 6, 16):
+                big = np.repeat(batch, n, axis=0)
+                detector.infer(name, big)
+                t = time.perf_counter()
+                for _ in range(10):
+                    detector.infer(name, big)
+                line += f"; батч {n}: {(time.perf_counter() - t) / 10 * 1000 / n:.1f} мс на кадр"
+        print(line)
     print(f"устройство: {detector.device}")
     return 0 if detector.device == "cuda" else 1
 

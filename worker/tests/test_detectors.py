@@ -83,3 +83,22 @@ def test_onnx_detector_really_uses_cuda(real_specs):
     batch = np.random.default_rng(0).random((1, 3, 640, 640), dtype=np.float32)
     for name in real_specs:
         np.testing.assert_allclose(gpu.infer(name, batch), cpu.infer(name, batch), atol=0.5, rtol=0.02)
+
+
+@pytest.mark.models
+def test_dynamic_onnx_matches_static(real_specs):
+    from worker.app.detector.onnx_detector import DYNAMIC_NAME, OnnxDetector
+
+    if not all(s.onnx_path.with_name(DYNAMIC_NAME).exists() for s in real_specs.values()):
+        pytest.skip("нет best.dynamic.onnx; запусти scripts/export_dynamic.py")
+    static = OnnxDetector(real_specs, allow_cuda=False, prefer_dynamic=False)
+    dynamic = OnnxDetector(real_specs, allow_cuda=False)
+    rng = np.random.default_rng(1)
+    batch = np.clip(rng.random((6, 3, 20, 20), dtype=np.float32).repeat(32, axis=2).repeat(32, axis=3), 0, 1)
+    for name in real_specs:
+        assert static.batch_limit(name) == 1 and dynamic.batch_limit(name) == 4
+        a, b = static.infer(name, batch), dynamic.infer(name, batch)
+        assert a.shape == b.shape == (6, 4 + real_specs[name].nc, 8400)
+        np.testing.assert_allclose(a, b, atol=1e-2, rtol=1e-3)
+        assert dynamic.infer(name, batch[:1]).shape == (1, 4 + real_specs[name].nc, 8400)
+        assert dynamic.infer(name, batch[:4]).shape == (4, 4 + real_specs[name].nc, 8400)

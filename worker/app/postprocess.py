@@ -47,10 +47,16 @@ def letterbox(img: np.ndarray, size: int) -> tuple[np.ndarray, LetterboxInfo]:
     return out, LetterboxInfo(scale, pad_x, pad_y, w, h)
 
 
-def preprocess(img_bgr: np.ndarray, size: int) -> tuple[np.ndarray, LetterboxInfo]:
+_255 = np.float32(255)
+
+
+def preprocess(img_bgr: np.ndarray, size: int, out: np.ndarray | None = None) -> tuple[np.ndarray, LetterboxInfo]:
     boxed, info = letterbox(img_bgr, size)
-    chw = np.ascontiguousarray(boxed[:, :, ::-1].transpose(2, 0, 1), dtype=np.float32) / 255.0
-    return chw, info
+    if out is None:
+        out = np.empty((3, size, size), dtype=np.float32)
+    for c in range(3):
+        np.divide(boxed[:, :, 2 - c], _255, out=out[c], casting="unsafe")
+    return out, info
 
 
 def to_source(xyxy: np.ndarray, info: LetterboxInfo) -> np.ndarray:

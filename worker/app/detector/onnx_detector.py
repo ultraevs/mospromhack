@@ -10,15 +10,17 @@ from worker.app.model_spec import ModelSpec
 log = logging.getLogger("worker.detector")
 
 DYNAMIC_NAME = "best.dynamic.onnx"
+# при смене размера батча cuda заново готовит свертки и все в 3 раза медленнее (19мс vs 7 на 3060). поэтому полные пачки в динамическую, хвост по одному
+CHUNK = 4
 
 
 class OnnxDetector:
     name = "onnx"
 
-    def __init__(self, specs: dict[str, ModelSpec], allow_cuda: bool = True):
+    def __init__(self, specs: dict[str, ModelSpec], allow_cuda: bool = True, prefer_dynamic: bool = True):
         self.warnings: list[str] = []
-        self._sessions: dict[str, ort.InferenceSession] = {}
-        self._dynamic: dict[str, bool] = {}
+        self._single: dict[str, ort.InferenceSession] = {}
+        self._chunked: dict[str, ort.InferenceSession] = {}
 
         providers = ["CPUExecutionProvider"]
         if allow_cuda:
@@ -31,31 +33,37 @@ class OnnxDetector:
                 providers.insert(0, "CUDAExecutionProvider")
 
         for name, spec in specs.items():
+            if not spec.onnx_path.exists():
+                raise FileNotFoundError(f"нет {spec.onnx_path}; запусти scripts/sync_models.ps1")
+            self._single[name] = ort.InferenceSession(str(spec.onnx_path), providers=providers)
             dynamic = spec.onnx_path.with_name(DYNAMIC_NAME)
-            path = dynamic if dynamic.exists() else spec.onnx_path
-            if not path.exists():
-                raise FileNotFoundError(f"нет {path}; запусти scripts/sync_models.ps1")
-            session = ort.InferenceSession(str(path), providers=providers)
-            self._sessions[name] = session
-            self._dynamic[name] = not isinstance(session.get_inputs()[0].shape[0], int)
-            log.info("модель %s: %s, провайдеры %s, batch %s", name, path.name, session.get_providers(),
-                     "динамический" if self._dynamic[name] else "1")
+            if prefer_dynamic and dynamic.exists():
+                self._chunked[name] = ort.InferenceSession(str(dynamic), providers=providers)
+            log.info("модель %s: провайдеры %s, пачки по %s", name, self._single[name].get_providers(),
+                     CHUNK if name in self._chunked else "1 (нет best.dynamic.onnx)")
 
+        sessions = [*self._single.values(), *self._chunked.values()]
         # смотрим что реально поднялось а не что просили
-        active = {p for s in self._sessions.values() for p in s.get_providers()}
-        self.device = "cuda" if all("CUDAExecutionProvider" in s.get_providers() for s in self._sessions.values()) else "cpu"
+        active = {p for s in sessions for p in s.get_providers()}
+        self.device = "cuda" if all("CUDAExecutionProvider" in s.get_providers() for s in sessions) else "cpu"
         if self.device == "cpu" and allow_cuda:
             msg = f"ИНФЕРЕНС ИДЁТ НА CPU: провайдер CUDA недоступен (активны {sorted(active)})"
             self.warnings.append(msg)
             log.error(msg)
 
     def batch_limit(self, model: str) -> int | None:
-        return None if self._dynamic[model] else 1
+        return CHUNK if model in self._chunked else 1
 
     def infer(self, model: str, batch: np.ndarray) -> np.ndarray:
-        session = self._sessions[model]
-        input_name = session.get_inputs()[0].name
+        single = self._single[model]
+        chunked = self._chunked.get(model)
+        name = single.get_inputs()[0].name
         batch = np.ascontiguousarray(batch, dtype=np.float32)
-        if self._dynamic[model] or len(batch) == 1:
-            return session.run(None, {input_name: batch})[0]
-        return np.concatenate([session.run(None, {input_name: batch[i:i + 1]})[0] for i in range(len(batch))])
+        out, i = [], 0
+        if chunked is not None:
+            while len(batch) - i >= CHUNK:
+                out.append(chunked.run(None, {name: batch[i:i + CHUNK]})[0])
+                i += CHUNK
+        for k in range(i, len(batch)):
+            out.append(single.run(None, {name: batch[k:k + 1]})[0])
+        return np.concatenate(out) if len(out) > 1 else out[0]

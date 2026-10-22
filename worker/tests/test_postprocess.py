@@ -154,3 +154,16 @@ def test_decode_empty_and_wrong_shape(toy_spec):
     assert len(det) == 0 and det.xyxy.shape == (0, 4)
     with pytest.raises(ValueError, match="ожидалось"):
         decode(np.zeros((11, A), np.float32), toy_spec, info)
+
+
+def test_preprocess_writes_into_given_buffer_and_matches_reference_formula():
+    img = np.random.default_rng(0).integers(0, 256, (360, 640, 3), dtype=np.uint8)
+    batch = np.zeros((2, 3, 640, 640), np.float32)
+    out, info = preprocess(img, 640, out=batch[1])
+    assert out.base is batch or np.shares_memory(out, batch)
+    assert not batch[0].any()
+    boxed, _ = letterbox(img, 640)
+    expected = np.ascontiguousarray(boxed[:, :, ::-1].transpose(2, 0, 1), dtype=np.float32) / 255.0
+    np.testing.assert_array_equal(batch[1], expected)
+    np.testing.assert_array_equal(preprocess(img, 640)[0], expected)
+    assert info.pad_y == 140
