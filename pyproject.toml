@@ -1,6 +1,6 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["worker/tests", "backend/tests"]
+testpaths = ["worker/tests", "backend/tests", "tests"]
 asyncio_mode = "auto"
 markers = [
     "models: нужны файлы моделей в models/ (scripts/sync_models.ps1)",
