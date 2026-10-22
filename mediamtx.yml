@@ -1,0 +1,24 @@
+logLevel: info
+logDestinations: [stdout]
+
+# через api бэк добавляет rtsp камеры
+api: yes
+apiAddress: :9997
+
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp]
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigins: ["*"]
+webrtcLocalUDPAddress: :8189
+
+rtmp: no
+hls: no
+srt: no
+moq: no
+
+# file камеры пушит ffmpeg в cam-N, rtsp добавляются через api
+paths:
+  all_others:

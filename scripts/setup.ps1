@@ -24,5 +24,33 @@ foreach ($d in "data\videos", "data\media", "models", "tools", "logs") {
 
 & (Join-Path $PSScriptRoot "sync_models.ps1")
 
+# mediamtx качаем в tools/, в гит не кладем
+$mtxVersion = "v1.21.1"
+$mtxExe = Join-Path $root "tools\mediamtx\mediamtx.exe"
+if (-not (Test-Path $mtxExe)) {
+    Write-Host "Downloading MediaMTX $mtxVersion..."
+    $zip = Join-Path $root "tools\mediamtx.zip"
+    $ProgressPreference = "SilentlyContinue"
+    Invoke-WebRequest -Uri "https://github.com/bluenviron/mediamtx/releases/download/$mtxVersion/mediamtx_${mtxVersion}_windows_amd64.zip" -OutFile $zip
+    Expand-Archive $zip -DestinationPath (Join-Path $root "tools\mediamtx") -Force
+    Remove-Item $zip
+}
+Write-Host ("MediaMTX: " + (& $mtxExe --version))
+
+if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
+    Write-Host ("ffmpeg: " + ((ffmpeg -version | Select-Object -First 1)))
+} else {
+    Write-Warning "ffmpeg not found in PATH. Install it: winget install Gyan.FFmpeg  (or: choco install ffmpeg), then reopen the terminal."
+}
+
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+    Write-Host "Installing frontend dependencies..."
+    Push-Location (Join-Path $root "frontend")
+    npm install --no-fund --no-audit
+    Pop-Location
+} else {
+    Write-Warning "npm not found. Install Node.js 20+ from nodejs.org, then run: cd frontend; npm install"
+}
+
 Write-Host "Checking ONNX Runtime device..."
 & $venvPython -m worker.app.check_device
