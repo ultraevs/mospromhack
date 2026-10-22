@@ -71,3 +71,39 @@ class SettingRow(Base):
 
     key: Mapped[str] = mapped_column(String, primary_key=True)
     value: Mapped[dict | list | int | str | None] = mapped_column(JSON)
+
+
+class WebhookRow(Base):
+    __tablename__ = "webhooks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    url: Mapped[str] = mapped_column(String, nullable=False)
+    secret: Mapped[str] = mapped_column(String, nullable=False)
+    event_types: Mapped[list] = mapped_column(JSON, default=list)
+    min_severity: Mapped[str] = mapped_column(String, default="low")
+    send_closed: Mapped[bool] = mapped_column(Boolean, default=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    deliveries: Mapped[list["DeliveryRow"]] = relationship(cascade="all, delete-orphan")
+
+
+class DeliveryRow(Base):
+    __tablename__ = "webhook_deliveries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    webhook_id: Mapped[int] = mapped_column(ForeignKey("webhooks.id", ondelete="CASCADE"), index=True)
+    event_id: Mapped[str] = mapped_column(String, index=True)
+    action: Mapped[str] = mapped_column(String)
+    attempt: Mapped[int] = mapped_column(Integer)
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    error: Mapped[str | None] = mapped_column(String, nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class TelegramChatRow(Base):
+    __tablename__ = "telegram_chats"
+
+    chat_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    subscribed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

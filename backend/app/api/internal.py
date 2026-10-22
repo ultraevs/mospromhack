@@ -5,16 +5,19 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.db.models import CameraRow, EventRow
 from backend.app.services import events as svc
+from backend.app.services import media
+from backend.app.services.bus import BusMessage
 from backend.app.services.rules import load_rules
 from backend.app.state import (AppState, get_config_version, get_db, get_setting, get_state, get_state_ws,
-                               require_internal, set_setting)
-from shared.schemas import Event, EventCreate, EventUpdate, WorkerCamera, WorkerConfig, Zone
+                               media_root, require_internal, set_setting)
+from shared.schemas import Event, EventCreate, EventStatus, EventUpdate, WorkerCamera, WorkerConfig, Zone
 
 log = logging.getLogger("backend.internal")
 
@@ -36,10 +39,55 @@ async def worker_config(db: Session = Depends(get_db), state: AppState = Depends
 
 
 @router.post("/events", response_model=Event, status_code=201, dependencies=[Depends(require_internal)])
-async def create_event(body: EventCreate, db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+async def create_event(request: Request, db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+    files: dict[str, bytes] = {}
+    try:
+        if request.headers.get("content-type", "").startswith("multipart/"):
+            form = await request.form()
+            body = EventCreate.model_validate_json(str(form.get("event") or ""))
+            for field in ("snapshot", "clean"):
+                upload = form.get(field)
+                if upload is not None and hasattr(upload, "read"):
+                    data = await upload.read()
+                    if len(data) > media.MAX_IMAGE_BYTES:
+                        raise HTTPException(413, f"{field}: файл больше {media.MAX_IMAGE_BYTES // 2 ** 20} МБ")
+                    files[field] = data
+        else:
+            body = EventCreate.model_validate_json(await request.body())
+    except ValidationError as e:
+        raise HTTPException(422, e.errors(include_url=False, include_context=False, include_input=False)) from None
+
     row = svc.create_event(db, body)
-    log.info("событие %s: %s, камера %s, задержка %s мс", row.id, row.type, row.camera_id, row.latency_ms)
+    root = media_root(state)
+    if "snapshot" in files:
+        row.snapshot_url = media.save(root, row.id, media.SNAPSHOT, files["snapshot"])
+    if "clean" in files:
+        row.snapshot_clean_url = media.save(root, row.id, media.CLEAN, files["clean"])
+    if files:
+        db.commit()
+    log.info("событие %s: %s, камера %s, задержка %s мс, стоп-кадров %s", row.id, row.type, row.camera_id,
+             row.latency_ms, len(files))
     await state.hub.send_event(svc.message("event_created", row))
+    state.bus.publish(BusMessage("opened", svc.to_schema(row), body.captured_ts))
+    return svc.to_schema(row)
+
+
+@router.post("/events/{event_id}/clip", response_model=Event, dependencies=[Depends(require_internal)])
+async def upload_clip(event_id: str, clip: UploadFile, db: Session = Depends(get_db),
+                      state: AppState = Depends(get_state)):
+    row = db.get(EventRow, event_id)
+    if row is None:
+        raise HTTPException(404, "событие не найдено")
+    data = await clip.read()
+    if not data:
+        raise HTTPException(422, "пустой файл клипа")
+    if len(data) > media.MAX_CLIP_BYTES:
+        raise HTTPException(413, f"клип больше {media.MAX_CLIP_BYTES // 2 ** 20} МБ")
+    row.clip_url = media.save(media_root(state), row.id, media.CLIP, data)
+    db.commit()
+    log.info("событие %s: клип %.1f МБ", row.id, len(data) / 2 ** 20)
+    await state.hub.send_event(svc.message("event_updated", row))
+    state.bus.publish(BusMessage("clip_added", svc.to_schema(row)))
     return svc.to_schema(row)
 
 
@@ -49,12 +97,15 @@ async def update_event(event_id: str, body: EventUpdate, db: Session = Depends(g
     row = db.get(EventRow, event_id)
     if row is None:
         raise HTTPException(404, "событие не найдено")
+    was_open = row.status == EventStatus.open.value
     if body.status is not None:
         row.status = body.status.value
     if body.ended_at is not None:
         row.ended_at = svc._naive_utc(body.ended_at)
     db.commit()
     await state.hub.send_event(svc.message("event_updated", row))
+    if body.status == EventStatus.closed and was_open:
+        state.bus.publish(BusMessage("closed", svc.to_schema(row)))
     return svc.to_schema(row)
 
 

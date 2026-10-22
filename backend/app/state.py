@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.db.models import SettingRow
+from backend.app.services.bus import EventBus
 from backend.app.services.hub import Hub
 from backend.app.services.sources import SourceManager
 from shared.config import AppConfig, Settings
@@ -23,6 +24,11 @@ class AppState:
     session_factory: sessionmaker[Session]
     hub: Hub
     sources: SourceManager
+    bus: EventBus = field(default_factory=EventBus)
+    webhooks: Any = None
+    notifier: Any = None
+    telegram_state: dict = field(default_factory=lambda: {"enabled": False, "running": False,
+                                                          "username": None, "error": None})
     worker_stats: dict[str, Any] = field(default_factory=dict)
     worker_seen: float = 0.0  # monotonic последнего /internal/stats
     worker_session: str | None = None
@@ -85,3 +91,7 @@ def set_setting(db: Session, key: str, value) -> None:
         db.add(SettingRow(key=key, value=value))
     else:
         row.value = value
+
+
+def media_root(state: AppState):
+    return state.settings.data_dir / "media"

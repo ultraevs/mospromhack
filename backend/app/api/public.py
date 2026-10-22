@@ -27,6 +27,8 @@ async def health(state: AppState = Depends(get_state)) -> dict:
     for cam_id, cam in sources["cameras"].items():
         if cam["error"]:
             problems.append(f"камера {cam_id}: {cam['error']}")
+    if state.telegram_state["error"]:
+        problems.append(f"телеграм: {state.telegram_state['error']}")
     for cam_id, cam in (stats.get("cameras") or {}).items():
         if not cam.get("online"):
             problems.append(f"камера {cam_id}: воркер не получает кадры" + (f" ({cam['error']})" if cam.get("error") else ""))
@@ -53,7 +55,8 @@ async def stats(db: Session = Depends(get_db), state: AppState = Depends(get_sta
     recent = db.execute(select(EventRow.latency_ms).where(EventRow.latency_ms.is_not(None))
                         .order_by(EventRow.started_at.desc()).limit(LATENCY_SAMPLE)).scalars().all()
     return {"worker_alive": state.worker_alive(), **(state.worker_stats if state.worker_alive() else {}),
-            "latency": {"capture_to_event": _summary(list(recent))},
+            "latency": {"capture_to_event": _summary(list(recent)),
+                        "capture_to_telegram": _summary(list(state.notifier.latency_ms)) if state.notifier else None},
             "subscribers": state.hub.counts()}
 
 
