@@ -29,7 +29,7 @@ class Hub:
         for ws in list(targets):
             try:
                 await ws.send_text(text)
-            except Exception as e:  # noqa: BLE001 - клиент отвалился, убираем из подписчиков
+            except Exception as e:  # noqa: BLE001
                 log.info("подписчик WebSocket отключён: %s", e)
                 targets.discard(ws)
 
