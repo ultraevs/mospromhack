@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models import EventRow
 from backend.app.services import events as svc
-from backend.app.state import AppState, get_db, get_state
+from backend.app.state import AppState, get_db, get_state, require_admin
 from shared.schemas import Event, EventReview, EventStatus, EventType, Review, Severity
 
-router = APIRouter(prefix="/api", tags=["events"])
+router = APIRouter(prefix="/api", tags=["events"], dependencies=[Depends(require_admin)])
 
 
 class EventPage(BaseModel):

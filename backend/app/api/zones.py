@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models import CameraRow, ZoneRow
 from backend.app.services.rules import load_rules, save_rules
-from backend.app.state import AppState, bump_config_version, get_db, get_state
+from backend.app.state import AppState, bump_config_version, get_current_user, get_db, get_state, require_admin
 from shared.schemas import RuleSettings, Zone, ZoneCreate, ZoneUpdate
 
 router = APIRouter(prefix="/api", tags=["zones"])
@@ -25,14 +25,14 @@ def _get(db: Session, zone_id: int) -> ZoneRow:
 
 
 @router.get("/cameras/{camera_id}/zones", response_model=list[Zone])
-async def list_zones(camera_id: int, db: Session = Depends(get_db)):
+async def list_zones(camera_id: int, _user=Depends(get_current_user), db: Session = Depends(get_db)):
     if db.get(CameraRow, camera_id) is None:
         raise HTTPException(404, "камера не найдена")
     return db.execute(select(ZoneRow).where(ZoneRow.camera_id == camera_id).order_by(ZoneRow.id)).scalars().all()
 
 
 @router.post("/cameras/{camera_id}/zones", response_model=Zone, status_code=201)
-async def create_zone(camera_id: int, body: ZoneCreate, db: Session = Depends(get_db)):
+async def create_zone(camera_id: int, body: ZoneCreate, _user=Depends(require_admin), db: Session = Depends(get_db)):
     if db.get(CameraRow, camera_id) is None:
         raise HTTPException(404, "камера не найдена")
     _check_polygon(body.polygon)
@@ -45,7 +45,7 @@ async def create_zone(camera_id: int, body: ZoneCreate, db: Session = Depends(ge
 
 
 @router.patch("/zones/{zone_id}", response_model=Zone)
-async def update_zone(zone_id: int, body: ZoneUpdate, db: Session = Depends(get_db)):
+async def update_zone(zone_id: int, body: ZoneUpdate, _user=Depends(require_admin), db: Session = Depends(get_db)):
     row = _get(db, zone_id)
     data = body.model_dump(exclude_unset=True, mode="json")
     if data.get("polygon") is not None:
@@ -59,19 +59,19 @@ async def update_zone(zone_id: int, body: ZoneUpdate, db: Session = Depends(get_
 
 
 @router.delete("/zones/{zone_id}", status_code=204)
-async def delete_zone(zone_id: int, db: Session = Depends(get_db)):
+async def delete_zone(zone_id: int, _user=Depends(require_admin), db: Session = Depends(get_db)):
     db.delete(_get(db, zone_id))
     bump_config_version(db)
     db.commit()
 
 
 @router.get("/settings/rules", response_model=RuleSettings)
-async def get_rules(db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+async def get_rules(_user=Depends(require_admin), db: Session = Depends(get_db), state: AppState = Depends(get_state)):
     return load_rules(db, state.config)
 
 
 @router.put("/settings/rules", response_model=RuleSettings)
-async def put_rules(body: RuleSettings, db: Session = Depends(get_db)):
+async def put_rules(body: RuleSettings, _user=Depends(require_admin), db: Session = Depends(get_db)):
     save_rules(db, body)
     bump_config_version(db)
     db.commit()

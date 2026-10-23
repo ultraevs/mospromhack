@@ -47,7 +47,7 @@ export interface TelegramSettings {
 
 export interface TelegramStatus {
   enabled: boolean;
-  reason: "switched_off" | "no_token" | null;
+  reason: "switched_off" | "no_token" | "invalid_token" | null;
   running: boolean;
   username: string | null;
   error: string | null;
@@ -123,6 +123,17 @@ export interface Camera {
   open_events: number;
 }
 
+export type UserRole = "admin" | "viewer";
+
+export interface AuthUser {
+  id: number;
+  login: string;
+  display_name: string;
+  role: UserRole;
+  active: boolean;
+  created_at: string;
+}
+
 export interface EventPage {
   items: SafetyEvent[];
   total: number;
@@ -147,6 +158,15 @@ export interface Stats {
     capture_to_event: { avg_ms: number; p95_ms: number; events: number } | null;
     capture_to_telegram?: { avg_ms: number; p95_ms: number; events: number } | null;
   };
+}
+
+export interface Health {
+  status: "ok" | "degraded" | string;
+  problems: string[];
+  backend?: { ok: boolean };
+  mediamtx?: { ok: boolean; error?: string | null };
+  worker?: { ok: boolean; detector?: string | null; device?: string | null };
+  sources?: Record<string, { online: boolean; error?: string | null }>;
 }
 
 export interface Webhook {
@@ -219,7 +239,7 @@ export const REVIEW_LABEL: Record<Review, string> = { none: "не размече
 
 export const SEVERITY_LABEL: Record<Severity, string> = { high: "высокая", medium: "средняя", low: "низкая" };
 export const SEVERITY_ICON: Record<Severity, string> = { high: "▲", medium: "◆", low: "●" };
-export const SEVERITY_COLOR: Record<Severity, string> = { high: "#f0524f", medium: "#f59e3b", low: "#e8cf4a" };
+export const SEVERITY_COLOR: Record<Severity, string> = { high: "#f28f86", medium: "#e27d75", low: "#cc716b" };
 export const EVENT_SEVERITY: Record<EventType, Severity> = {
   fire: "high", smoke: "high", zone_intrusion: "high",
   vehicle_proximity: "high", fall: "high", lying_immobile: "high", running: "medium",

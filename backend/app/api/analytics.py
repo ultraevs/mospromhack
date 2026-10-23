@@ -8,10 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.db.models import EventRow
-from backend.app.state import get_db
+from backend.app.state import get_db, require_admin
 from shared.schemas import EventType, Review, Severity
 
-router = APIRouter(prefix="/api", tags=["analytics"])
+router = APIRouter(prefix="/api", tags=["analytics"], dependencies=[Depends(require_admin)])
 
 
 def _naive(dt: datetime | None) -> datetime | None:
@@ -33,10 +33,15 @@ def _review_counts(reviews: list[str]) -> dict:
 async def summary(
     from_: datetime | None = Query(default=None, alias="from"),
     to: datetime | None = None,
+    days: int | None = Query(default=None, ge=1, le=3650),
     camera_id: int | None = None,
     tz_offset_min: int = Query(default=0, ge=-840, le=840, description="смещение местного времени от UTC, минуты"),
     db: Session = Depends(get_db),
 ) -> dict:
+    if days is not None and from_ is None:
+        now = datetime.now(timezone.utc)
+        from_ = now - timedelta(days=days)
+        to = to or now
     conds = []
     if from_ is not None:
         conds.append(EventRow.started_at >= _naive(from_))

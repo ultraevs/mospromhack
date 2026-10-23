@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models import CameraRow, EventRow
 from backend.app.services.sources import Desired
-from backend.app.state import AppState, bump_config_version, get_db, get_state
+from backend.app.state import AppState, bump_config_version, get_current_user, get_db, get_state, require_admin
 from shared.schemas import Camera, CameraCreate, CameraUpdate, EventStatus, SourceType
 
 router = APIRouter(prefix="/api", tags=["cameras"])
@@ -49,14 +49,14 @@ def _get(db: Session, camera_id: int) -> CameraRow:
 
 
 @router.get("/cameras", response_model=list[Camera])
-async def list_cameras(db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+async def list_cameras(_user=Depends(get_current_user), db: Session = Depends(get_db), state: AppState = Depends(get_state)):
     counts = _open_counts(db)
     rows = db.execute(select(CameraRow).order_by(CameraRow.id)).scalars().all()
     return [to_schema(r, state, counts.get(r.id, 0)) for r in rows]
 
 
 @router.post("/cameras", response_model=Camera, status_code=201)
-async def create_camera(body: CameraCreate, db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+async def create_camera(body: CameraCreate, _user=Depends(require_admin), db: Session = Depends(get_db), state: AppState = Depends(get_state)):
     _validate_source(body.source_type, body.source, state)
     row = CameraRow(name=body.name, source_type=body.source_type.value, source=body.source,
                     required_ppe=[p.value for p in body.required_ppe], enabled=body.enabled)
@@ -68,13 +68,13 @@ async def create_camera(body: CameraCreate, db: Session = Depends(get_db), state
 
 
 @router.get("/cameras/{camera_id}", response_model=Camera)
-async def get_camera(camera_id: int, db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+async def get_camera(camera_id: int, _user=Depends(get_current_user), db: Session = Depends(get_db), state: AppState = Depends(get_state)):
     return to_schema(_get(db, camera_id), state, _open_counts(db).get(camera_id, 0))
 
 
 @router.patch("/cameras/{camera_id}", response_model=Camera)
 async def update_camera(camera_id: int, body: CameraUpdate, db: Session = Depends(get_db),
-                        state: AppState = Depends(get_state)):
+                        state: AppState = Depends(get_state), _user=Depends(require_admin)):
     row = _get(db, camera_id)
     data = body.model_dump(exclude_unset=True, mode="json")
     if "source" in data or "source_type" in data:
@@ -88,7 +88,7 @@ async def update_camera(camera_id: int, body: CameraUpdate, db: Session = Depend
 
 
 @router.delete("/cameras/{camera_id}", status_code=204)
-async def delete_camera(camera_id: int, db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+async def delete_camera(camera_id: int, _user=Depends(require_admin), db: Session = Depends(get_db), state: AppState = Depends(get_state)):
     db.delete(_get(db, camera_id))
     bump_config_version(db)
     db.commit()
@@ -96,7 +96,7 @@ async def delete_camera(camera_id: int, db: Session = Depends(get_db), state: Ap
 
 
 @router.get("/videos")
-async def list_videos(state: AppState = Depends(get_state)) -> list[dict]:
+async def list_videos(_user=Depends(get_current_user), state: AppState = Depends(get_state)) -> list[dict]:
     videos = state.settings.data_dir / "videos"
     if not videos.exists():
         return []

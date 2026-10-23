@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,12 +9,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.db.models import DeliveryRow, TelegramChatRow, WebhookRow
-from backend.app.services.telegram import load_settings, save_settings
+from backend.app.services.telegram import AiogramSender, TelegramNotifier, load_settings, save_enabled, save_settings, run_bot
 from backend.app.services.webhooks import sample_event
-from backend.app.state import AppState, get_db, get_state
+from backend.app.state import AppState, get_db, get_state, require_admin
 from shared.schemas import EventType, Severity, TelegramSettings
 
-router = APIRouter(prefix="/api", tags=["notifications"])
+router = APIRouter(prefix="/api", tags=["notifications"], dependencies=[Depends(require_admin)])
 
 
 class WebhookIn(BaseModel):
@@ -32,6 +33,10 @@ class WebhookPatch(BaseModel):
     min_severity: Severity | None = None
     send_closed: bool | None = None
     enabled: bool | None = None
+
+
+class TelegramToggle(BaseModel):
+    enabled: bool
 
 
 class WebhookOut(BaseModel):
@@ -130,6 +135,48 @@ async def telegram_status(db: Session = Depends(get_db), state: AppState = Depen
     return {"enabled": tg["enabled"], "reason": tg["reason"], "running": tg["running"], "username": tg["username"],
             "error": tg["error"],
             "subscribers": subscribers, "sent": state.notifier.sent if state.notifier else 0,
+            "errors": state.notifier.errors if state.notifier else 0,
+            "pending": state.notifier.pending if state.notifier else 0}
+
+
+@router.put("/telegram")
+async def set_telegram_enabled(body: TelegramToggle, db: Session = Depends(get_db), state: AppState = Depends(get_state)) -> dict:
+    if body.enabled:
+        token = state.settings.telegram_bot_token
+        if not token:
+            raise HTTPException(status_code=409, detail="не задан TELEGRAM_BOT_TOKEN в окружении backend")
+        try:
+            sender = AiogramSender(token)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=422, detail=f"токен Telegram не принят: {exc}") from exc
+        if state.notifier is None:
+            state.notifier = TelegramNotifier(state.session_factory, sender, state.settings.data_dir / "media", state.config.telegram)
+            state.bus.subscribe("telegram", state.notifier.handle)
+        else:
+            state.notifier.set_sender(sender)
+            state.notifier.set_enabled(True)
+        state.telegram_sender = sender
+        save_enabled(db, True)
+        state.telegram_state.update(enabled=True, reason=None, error=None, running=False)
+        if state.telegram_bot_task is None or state.telegram_bot_task.done():
+            state.telegram_bot_task = asyncio.create_task(run_bot(sender, state.notifier, state.telegram_state), name="telegram-bot")
+    else:
+        if state.notifier:
+            state.notifier.set_enabled(False)
+        task = state.telegram_bot_task
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        state.telegram_bot_task = None
+        state.telegram_sender = None
+        save_enabled(db, False)
+        state.telegram_state.update(enabled=False, running=False, username=None, reason="switched_off", error=None)
+    db.commit()
+    subscribers = db.execute(select(func.count()).select_from(TelegramChatRow)).scalar_one()
+    return {"enabled": state.telegram_state["enabled"], "reason": state.telegram_state["reason"],
+            "running": state.telegram_state["running"], "username": state.telegram_state["username"],
+            "error": state.telegram_state["error"], "subscribers": subscribers,
+            "sent": state.notifier.sent if state.notifier else 0,
             "errors": state.notifier.errors if state.notifier else 0,
             "pending": state.notifier.pending if state.notifier else 0}
 

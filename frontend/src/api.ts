@@ -1,11 +1,12 @@
 import type {
-  AnalyticsSummary, Camera, ClientConfig, Delivery, EventPage, RuleSettings, SafetyEvent, Stats, TelegramSettings,
-  TelegramStatus, Webhook, WebhookInput, Zone, ZoneInput,
+  AnalyticsSummary, AuthUser, Camera, ClientConfig, Delivery, EventPage, RuleSettings, SafetyEvent, Stats, TelegramSettings,
+  TelegramStatus, UserRole, Webhook, WebhookInput, Zone, ZoneInput,
 } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
+  const res = await fetch(path, { credentials: "same-origin", ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
   if (!res.ok) {
+    if (res.status === 401 && path !== "/api/auth/login" && path !== "/api/auth/me") window.dispatchEvent(new Event("auth-expired"));
     let detail = `${res.status}`;
     try {
       const body = await res.json();
@@ -26,6 +27,12 @@ function query(params: Query): string {
 }
 
 export const api = {
+  authMe: () => request<AuthUser>("/api/auth/me"),
+  authLogin: (body: { login: string; password: string }) => request<AuthUser>("/api/auth/login", { method: "POST", body: JSON.stringify(body) }),
+  authLogout: () => request<void>("/api/auth/logout", { method: "POST" }),
+  authUsers: () => request<AuthUser[]>("/api/auth/users"),
+  createAuthUser: (body: { login: string; display_name: string; role: UserRole; password: string }) => request<AuthUser>("/api/auth/users", { method: "POST", body: JSON.stringify(body) }),
+  updateAuthUser: (id: number, body: Partial<{ display_name: string; role: UserRole; password: string; active: boolean }>) => request<AuthUser>(`/api/auth/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   cameras: () => request<Camera[]>("/api/cameras"),
   camera: (id: number) => request<Camera>(`/api/cameras/${id}`),
   createCamera: (body: Partial<Camera>) => request<Camera>("/api/cameras", { method: "POST", body: JSON.stringify(body) }),
@@ -41,13 +48,14 @@ export const api = {
   rules: () => request<RuleSettings>("/api/settings/rules"),
   saveRules: (body: RuleSettings) => request<RuleSettings>("/api/settings/rules", { method: "PUT", body: JSON.stringify(body) }),
   telegram: () => request<TelegramStatus>("/api/telegram"),
+  setTelegramEnabled: (enabled: boolean) => request<TelegramStatus>("/api/telegram", { method: "PUT", body: JSON.stringify({ enabled }) }),
   telegramSettings: () => request<TelegramSettings>("/api/settings/telegram"),
   saveTelegramSettings: (body: TelegramSettings) =>
     request<TelegramSettings>("/api/settings/telegram", { method: "PUT", body: JSON.stringify(body) }),
   videos: () => request<{ name: string; size: number }[]>("/api/videos"),
   events: (params: Query = {}) => request<EventPage>(`/api/events?${query(params)}`),
   event: (id: string) => request<SafetyEvent>(`/api/events/${id}`),
-  analytics: (params: Query = {}) => request<AnalyticsSummary>(`/api/analytics/summary?${query(params)}`),
+  analytics: (params: Query = {}) => request<AnalyticsSummary>(`/api/analytics/summary?${query(params)}`, { cache: "no-store" }),
   webhooks: () => request<Webhook[]>("/api/webhooks"),
   createWebhook: (body: WebhookInput) => request<Webhook>("/api/webhooks", { method: "POST", body: JSON.stringify(body) }),
   updateWebhook: (id: number, body: Partial<WebhookInput>) =>
@@ -59,7 +67,7 @@ export const api = {
     request<SafetyEvent>(`/api/events/${id}`, { method: "PATCH", body: JSON.stringify({ review }) }),
   stats: () => request<Stats>("/api/stats"),
   clientConfig: () => request<ClientConfig>("/api/client-config"),
-  health: () => request<{ status: string; problems: string[] }>("/api/health"),
+  health: () => request<import("./types").Health>("/api/health"),
 };
 
 export function wsUrl(path: string): string {

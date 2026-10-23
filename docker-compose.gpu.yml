@@ -1,5 +1,8 @@
 services:
   worker:
+    build:
+      args:
+        ONNXRUNTIME_PACKAGE: "onnxruntime-gpu[cuda,cudnn]"
     deploy:
       resources:
         reservations:

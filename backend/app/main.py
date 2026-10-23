@@ -5,17 +5,18 @@ from contextlib import asynccontextmanager
 
 import asyncio
 
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import FileResponse
 
-from backend.app.api import analytics, cameras, events, internal, notifications, public, zones
+from backend.app.api import analytics, auth, cameras, events, internal, notifications, public, zones
 from backend.app.db.session import make_engine, make_session_factory
 from backend.app.services.hub import Hub
-from backend.app.services.telegram import AiogramSender, TelegramNotifier, run_bot
+from backend.app.services.auth import seed_users
+from backend.app.services.telegram import AiogramSender, TelegramNotifier, load_enabled, run_bot
 from backend.app.services.webhooks import WebhookDispatcher
 from backend.app.services.rules import seed_rules
 from backend.app.services.sources import SourceManager
-from backend.app.state import AppState
+from backend.app.state import AppState, get_state, require_admin
 from shared.config import ROOT, Settings, get_settings, load_config
 
 log = logging.getLogger("backend")
@@ -29,7 +30,8 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
     sources = SourceManager(videos_dir=settings.data_dir / "videos", logs_dir=ROOT / "logs",
                             rtsp_port=settings.mediamtx_rtsp_port, api_port=settings.mediamtx_api_port,
                             active=run_sources, host=settings.mediamtx_host,
-                            width=settings.stream_width, maxrate=settings.stream_maxrate, lag_s=settings.sync_lag_s)
+                            width=settings.stream_width, maxrate=settings.stream_maxrate, lag_s=settings.sync_lag_s,
+                            codec=settings.stream_codec)
     media_dir = settings.data_dir / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
     state = AppState(settings=settings, config=config, session_factory=make_session_factory(engine),
@@ -37,8 +39,12 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        telegram_enabled = settings.telegram_enabled
         with state.session_factory() as db:
             seed_rules(db, config)
+            if settings.auth_enabled:
+                seed_users(db, settings)
+            telegram_enabled = settings.telegram_enabled and load_enabled(db, True)
             cameras.sync_sources(db, state)
         sources.start()
 
@@ -46,22 +52,26 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
                           if webhook_retry_pauses is not None else WebhookDispatcher(state.session_factory))
         state.bus.subscribe("webhooks", state.webhooks.handle)
         bot_task = None
-        sender = telegram_sender if settings.telegram_enabled else None
-        if not settings.telegram_enabled:
+        sender = telegram_sender if telegram_enabled else None
+        state.telegram_sender = sender
+        if not telegram_enabled:
             state.telegram_state["reason"] = "switched_off"
         elif sender is None and settings.telegram_bot_token:
             try:
                 sender = AiogramSender(settings.telegram_bot_token)
             except Exception as e:  # noqa: BLE001
+                state.telegram_state["reason"] = "invalid_token"
                 state.telegram_state["error"] = f"токен бота не принят: {e}"
                 log.error(state.telegram_state["error"])
         if sender is not None:
             state.notifier = TelegramNotifier(state.session_factory, sender, media_dir, config.telegram)
+            state.telegram_sender = sender
             state.bus.subscribe("telegram", state.notifier.handle)
             state.telegram_state.update(enabled=True, reason=None)
             if isinstance(sender, AiogramSender):
                 bot_task = asyncio.create_task(run_bot(sender, state.notifier, state.telegram_state), name="telegram-bot")
-        elif not settings.telegram_enabled:
+                state.telegram_bot_task = bot_task
+        elif not telegram_enabled:
             log.info("телеграм-бот выключен: TELEGRAM_ENABLED=false")
         else:
             log.info("телеграм-бот выключен: TELEGRAM_BOT_TOKEN пуст")
@@ -69,9 +79,11 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
 
         log.info("backend запущен, порт %s", settings.backend_port)
         yield
-        if bot_task:
-            bot_task.cancel()
-            await asyncio.gather(bot_task, return_exceptions=True)
+        active_bot_task = state.telegram_bot_task or bot_task
+        if active_bot_task and not active_bot_task.done():
+            active_bot_task.cancel()
+            await asyncio.gather(active_bot_task, return_exceptions=True)
+        state.telegram_bot_task = None
         await state.bus.stop()
         await state.webhooks.close()
         if state.notifier:
@@ -81,9 +93,15 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
 
     app = FastAPI(title="Контроль нарушений по видео", lifespan=lifespan)
     app.state.app = state
-    for module in (cameras, zones, events, analytics, notifications, internal, public):
+    for module in (auth, cameras, zones, events, analytics, notifications, internal, public):
         app.include_router(module.router)
-    app.mount("/media", StaticFiles(directory=media_dir), name="media")
+    @app.get("/media/{file_path:path}", include_in_schema=False)
+    async def media_file(file_path: str, _user=Depends(require_admin), state: AppState = Depends(get_state)):
+        path = (media_dir / file_path).resolve()
+        if media_dir.resolve() not in path.parents or not path.is_file():
+            raise HTTPException(status_code=404, detail="файл не найден")
+        return FileResponse(path)
+
     return app
 
 

@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     ppe_fps: float | None = None
     telegram_enabled: bool = True
     internal_token: str = "change-me"
+    auth_admin_login: str = "admin"
+    auth_admin_password: str = "admin1234"
+    auth_viewer_login: str = "viewer"
+    auth_viewer_password: str = "viewer1234"
+    auth_session_ttl_hours: int = 12
+    auth_enabled: bool = True
     train_runs_dir: str = ""
     merged_dir: str = ""
     linq_login: str = ""
@@ -102,6 +108,7 @@ class Settings(BaseSettings):
     sync_lag_s: float = 0.0
     stream_width: int = 0
     stream_maxrate: str = ""
+    stream_codec: Literal["h264", "vp8"] = "h264"
 
     config_path: Path = ROOT / "config.yaml"
     models_dir: Path = ROOT / "models"

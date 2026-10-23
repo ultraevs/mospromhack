@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -48,10 +49,12 @@ def _double(rate: str) -> str:
 
 class SourceManager:
     def __init__(self, videos_dir: Path, logs_dir: Path, rtsp_port: int, api_port: int, active: bool = True,
-                 host: str = "127.0.0.1", width: int = 0, maxrate: str = "", lag_s: float = 0.0):
+                 host: str = "127.0.0.1", width: int = 0, maxrate: str = "", lag_s: float = 0.0,
+                 codec: str = "h264"):
         self.width = width
         self.lag_s = lag_s
         self.maxrate = maxrate
+        self.codec = codec or os.getenv("STREAM_CODEC", "h264")
         self.videos_dir = videos_dir
         self.logs_dir = logs_dir
         self.rtsp_port = rtsp_port
@@ -177,12 +180,16 @@ class SourceManager:
     def ffmpeg_command(self, d: Desired, path: Path, offset: float | None = None) -> list[str]:
         scale = ["-vf", f"scale={self.width}:-2"] if self.width > 0 else []
         rate = ["-maxrate", self.maxrate, "-bufsize", _double(self.maxrate)] if self.maxrate else []
+        if self.codec == "vp8":
+            codec_args = ["-c:v", "libvpx", "-deadline", "realtime", "-cpu-used", "5", "-g", "30"]
+            frame_args = ["-pix_fmt", "yuv420p"]
+        else:
+            codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency"]
+            frame_args = ["-bf", "0", "-pix_fmt", "yuv420p"]
         return [
             "ffmpeg", "-hide_banner", "-loglevel", "warning", "-nostdin",
-            *loop_input(path, offset),
-            "-an", "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
-            *scale, "-bf", "0", "-pix_fmt", "yuv420p", *rate,
-            "-force_key_frames", "expr:gte(t,n_forced*1)",  # кейфрейм раз в сек, а то webrtc долго стартует
+            *loop_input(path, offset), "-an", *codec_args, *scale, *frame_args, *rate,
+            "-force_key_frames", "expr:gte(t,n_forced*1)",
             "-f", "rtsp", "-rtsp_transport", "tcp", self.rtsp_url(d.camera_id),
         ]
 
