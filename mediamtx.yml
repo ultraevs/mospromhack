@@ -15,7 +15,15 @@ webrtcAllowOrigins: ["*"]
 webrtcLocalUDPAddress: :8189
 
 rtmp: no
-hls: no
+
+# для прокси без webrtc (VIDEO_MODE=hls)
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigins: ["*"]
+hlsVariant: mpegts
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsAlwaysRemux: no
 srt: no
 moq: no
 

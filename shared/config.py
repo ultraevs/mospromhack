@@ -39,8 +39,18 @@ class DecodeSection(BaseModel):
     hwaccel: Literal["auto", "none"] = "auto"
 
 
+class LinqSection(BaseModel):
+    transport: Literal["cloud", "pytpu"] = "cloud"
+    broker: str = "10.0.114.30"
+    port: int = 5672
+    program_dir: str = "/auto/cache/{login}"
+    timeout_s: float = 20
+    batch: int = 8
+
+
 class WorkerSection(BaseModel):
     detector: Literal["onnx", "linq", "fake"] = "onnx"
+    linq: LinqSection = Field(default_factory=LinqSection)
     precision: Literal["auto", "fp32", "fp16"] = "auto"
     ppe_fps: float = 6
     hazard_fps: float = 1
@@ -71,6 +81,8 @@ class Settings(BaseSettings):
     telegram_enabled: bool = True
     internal_token: str = "change-me"
     train_runs_dir: str = ""
+    merged_dir: str = ""
+    linq_login: str = ""
 
     backend_host: str = "127.0.0.1"
     mediamtx_host: str = "127.0.0.1"
@@ -80,6 +92,10 @@ class Settings(BaseSettings):
     mediamtx_rtsp_port: int = 8554
     mediamtx_webrtc_port: int = 8889
     mediamtx_api_port: int = 9997
+    mediamtx_hls_port: int = 8888
+    video_mode: Literal["webrtc", "hls"] = "webrtc"
+    stream_width: int = 0
+    stream_maxrate: str = ""
 
     config_path: Path = ROOT / "config.yaml"
     models_dir: Path = ROOT / "models"
@@ -90,6 +106,11 @@ def load_config(path: Path | None = None) -> AppConfig:
     path = path or get_settings().config_path
     raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     return AppConfig.model_validate(raw)
+
+
+def merged_dir(settings: Settings | None = None) -> Path:
+    settings = settings or get_settings()
+    return Path(settings.merged_dir) if settings.merged_dir else Path(settings.train_runs_dir).parent / "merged"
 
 
 @lru_cache

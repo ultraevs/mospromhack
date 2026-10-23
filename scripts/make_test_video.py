@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from shared.config import get_settings  # noqa: E402
+from shared.config import get_settings, merged_dir  # noqa: E402
 
 
 def main() -> int:
@@ -25,12 +25,12 @@ def main() -> int:
     if not shutil.which("ffmpeg"):
         print("ffmpeg не найден в PATH. Установка: winget install Gyan.FFmpeg (или choco install ffmpeg)")
         return 1
-    src = Path(settings.train_runs_dir).parent / "merged" / "ppe" / "images" / "test"
+    src = merged_dir(settings) / "ppe" / "images" / "test"
     images = sorted(src.glob("css_*"))
     if args.limit:
         images = images[:args.limit]
     if not images:
-        print(f"нет картинок css_* в {src}; проверь TRAIN_RUNS_DIR в .env")
+        print(f"нет картинок css_* в {src}; проверь MERGED_DIR в .env")
         return 1
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

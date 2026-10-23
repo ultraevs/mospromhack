@@ -478,6 +478,10 @@ class Worker:
         self._pool.shutdown(wait=False, cancel_futures=True)
         self._cpu.shutdown(wait=False, cancel_futures=True)
         self._clips.cleanup()
+        # LinqDetector держит открытыми устройство и сессии TPU
+        close = getattr(self.detector, "close", None)
+        if close:
+            close()
 
 
 def build(settings: Settings, config: AppConfig) -> Worker:
@@ -485,7 +489,9 @@ def build(settings: Settings, config: AppConfig) -> Worker:
     if "ppe" not in specs:
         raise SystemExit(f"нет модели ppe в {settings.models_dir}; запусти scripts/sync_models.ps1")
     check_classes(specs["ppe"], specs.get("hazard"))
-    detector = create_detector(config.worker.detector, specs, config.worker.fake_scenario, config.worker.precision)
+    linq = config.worker.linq.model_dump()
+    linq["program_dir"] = linq["program_dir"].replace("{login}", settings.linq_login) if settings.linq_login else ""
+    detector = create_detector(config.worker.detector, specs, config.worker.fake_scenario, config.worker.precision, linq)
     base = f"http://{settings.backend_host}:{settings.backend_port}"
     client = BackendClient(base, settings.internal_token)
     sender = DetectionsSender(base, settings.internal_token).start()

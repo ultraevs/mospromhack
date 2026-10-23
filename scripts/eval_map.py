@@ -13,7 +13,7 @@ import onnxruntime as ort
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from shared.config import get_settings  # noqa: E402
+from shared.config import get_settings, merged_dir  # noqa: E402
 from worker.app.model_spec import load_all_specs  # noqa: E402
 from worker.app.postprocess import decode, iou_matrix, preprocess  # noqa: E402
 
@@ -33,7 +33,9 @@ def average_precision(tp: np.ndarray, conf: np.ndarray, n_gt: int) -> float:
     mpre = np.concatenate(([1.0], precision, [0.0]))
     mpre = np.flip(np.maximum.accumulate(np.flip(mpre)))
     x = np.linspace(0, 1, 101)
-    return float(np.trapezoid(np.interp(x, mrec, mpre), x))
+    # в sdk linq numpy 1.26: trapezoid там ещё trapz
+    trapezoid = getattr(np, "trapezoid", None) or np.trapz
+    return float(trapezoid(np.interp(x, mrec, mpre), x))
 
 
 def evaluate(session: ort.InferenceSession, spec, images: list[Path], labels_dir: Path) -> tuple[dict[str, float], float]:
@@ -91,7 +93,7 @@ def main() -> None:
     ap.add_argument("--models", nargs="+", default=["ppe", "hazard"])
     ap.add_argument("--limit", type=int, default=0, help="сколько картинок val брать; 0 — все")
     args = ap.parse_args()
-    merged = Path(settings.train_runs_dir).parent / "merged"
+    merged = merged_dir(settings)
     specs = load_all_specs(settings.models_dir)
     ort.preload_dlls()
 

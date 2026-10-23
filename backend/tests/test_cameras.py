@@ -103,4 +103,5 @@ def test_health_reports_problems(client, camera):
 
 
 def test_client_config(client):
-    assert client.get("/api/client-config").json() == {"webrtc_port": 8889, "overlay_delay_ms": 0}
+    assert client.get("/api/client-config").json() == {"video": "webrtc", "webrtc_port": 8889, "hls_port": 8888,
+                                                         "overlay_delay_ms": 0}

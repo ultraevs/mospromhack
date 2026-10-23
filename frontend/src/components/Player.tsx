@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { whepUrl } from "../api";
+import Hls from "hls.js";
+import { hlsUrl, whepUrl } from "../api";
 import { useSocket } from "../hooks/useSocket";
 import { videoRect } from "../lib/geometry";
 import { DEFAULT_LAYERS, drawDetections, isStale } from "../lib/overlay";
@@ -25,14 +26,68 @@ export function Player({ cameraId, config, layers = DEFAULT_LAYERS, drawExtra, r
   const queue = useRef<DetectionsMessage[]>([]);
   const [state, setState] = useState<VideoState>("connecting");
   const [error, setError] = useState("");
+  const latencyMs = useRef(0);
 
   const boxesConnected = useSocket<DetectionsMessage>(`/ws/detections?camera_id=${cameraId}`, (msg) => {
     if (msg.type !== "detections") return;
     queue.current.push(msg);
-    if (queue.current.length > 60) queue.current.shift();
+    if (queue.current.length > 300) queue.current.shift();
   });
 
   useEffect(() => {
+    if (config.video !== "hls") return;
+    const video = videoRef.current;
+    if (!video) return;
+    const url = hlsUrl(cameraId, config.hls_port);
+    const onPlaying = () => setState("playing");
+    video.addEventListener("playing", onPlaying);
+    setState("connecting");
+    latencyMs.current = 0;
+    let hls: Hls | null = null;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    if (Hls.isSupported()) {
+      const start = () => {
+        hls?.destroy();
+        hls = new Hls({ lowLatencyMode: true, liveSyncDurationCount: 2, liveMaxLatencyDurationCount: 5, maxLiveSyncPlaybackRate: 1.2, backBufferLength: 10 });
+        hls.on(Hls.Events.ERROR, (_e, data) => {
+          if (!data.fatal) return;
+          setState("error");
+          setError("поток HLS недоступен");
+          retry = setTimeout(start, 2000);
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        video.play().catch(() => {});
+      };
+      start();
+      timer = setInterval(() => {
+        const lat = hls?.latency;
+        if (lat && Number.isFinite(lat)) latencyMs.current = lat * 1000;
+      }, 500);
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = url;
+      video.play().catch(() => {});
+      timer = setInterval(() => {
+        const r = video.seekable;
+        if (r.length) latencyMs.current = Math.max(0, r.end(r.length - 1) - video.currentTime) * 1000;
+      }, 500);
+    } else {
+      setState("error");
+      setError("браузер не поддерживает HLS");
+    }
+    return () => {
+      clearInterval(timer);
+      clearTimeout(retry);
+      video.removeEventListener("playing", onPlaying);
+      hls?.destroy();
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [cameraId, config.video, config.hls_port]);
+
+  useEffect(() => {
+    if (config.video === "hls") return;
     let session: WhepSession | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
@@ -71,7 +126,7 @@ export function Player({ cameraId, config, layers = DEFAULT_LAYERS, drawExtra, r
       clearTimeout(timer);
       session?.close();
     };
-  }, [cameraId, config.webrtc_port]);
+  }, [cameraId, config.video, config.webrtc_port]);
 
   const layersRef = useRef(layers);
   layersRef.current = layers;
@@ -98,10 +153,11 @@ export function Player({ cameraId, config, layers = DEFAULT_LAYERS, drawExtra, r
       ctx.clearRect(0, 0, cw, ch);
 
       const now = Date.now();
+      const delay = config.overlay_delay_ms + latencyMs.current;
       const q = queue.current;
       let msg: DetectionsMessage | undefined;
       for (let i = q.length - 1; i >= 0; i--) {
-        if (now - q[i].ts >= config.overlay_delay_ms) {
+        if (now - q[i].ts >= delay) {
           msg = q[i];
           q.splice(0, i);
           break;
@@ -111,7 +167,7 @@ export function Player({ cameraId, config, layers = DEFAULT_LAYERS, drawExtra, r
       const rect = videoRect(cw, ch, frame.w, frame.h);
       if (rectRef) rectRef.current = rect;
       extraRef.current?.(ctx, rect);
-      if (msg && !isStale(msg, now, config.overlay_delay_ms)) drawDetections(ctx, msg, rect, layersRef.current);
+      if (msg && !isStale(msg, now, delay)) drawDetections(ctx, msg, rect, layersRef.current);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);

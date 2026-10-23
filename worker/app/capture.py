@@ -18,6 +18,8 @@ os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp|fflag
 
 import cv2  # noqa: E402
 
+from shared.sync import loop_offset, probe_duration  # noqa: E402
+
 log = logging.getLogger("worker.capture")
 
 RECONNECT_PAUSES = (1, 2, 4, 8, 15)
@@ -44,7 +46,32 @@ FIRST_FRAME_TIMEOUT_S = 15.0
 _cuvid_failed = False
 
 
+SYNC_SCHEME = "syncfile://"
+_durations: dict[Path, float | None] = {}
+
+
+def sync_path(url: str) -> Path:
+    return Path(os.environ.get("SYNC_VIDEOS_DIR", "data/videos")) / url[len(SYNC_SCHEME):]
+
+
+def _duration(path: Path) -> float | None:
+    if path not in _durations:
+        _durations[path] = probe_duration(path)
+    return _durations[path]
+
+
+# файл крутим по настенным часам, как backend публикует, чтобы кадр совпадал с ui
+def sync_input(url: str, now: float | None = None) -> list[str]:
+    path = sync_path(url)
+    dur = _duration(path)
+    # декодим всё равно в raw, поэтому входной -ss точный, не по кейфреймам
+    seek = ["-ss", f"{loop_offset(dur, now):.3f}"] if dur else []
+    return ["-re", "-stream_loop", "-1", *seek, "-i", str(path)]
+
+
 def probe_stream(url: str) -> tuple[str, int, int] | None:
+    if url.startswith(SYNC_SCHEME):
+        url = str(sync_path(url))
     cmd = ["ffprobe", "-v", "error"]
     if url.startswith("rtsp"):
         cmd += ["-rtsp_transport", "tcp"]
@@ -74,7 +101,8 @@ def ffmpeg_command(url: str, codec: str, size: tuple[int, int], src: tuple[int, 
             cmd += ["-resize", f"{size[0]}x{size[1]}"]
     elif size != src:
         filters.append(f"scale={size[0]}:{size[1]}")
-    cmd += ["-i", url, "-an"]
+    cmd += sync_input(url) if url.startswith(SYNC_SCHEME) else ["-i", url]
+    cmd += ["-an"]
     if filters:
         cmd += ["-vf", ",".join(filters)]
     return cmd + ["-pix_fmt", "bgr24", "-f", "rawvideo", "pipe:1"]

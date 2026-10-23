@@ -188,7 +188,9 @@ export interface AnalyticsSummary extends ReviewCounts {
 }
 
 export interface ClientConfig {
+  video: "webrtc" | "hls";
   webrtc_port: number;
+  hls_port: number;
   overlay_delay_ms: number;
 }
 

@@ -66,6 +66,10 @@ export function wsUrl(path: string): string {
   return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${path}`;
 }
 
+export function hlsUrl(cameraId: number, hlsPort: number): string {
+  return `http://${location.hostname}:${hlsPort}/cam-${cameraId}/index.m3u8`;
+}
+
 export function whepUrl(cameraId: number, webrtcPort: number): string {
   return `http://${location.hostname}:${webrtcPort}/cam-${cameraId}/whep`;
 }

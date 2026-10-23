@@ -28,7 +28,8 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
     engine = make_engine(settings.data_dir / "db.sqlite")
     sources = SourceManager(videos_dir=settings.data_dir / "videos", logs_dir=ROOT / "logs",
                             rtsp_port=settings.mediamtx_rtsp_port, api_port=settings.mediamtx_api_port,
-                            active=run_sources, host=settings.mediamtx_host)
+                            active=run_sources, host=settings.mediamtx_host,
+                            width=settings.stream_width, maxrate=settings.stream_maxrate)
     media_dir = settings.data_dir / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
     state = AppState(settings=settings, config=config, session_factory=make_session_factory(engine),

@@ -241,3 +241,5 @@ auto.key
 *.key
 *.crt
 !frontend/src/lib/
+
+/hack_materials/

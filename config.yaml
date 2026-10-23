@@ -1,5 +1,6 @@
 worker:
   detector: onnx
+  linq: {transport: cloud, broker: 10.0.114.30, port: 5672, program_dir: "/auto/cache/{login}", timeout_s: 20, batch: 8}
   precision: auto
   ppe_fps: 6  # больше 6 на cpu не тянет
   hazard_fps: 1

@@ -203,3 +203,26 @@ def test_reader_keeps_short_queue_of_new_frames():
         assert reader.latest().seq == 7
     finally:
         reader.stop()
+
+
+from shared.sync import SYNC_EPOCH_S, loop_offset  # noqa: E402
+
+
+def test_loop_offset_wraps():
+    assert loop_offset(10, SYNC_EPOCH_S + 3.5) == pytest.approx(3.5)
+    assert loop_offset(10, SYNC_EPOCH_S + 23.5) == pytest.approx(3.5)
+    assert loop_offset(10, SYNC_EPOCH_S - 1) == pytest.approx(9.0)  # до эпохи тоже положительный
+    assert loop_offset(0, SYNC_EPOCH_S + 5) == 0.0 and loop_offset(-1) == 0.0
+
+
+def test_ffmpeg_command_syncfile(monkeypatch, tmp_path):
+    monkeypatch.setenv("SYNC_VIDEOS_DIR", str(tmp_path))
+    monkeypatch.setattr(capture, "_durations", {tmp_path / "a.mp4": 10.0})
+    monkeypatch.setattr(capture, "loop_offset", lambda d, now=None: loop_offset(d, SYNC_EPOCH_S + 27.25))
+    cmd = ffmpeg_command("syncfile://a.mp4", "h264", (640, 360), (1280, 720), 6, cuvid=False)
+    i = cmd.index("-i")
+    assert cmd[i + 1] == str(tmp_path / "a.mp4") and cmd[i - 2:i] == ["-ss", "7.250"]
+    assert cmd[:i].count("-re") == 1 and cmd[cmd.index("-stream_loop") + 1] == "-1"
+    assert cmd[cmd.index("-vf") + 1] == "fps=6,scale=640:360" and cmd[-1] == "pipe:1"
+    monkeypatch.setattr(capture, "_durations", {tmp_path / "a.mp4": None})
+    assert "-ss" not in ffmpeg_command("syncfile://a.mp4", "h264", (640, 360), (640, 360), 0, cuvid=False)

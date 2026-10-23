@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import subprocess
 import threading
@@ -9,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
+
+from shared.sync import loop_offset, probe_duration
 
 log = logging.getLogger("backend.sources")
 
@@ -35,9 +38,19 @@ class _Proc:
     log_file: object
 
 
+def _double(rate: str) -> str:
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)([kKmM]?)", rate.strip())
+    if not m:
+        return rate
+    n = float(m.group(1)) * 2
+    return f"{int(n) if n.is_integer() else n}{m.group(2)}"
+
+
 class SourceManager:
     def __init__(self, videos_dir: Path, logs_dir: Path, rtsp_port: int, api_port: int, active: bool = True,
-                 host: str = "127.0.0.1"):
+                 host: str = "127.0.0.1", width: int = 0, maxrate: str = ""):
+        self.width = width
+        self.maxrate = maxrate
         self.videos_dir = videos_dir
         self.logs_dir = logs_dir
         self.rtsp_port = rtsp_port
@@ -51,6 +64,7 @@ class SourceManager:
         self._fails: dict[int, int] = {}
         self._next_try: dict[int, float] = {}
         self._ready: set[str] = set()
+        self._durations: dict[Path, float | None] = {}
         self.mediamtx_error: str | None = "ещё не проверялся"
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -159,12 +173,16 @@ class SourceManager:
         self._next_try[cam_id] = time.monotonic() + RESTART_PAUSES[min(n, len(RESTART_PAUSES) - 1)]
 
 
-    def ffmpeg_command(self, d: Desired, path: Path) -> list[str]:
+    def ffmpeg_command(self, d: Desired, path: Path, offset: float | None = None) -> list[str]:
+        # всё равно перекодируем в x264, так что входной -ss точный (декодит от кейфрейма и выкидывает лишнее)
+        seek = ["-ss", f"{offset:.3f}"] if offset else []
+        scale = ["-vf", f"scale={self.width}:-2"] if self.width > 0 else []
+        rate = ["-maxrate", self.maxrate, "-bufsize", _double(self.maxrate)] if self.maxrate else []
         return [
             "ffmpeg", "-hide_banner", "-loglevel", "warning", "-nostdin",
-            "-re", "-stream_loop", "-1", "-i", str(path),
+            "-re", "-stream_loop", "-1", *seek, "-i", str(path),
             "-an", "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
-            "-bf", "0", "-pix_fmt", "yuv420p",
+            *scale, "-bf", "0", "-pix_fmt", "yuv420p", *rate,
             "-force_key_frames", "expr:gte(t,n_forced*1)",  # кейфрейм раз в сек, а то webrtc долго стартует
             "-f", "rtsp", "-rtsp_transport", "tcp", self.rtsp_url(d.camera_id),
         ]
@@ -179,7 +197,11 @@ class SourceManager:
             return
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         log_file = open(self.logs_dir / f"ffmpeg-{path_name(d.camera_id)}.log", "ab")
-        popen = subprocess.Popen(self.ffmpeg_command(d, path), stdout=log_file, stderr=subprocess.STDOUT,
+        if path not in self._durations:
+            self._durations[path] = probe_duration(path)
+        dur = self._durations[path]
+        offset = loop_offset(dur) if dur else None
+        popen = subprocess.Popen(self.ffmpeg_command(d, path, offset), stdout=log_file, stderr=subprocess.STDOUT,
                                  stdin=subprocess.DEVNULL)
         self._procs[d.camera_id] = _Proc(d, popen, time.monotonic(), log_file)
         self._errors.pop(d.camera_id, None)
