@@ -18,6 +18,10 @@ class EventType(str, Enum):
     smoking = "smoking"
     fire = "fire"
     smoke = "smoke"
+    running = "running"
+    vehicle_proximity = "vehicle_proximity"
+    fall = "fall"
+    lying_immobile = "lying_immobile"
 
 
 class Severity(str, Enum):
@@ -39,6 +43,7 @@ class Review(str, Enum):
     none = "none"
     confirmed = "confirmed"
     false_positive = "false_positive"
+    forwarded = "forwarded"
 
 
 class PpeStatus(str, Enum):
@@ -238,6 +243,36 @@ class SmokingRule(KofMRule):
     everywhere: bool = False
 
 
+class RunningRule(BaseModel):
+    window_s: Seconds = 2
+    min_observations: Count = 6
+    fraction: Share = 0.6
+    speed_heights_s: Annotated[float, Field(gt=0, le=100)] = 1.5
+
+
+class VehicleProximityRule(BaseModel):
+    window_s: Seconds = 1.5
+    min_observations: Count = 4
+    fraction: Share = 0.7
+    distance_heights: Annotated[float, Field(gt=0, le=100)] = 1.0
+
+
+class FallRule(BaseModel):
+    window_s: Seconds = 1.5
+    min_observations: Count = 2
+    upright_ratio: Annotated[float, Field(gt=0, le=10)] = 1.3
+    lying_ratio: Annotated[float, Field(gt=0, le=10)] = 1.0
+    drop_heights: Annotated[float, Field(ge=0, le=10)] = 0.2
+
+
+class LyingImmobileRule(BaseModel):
+    window_s: Seconds = 10
+    min_observations: Count = 20
+    fraction: Share = 0.9
+    lying_ratio: Annotated[float, Field(gt=0, le=10)] = 1.0
+    max_speed: Annotated[float, Field(ge=0, le=10)] = 0.1
+
+
 class LifecycleRule(BaseModel):
     close_after_s: Seconds = 5
     cooldown_s: Annotated[float, Field(ge=0, le=86_400)] = 60
@@ -255,6 +290,10 @@ class RuleSettings(BaseModel):
     smoking: SmokingRule = Field(default_factory=SmokingRule)
     fire: KofMRule = Field(default_factory=lambda: KofMRule(k=3, m=5))
     smoke: KofMRule = Field(default_factory=lambda: KofMRule(k=3, m=5))
+    running: RunningRule = Field(default_factory=RunningRule)
+    vehicle_proximity: VehicleProximityRule = Field(default_factory=VehicleProximityRule)
+    fall: FallRule = Field(default_factory=FallRule)
+    lying_immobile: LyingImmobileRule = Field(default_factory=LyingImmobileRule)
     lifecycle: LifecycleRule = Field(default_factory=LifecycleRule)
 
 

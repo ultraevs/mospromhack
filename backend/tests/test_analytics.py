@@ -20,7 +20,8 @@ def by(items, key):
 def test_empty_summary(client):
     s = client.get("/api/analytics/summary").json()
     assert s["total"] == 0 and s["false_share"] is None and s["by_camera"] == [] and s["by_zone"] == [] and s["by_day"] == []
-    assert [t["type"] for t in s["by_type"]] == ["no_helmet", "no_mask", "no_vest", "zone_intrusion", "smoking", "fire", "smoke"]
+    assert [t["type"] for t in s["by_type"]] == ["no_helmet", "no_mask", "no_vest", "zone_intrusion", "smoking", "fire", "smoke",
+                                                 "running", "vehicle_proximity", "fall", "lying_immobile"]
     assert all(t["total"] == 0 for t in s["by_type"]) and len(s["by_hour"]) == 24
 
 
@@ -41,7 +42,7 @@ def test_summary_counts(client, camera):
     assert (s["total"], s["confirmed"], s["false_positive"], s["unreviewed"]) == (5, 1, 2, 2)
     assert s["false_share"] == 0.667
     types = by(s["by_type"], "type")
-    assert types["no_helmet"] == {"type": "no_helmet", "total": 3, "confirmed": 1, "false_positive": 2, "unreviewed": 0,
+    assert types["no_helmet"] == {"type": "no_helmet", "total": 3, "confirmed": 1, "false_positive": 2, "unreviewed": 0, "forwarded": 0,
                                   "false_share": 0.667}
     assert types["fire"]["total"] == 1 and types["fire"]["false_share"] is None and types["smoke"]["total"] == 0
     assert {x["severity"]: x["total"] for x in s["by_severity"]} == {"high": 2, "medium": 3, "low": 0}

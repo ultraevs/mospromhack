@@ -31,6 +31,7 @@ def _naive(dt: datetime | None) -> datetime | None:
 @router.get("/events", response_model=EventPage)
 async def list_events(
     camera_id: int | None = None,
+    zone_id: int | None = None,
     type: EventType | None = None,
     severity: Severity | None = None,
     status: EventStatus | None = None,
@@ -44,6 +45,8 @@ async def list_events(
     conds = []
     if camera_id is not None:
         conds.append(EventRow.camera_id == camera_id)
+    if zone_id is not None:
+        conds.append(EventRow.zone_id == zone_id)
     if type is not None:
         conds.append(EventRow.type == type.value)
     if severity is not None:

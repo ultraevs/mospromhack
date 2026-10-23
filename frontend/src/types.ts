@@ -1,8 +1,9 @@
 // то же что shared/schemas.py. рамки [x, y, w, h] в долях кадра
 export type BBox = [number, number, number, number];
-export type EventType = "no_helmet" | "no_mask" | "no_vest" | "zone_intrusion" | "smoking" | "fire" | "smoke";
+export type EventType = "no_helmet" | "no_mask" | "no_vest" | "zone_intrusion" | "smoking" | "fire" | "smoke"
+  | "running" | "vehicle_proximity" | "fall" | "lying_immobile";
 export type Severity = "low" | "medium" | "high";
-export type Review = "none" | "confirmed" | "false_positive";
+export type Review = "none" | "confirmed" | "false_positive" | "forwarded";
 export type PpeItem = "helmet" | "mask" | "vest";
 export type Point = [number, number];
 export type ZoneType = "restricted" | "ppe_required" | "flammable";
@@ -27,6 +28,10 @@ export interface RuleSettings {
   smoking: { k: number; m: number; upper_fraction: number; everywhere: boolean };
   fire: { k: number; m: number };
   smoke: { k: number; m: number };
+  running: { window_s: number; min_observations: number; fraction: number; speed_heights_s: number };
+  vehicle_proximity: { window_s: number; min_observations: number; fraction: number; distance_heights: number };
+  fall: { window_s: number; min_observations: number; upright_ratio: number; lying_ratio: number; drop_heights: number };
+  lying_immobile: { window_s: number; min_observations: number; fraction: number; lying_ratio: number; max_speed: number };
   lifecycle: {
     close_after_s: number; cooldown_s: number; retrack_iou: number; retrack_window_s: number;
     camera_cooldown_s: number; track_lost_s: number;
@@ -174,6 +179,7 @@ export interface ReviewCounts {
   confirmed: number;
   false_positive: number;
   unreviewed: number;
+  forwarded: number;
   false_share: number | null;
 }
 
@@ -202,16 +208,21 @@ export const EVENT_LABEL: Record<EventType, string> = {
   smoking: "курение",
   fire: "огонь",
   smoke: "дым",
+  running: "бег",
+  vehicle_proximity: "сближение с техникой",
+  fall: "падение",
+  lying_immobile: "лежит неподвижно",
 };
 
 export const EVENT_TYPES = Object.keys(EVENT_LABEL) as EventType[];
-export const REVIEW_LABEL: Record<Review, string> = { none: "не размечено", confirmed: "подтверждено", false_positive: "ложное" };
+export const REVIEW_LABEL: Record<Review, string> = { none: "не размечено", confirmed: "подтверждено", false_positive: "ложное", forwarded: "передано мастеру" };
 
 export const SEVERITY_LABEL: Record<Severity, string> = { high: "высокая", medium: "средняя", low: "низкая" };
 export const SEVERITY_ICON: Record<Severity, string> = { high: "▲", medium: "◆", low: "●" };
 export const SEVERITY_COLOR: Record<Severity, string> = { high: "#f0524f", medium: "#f59e3b", low: "#e8cf4a" };
 export const EVENT_SEVERITY: Record<EventType, Severity> = {
   fire: "high", smoke: "high", zone_intrusion: "high",
+  vehicle_proximity: "high", fall: "high", lying_immobile: "high", running: "medium",
   no_helmet: "medium", no_mask: "medium", smoking: "medium",
   no_vest: "low",
 };

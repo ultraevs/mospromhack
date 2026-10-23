@@ -9,10 +9,10 @@ import {
 } from "../lib/journal";
 import type { JournalFilters } from "../lib/journal";
 import { EVENT_LABEL, EVENT_TYPES, REVIEW_LABEL, SEVERITY_LABEL } from "../types";
-import type { Camera, EventMessage, EventPage, Review, SafetyEvent, Severity } from "../types";
+import type { Camera, EventMessage, EventPage, Review, SafetyEvent, Severity, Zone } from "../types";
 
 const SELECT = "rounded border border-line bg-bg px-2 py-1 text-text";
-const REVIEW_MARK: Record<Review, string> = { none: "", confirmed: "✔ ", false_positive: "✖ " };
+const REVIEW_MARK: Record<Review, string> = { none: "", confirmed: "✔ ", false_positive: "✖ ", forwarded: "➜ " };
 
 function Filter({ title, children }: { title: string; children: React.ReactNode }) {
   return <label className="flex flex-col gap-1 text-xs text-muted">{title}{children}</label>;
@@ -38,6 +38,13 @@ export function JournalPage() {
 
   useEffect(load, [load]);
   useEffect(() => { api.cameras().then(setCameras).catch(() => undefined); }, []);
+  const [zones, setZones] = useState<Zone[]>([]);
+  useEffect(() => {
+    const ids = filters.camera_id ? [Number(filters.camera_id)] : cameras.map((c) => c.id);
+    Promise.all(ids.map((id) => api.zones(id).catch(() => [] as Zone[])))
+      .then((all) => setZones(all.flat()));
+  }, [filters.camera_id, cameras]);
+  const camName = (id: number) => cameras.find((c) => c.id === id)?.name ?? "";
 
   useEffect(() => {
     if (!selectedId) return setSelected(null);
@@ -83,9 +90,15 @@ export function JournalPage() {
 
         <div className="mb-3 flex flex-wrap items-end gap-3 rounded border border-line bg-panel p-3">
           <Filter title="Камера">
-            <select className={SELECT} value={filters.camera_id} onChange={(e) => update({ camera_id: e.target.value })}>
+            <select className={SELECT} value={filters.camera_id} onChange={(e) => update({ camera_id: e.target.value, zone_id: "" })}>
               <option value="">все</option>
               {cameras.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Filter>
+          <Filter title="Зона">
+            <select className={SELECT} value={filters.zone_id} onChange={(e) => update({ zone_id: e.target.value })}>
+              <option value="">все</option>
+              {zones.map((z) => <option key={z.id} value={z.id}>{filters.camera_id ? z.name : `${camName(z.camera_id)} / ${z.name}`}</option>)}
             </select>
           </Filter>
           <Filter title="Нарушение">
@@ -110,7 +123,7 @@ export function JournalPage() {
           <Filter title="Отметка">
             <select className={SELECT} value={filters.review} onChange={(e) => update({ review: e.target.value })}>
               <option value="">любая</option>
-              {(["none", "confirmed", "false_positive"] as Review[]).map((r) => <option key={r} value={r}>{REVIEW_LABEL[r]}</option>)}
+              {(["none", "confirmed", "false_positive", "forwarded"] as Review[]).map((r) => <option key={r} value={r}>{REVIEW_LABEL[r]}</option>)}
             </select>
           </Filter>
           <Filter title="С">
@@ -157,7 +170,7 @@ export function JournalPage() {
                 <td className={`whitespace-nowrap px-2 py-2 ${e.status === "open" ? "text-medium" : "text-muted"}`}>
                   {formatDuration(e.started_at, e.ended_at)}
                 </td>
-                <td className={`whitespace-nowrap px-2 py-2 ${e.review === "confirmed" ? "text-ok" : e.review === "false_positive" ? "text-medium" : "text-muted"}`}>
+                <td className={`whitespace-nowrap px-2 py-2 ${e.review === "confirmed" ? "text-ok" : e.review === "false_positive" ? "text-medium" : e.review === "forwarded" ? "text-accent" : "text-muted"}`}>
                   {REVIEW_MARK[e.review]}{REVIEW_LABEL[e.review]}
                 </td>
               </tr>

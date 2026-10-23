@@ -25,6 +25,7 @@ def _review_counts(reviews: list[str]) -> dict:
     confirmed, false = c[Review.confirmed.value], c[Review.false_positive.value]
     marked = confirmed + false
     return {"total": len(reviews), "confirmed": confirmed, "false_positive": false, "unreviewed": c[Review.none.value],
+            "forwarded": c[Review.forwarded.value],
             "false_share": round(false / marked, 3) if marked else None}
 
 

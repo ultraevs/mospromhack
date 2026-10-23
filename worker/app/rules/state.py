@@ -7,6 +7,7 @@ from shared.schemas import EventType, PpeItem, Severity
 
 PERSON = "person"
 CIGARETTE = "cigarette"
+VEHICLE = "vehicle"
 HAZARD_EVENTS = {"fire": EventType.fire, "smoke": EventType.smoke}
 
 PPE_CLASSES: dict[PpeItem, tuple[str, str | None, bool]] = {
@@ -25,6 +26,10 @@ SEVERITY: dict[EventType, Severity] = {
     EventType.no_mask: Severity.medium,
     EventType.smoking: Severity.medium,  # high если в зоне flammable
     EventType.no_vest: Severity.low,
+    EventType.running: Severity.medium,  # high в restricted
+    EventType.vehicle_proximity: Severity.high,
+    EventType.fall: Severity.high,
+    EventType.lying_immobile: Severity.high,
 }
 
 HISTORY_S = 12.0  # должно быть >= самого длинного окна правил
@@ -39,6 +44,8 @@ class Observation:
     seen: dict[str, float]
     zones: frozenset[int]
     required: frozenset[PpeItem]
+    vehicles: tuple[tuple[float, float, float, float], ...] = ()  # техника в этом кадре, x y w h в долях
+    aspect: float = 1.0  # w/h кадра
 
 
 @dataclass

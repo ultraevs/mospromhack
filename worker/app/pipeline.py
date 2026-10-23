@@ -13,7 +13,7 @@ from worker.app.crops import crop_box
 from worker.app.rules.checks import check_k_of_m, in_upper_part, in_window
 from worker.app.rules.engine import Candidate, RuleEngine
 from worker.app.rules.state import (ATTACHABLE, CIGARETTE, HAZARD_EVENTS, HEAD_CLASSES, PERSON, PPE_CLASSES,
-                                    Observation, TrackState)
+                                    VEHICLE, Observation, TrackState)
 from worker.app.rules.types import EventClose, EventOpen
 from worker.app.tracking import IouTracker
 
@@ -130,6 +130,7 @@ class CameraPipeline:
         track_ids = self.tracker.update(people_xyxy, t)
         owner = assign_items(people_xyxy, dets.xyxy[item_idx], [names[i] in HEAD_CLASSES for i in item_idx])
         owner_of = dict(zip(item_idx, owner))  # индекс сиз -> индекс человека или -1
+        vehicles = tuple(norm_box(dets.xyxy[i], w, h) for i, n in enumerate(names) if n == VEHICLE)
 
         for p, det_i in enumerate(person_idx):
             bbox = norm_box(dets.xyxy[det_i], w, h)
@@ -145,7 +146,8 @@ class CameraPipeline:
                     seen[names[i]] = max(seen.get(names[i], 0.0), float(dets.conf[i]))
             track = self.tracks.setdefault(int(track_ids[p]), TrackState(int(track_ids[p])))
             track.add(Observation(t=t, bbox=bbox, height_px=float(dets.xyxy[det_i][3] - dets.xyxy[det_i][1]) * px_scale,
-                                  conf=float(dets.conf[det_i]), seen=seen, zones=zones, required=frozenset(required)))
+                                  conf=float(dets.conf[det_i]), seen=seen, zones=zones, required=frozenset(required),
+                                  vehicles=vehicles, aspect=w / h if h else 1.0))
 
         actions, evaluated = self.engine.step(t, self.tracks, camera, rules)
         horizon = max(rules.lifecycle.track_lost_s, self.tracker.max_age_s)

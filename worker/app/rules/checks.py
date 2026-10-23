@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Iterable, Sequence
 
-from shared.schemas import FractionRule, KofMRule, NoVestRule, PpeItem, ZoneIntrusionRule
+from shared.schemas import FallRule, FractionRule, LyingImmobileRule, KofMRule, NoVestRule, PpeItem, RunningRule, VehicleProximityRule, ZoneIntrusionRule
 from worker.app.rules.state import Observation
 
 
@@ -80,3 +81,102 @@ def check_k_of_m(checks: Sequence[tuple[float, bool, float]], p: KofMRule) -> Ru
     if not last:
         return INACTIVE
     return RuleResult(len(hits) >= p.k, len(hits) / len(last), len(last), sum(hits) / len(hits) if hits else 0.0, 0.0)
+
+
+def foot(b: tuple[float, float, float, float]) -> tuple[float, float]:
+    return b[0] + b[2] / 2, b[1] + b[3]
+
+
+SPEED_LAG_S = 0.5  # скорость меряем на отрезке ~0.5с, по соседним кадрам слишком шумит
+
+
+# скорость в ростах человека в секунду
+def speed_heights(obs: Sequence[Observation], i: int) -> float | None:
+    o = obs[i]
+    prev = next((p for p in reversed(list(obs)[:i]) if o.t - p.t >= SPEED_LAG_S), None)
+    if prev is None or o.t - prev.t > SPEED_LAG_S * 3:
+        return None
+    (x0, y0), (x1, y1) = foot(prev.bbox), foot(o.bbox)
+    height = (prev.bbox[3] + o.bbox[3]) / 2
+    if height <= 0:
+        return None
+    return math.hypot((x1 - x0) * o.aspect, y1 - y0) / height / (o.t - prev.t)
+
+
+def check_running(obs: Sequence[Observation], t: float, p: RunningRule) -> RuleResult:
+    speeds = [s for i, o in enumerate(obs) if t - p.window_s <= o.t <= t
+              for s in [speed_heights(obs, i)] if s is not None]
+    n = len(speeds)
+    if n == 0:
+        return INACTIVE
+    fast = [s for s in speeds if s >= p.speed_heights_s]
+    fraction = len(fast) / n
+    active = n >= p.min_observations and fraction >= p.fraction
+    conf = min(1.0, sum(fast) / len(fast) / (2 * p.speed_heights_s)) if fast else 0.0
+    return RuleResult(active, fraction, n, conf, p.window_s)
+
+
+# от ног человека до нижней кромки рамки техники, в ростах. у длинной фуры центр далеко, поэтому до кромки
+def vehicle_distance(o: Observation) -> float | None:
+    if not o.vehicles or o.bbox[3] <= 0:
+        return None
+    fx, fy = foot(o.bbox)
+    best = None
+    for vx, vy, vw, vh in o.vehicles:
+        dx = (min(max(fx, vx), vx + vw) - fx) * o.aspect
+        d = math.hypot(dx, vy + vh - fy) / o.bbox[3]
+        best = d if best is None else min(best, d)
+    return best
+
+
+def check_vehicle_proximity(obs: Sequence[Observation], t: float, p: VehicleProximityRule) -> RuleResult:
+    w = in_window(obs, t, p.window_s)
+    n = len(w)
+    if n == 0 or not obs[-1].vehicles:
+        return INACTIVE
+    dists = [vehicle_distance(o) for o in w]
+    close = [d for d in dists if d is not None and d < p.distance_heights]
+    fraction = len(close) / n
+    active = n >= p.min_observations and fraction >= p.fraction
+    conf = 1.0 - min(close) / p.distance_heights if close else 0.0
+    return RuleResult(active, fraction, n, max(conf, 0.5) if active else conf, p.window_s)
+
+
+# h/w рамки в пикселях
+def tallness(o: Observation) -> float:
+    return o.bbox[3] / (o.bbox[2] * o.aspect) if o.bbox[2] > 0 else 0.0
+
+
+# стоял -> лег за window_s и центр рамки резко ушел вниз. эвристика по bbox, позы нет
+def check_fall(obs: Sequence[Observation], t: float, p: FallRule) -> RuleResult:
+    w = in_window(obs, t, p.window_s)
+    upright = [i for i, o in enumerate(w) if tallness(o) >= p.upright_ratio]
+    if not upright:
+        return INACTIVE
+    stood = w[upright[-1]]
+    after = w[upright[-1] + 1:]
+    lying = [o for o in after if tallness(o) > 0 and 1 / tallness(o) >= p.lying_ratio]
+    if not after or not lying or lying[-1] is not after[-1]:
+        return INACTIVE
+    drop = ((w[-1].bbox[1] + w[-1].bbox[3] / 2) - (stood.bbox[1] + stood.bbox[3] / 2)) / stood.bbox[3]
+    fraction = len(lying) / len(after)
+    active = len(lying) >= p.min_observations and fraction >= 0.8 and drop >= p.drop_heights
+    return RuleResult(active, fraction, len(after), min(1.0, max(drop, 0.0) / (2 * p.drop_heights)), p.window_s)
+
+
+def check_lying_immobile(obs: Sequence[Observation], t: float, p: LyingImmobileRule) -> RuleResult:
+    w = in_window(obs, t, p.window_s)
+    n = len(w)
+    if n == 0 or w[-1].t - w[0].t < p.window_s * 0.9:
+        return INACTIVE
+    lying = [o for o in w if tallness(o) > 0 and 1 / tallness(o) >= p.lying_ratio]
+    fraction = len(lying) / n
+    if not lying:
+        return RuleResult(False, 0.0, n, 0.0, p.window_s)
+    a, b = lying[0], lying[-1]
+    size = max(b.bbox[2] * b.aspect, b.bbox[3])
+    dt = max(b.t - a.t, 1e-6)
+    (x0, y0), (x1, y1) = foot(a.bbox), foot(b.bbox)
+    speed = math.hypot((x1 - x0) * b.aspect, y1 - y0) / size / dt
+    active = n >= p.min_observations and fraction >= p.fraction and speed < p.max_speed
+    return RuleResult(active, fraction, n, fraction, p.window_s)

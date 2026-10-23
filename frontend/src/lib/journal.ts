@@ -2,6 +2,7 @@ export const PAGE_SIZE = 25;
 
 export interface JournalFilters {
   camera_id: string;
+  zone_id: string;
   type: string;
   severity: string;
   status: string;
@@ -12,10 +13,10 @@ export interface JournalFilters {
 }
 
 export const EMPTY_FILTERS: JournalFilters = {
-  camera_id: "", type: "", severity: "", status: "", review: "", from: "", to: "", page: 0,
+  camera_id: "", zone_id: "", type: "", severity: "", status: "", review: "", from: "", to: "", page: 0,
 };
 
-const KEYS = ["camera_id", "type", "severity", "status", "review", "from", "to"] as const;
+const KEYS = ["camera_id", "zone_id", "type", "severity", "status", "review", "from", "to"] as const;
 
 export function filtersFromParams(params: URLSearchParams): JournalFilters {
   const out = { ...EMPTY_FILTERS };
@@ -42,6 +43,7 @@ export function localToIso(value: string): string | undefined {
 export function toQuery(filters: JournalFilters, pageSize = PAGE_SIZE): Record<string, string | number | undefined> {
   return {
     camera_id: filters.camera_id || undefined,
+    zone_id: filters.zone_id || undefined,
     type: filters.type || undefined,
     severity: filters.severity || undefined,
     status: filters.status || undefined,

@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 from shared.schemas import EventType, PpeItem, RuleSettings, Severity, WorkerCamera, ZoneType
 from worker.app.association import iou_xywh
-from worker.app.rules.checks import RuleResult, check_head_ppe, check_k_of_m, check_no_vest, check_zone
+from worker.app.rules.checks import (RuleResult, check_fall, check_head_ppe, check_k_of_m, check_lying_immobile,
+                                     check_no_vest, check_running, check_vehicle_proximity, check_zone)
 from worker.app.rules.state import PPE_CLASSES, SEVERITY, TrackState
 from worker.app.rules.types import EventClose, EventOpen
 
@@ -67,6 +68,16 @@ def evaluate_track(track: TrackState, t: float, camera: WorkerCamera, rules: Rul
         severity = Severity.high if track.last.zones & flammable else SEVERITY[EventType.smoking]
         zone_id = next(iter(sorted(track.last.zones & flammable)), None)
         out.append(Candidate(EventType.smoking, check_k_of_m(track.checks, rules.smoking), severity, bbox, zone_id))
+
+    restricted = {z.id for z in camera.zones if z.type == ZoneType.restricted}
+    severity = Severity.high if track.last.zones & restricted else SEVERITY[EventType.running]
+    zone_id = next(iter(sorted(track.last.zones & restricted)), None)
+    out.append(Candidate(EventType.running, check_running(obs, t, rules.running), severity, bbox, zone_id))
+    out.append(Candidate(EventType.vehicle_proximity, check_vehicle_proximity(obs, t, rules.vehicle_proximity),
+                         SEVERITY[EventType.vehicle_proximity], bbox))
+    out.append(Candidate(EventType.fall, check_fall(obs, t, rules.fall), SEVERITY[EventType.fall], bbox))
+    out.append(Candidate(EventType.lying_immobile, check_lying_immobile(obs, t, rules.lying_immobile),
+                         SEVERITY[EventType.lying_immobile], bbox))
     return out
 
 

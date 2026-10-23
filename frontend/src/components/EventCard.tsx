@@ -93,6 +93,10 @@ export function EventCard({ event, onChange, onClose }: {
                   className={`flex-1 rounded border px-3 py-1.5 disabled:opacity-40 ${event.review === "false_positive" ? "border-medium bg-medium/15 text-medium" : "border-line hover:border-medium"}`}>
             ✖ Ложное срабатывание
           </button>
+          <button disabled={busy} onClick={() => mark("forwarded")}
+                  className={`flex-1 rounded border px-3 py-1.5 disabled:opacity-40 ${event.review === "forwarded" ? "border-accent bg-accent/15 text-accent" : "border-line hover:border-accent"}`}>
+            ➜ Мастеру
+          </button>
         </div>
         {error && <div className="mb-2 text-high">▲ {error}</div>}
 

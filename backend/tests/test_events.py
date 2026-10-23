@@ -56,6 +56,24 @@ def test_review(client, camera):
     assert client.patch("/api/events/evt_nope", json={"review": "confirmed"}).status_code == 404
 
 
+def test_review_forwarded(client, camera):
+    ev = post_event(client, camera["id"])
+    r = client.patch(f"/api/events/{ev['id']}", json={"review": "forwarded"})
+    assert r.status_code == 200 and r.json()["review"] == "forwarded"
+    assert [e["id"] for e in client.get("/api/events", params={"review": "forwarded"}).json()["items"]] == [ev["id"]]
+    s = client.get("/api/analytics/summary").json()
+    assert s["forwarded"] == 1 and s["confirmed"] == 0 and s["unreviewed"] == 0
+
+
+def test_journal_zone_filter(client, camera):
+    zone = client.post(f"/api/cameras/{camera['id']}/zones", json={
+        "name": "Z", "type": "restricted", "polygon": [[0, 0], [1, 0], [1, 1]], "required_ppe": []}).json()
+    a = post_event(client, camera["id"], zone_id=zone["id"])
+    post_event(client, camera["id"])
+    items = client.get("/api/events", params={"zone_id": zone["id"]}).json()["items"]
+    assert [e["id"] for e in items] == [a["id"]] and items[0]["zone_name"] == "Z"
+
+
 def test_journal_filters_and_pagination(client, camera):
     other = client.post("/api/cameras", json={"name": "B", "source_type": "file", "source": "demo.mp4"}).json()
     a = post_event(client, camera["id"], started_at="2026-10-04T10:00:00Z")

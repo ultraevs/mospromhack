@@ -185,25 +185,58 @@ def run_stand(args) -> None:
         log.info("ws воркера закрыт")
         return ws
 
-    async def handler(request):
-        if request.path == "/internal/detections" and request.headers.get("Upgrade", "").lower() == "websocket":
-            return await ws_handler(request)
-        if not amqp.connected:
-            return web.Response(status=503, text="bridge: amqp not connected")
-        body = await request.read()
-        h, b = encode_request(request.method, request.path_qs, request.headers.items(), body)
+    async def forward(method: str, path: str, headers, body: bytes):
+        h, b = encode_request(method, path, headers, body)
         t0 = time.monotonic()
         cid, fut = amqp.request(asyncio.get_running_loop(), h, b)
         try:
             status, hdrs, rbody = await asyncio.wait_for(fut, args.timeout)
         except asyncio.TimeoutError:
             amqp.forget(cid)
-            log.info("%s %s таймаут", request.method, request.path_qs)
-            return web.Response(status=504, text="bridge: timeout")
+            log.info("%s %s таймаут", method, path)
+            return 504, [], b"bridge: timeout"
         except ConnectionError:
-            return web.Response(status=503, text="bridge: amqp dropped")
-        log.debug("%s %s -> %d %dB/%dB %.2fs", request.method, request.path_qs, status, len(b), len(rbody),
-                  time.monotonic() - t0)
+            return 503, [], b"bridge: amqp dropped"
+        log.debug("%s %s -> %d %dB/%dB %.2fs", method, path, status, len(b), len(rbody), time.monotonic() - t0)
+        return status, hdrs, rbody
+
+    # цикл воркера однопоточный, каждый поход через впн тормозит детекцию.
+    # stats шлем в фоне, конфиг отдаем из кэша и обновляем в фоне
+    background: set = set()
+    config: dict = {}
+
+    def spawn(coro):
+        t = asyncio.ensure_future(coro)
+        background.add(t)
+        t.add_done_callback(background.discard)
+
+    async def refresh_config(path: str, headers):
+        try:
+            status, hdrs, rbody = await forward("GET", path, headers, b"")
+            if status == 200:
+                config[path] = (status, hdrs, rbody)
+        finally:
+            config.pop("_busy", None)
+
+    async def handler(request):
+        if request.path == "/internal/detections" and request.headers.get("Upgrade", "").lower() == "websocket":
+            return await ws_handler(request)
+        if not amqp.connected:
+            return web.Response(status=503, text="bridge: amqp not connected")
+        body = await request.read()
+        headers = list(request.headers.items())
+        if request.method == "POST" and request.path == "/internal/stats":
+            spawn(forward("POST", request.path_qs, headers, body))
+            return web.Response(status=204)
+        if request.method == "GET" and request.path == "/internal/config" and request.path_qs in config:
+            if "_busy" not in config:
+                config["_busy"] = True
+                spawn(refresh_config(request.path_qs, headers))
+            status, hdrs, rbody = config[request.path_qs]
+        else:
+            status, hdrs, rbody = await forward(request.method, request.path_qs, headers, body)
+            if request.method == "GET" and request.path == "/internal/config" and status == 200:
+                config[request.path_qs] = (status, hdrs, rbody)
         resp = web.Response(status=status, body=rbody)
         for k, v in hdrs:
             resp.headers.add(k, v)
@@ -285,6 +318,19 @@ class WsForwarder:
             self._stop.wait(1.0)
 
 
+def _login() -> str:
+    if os.environ.get("LINQ_LOGIN"):
+        return os.environ["LINQ_LOGIN"]
+    try:
+        for line in open("/creds", encoding="utf-8"):
+            if line.startswith("jupyter_notebook_log="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    import getpass
+    return getpass.getuser()
+
+
 def _env_token() -> str:
     import sys
     from pathlib import Path
@@ -294,6 +340,17 @@ def _env_token() -> str:
         return get_settings().internal_token
     except Exception:  # noqa: BLE001
         return ""
+
+
+def _dotenv(key: str) -> str:
+    from pathlib import Path
+    try:
+        for line in (Path(__file__).resolve().parent.parent / ".env").read_text(encoding="utf-8").splitlines():
+            if line.startswith(key + "="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return ""
 
 
 def run_local(args) -> None:
@@ -390,7 +447,7 @@ def run_local(args) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="мост воркер<->бэк через rabbitmq")
     ap.add_argument("mode", choices=["stand", "local"])
-    ap.add_argument("--prefix", required=True, help="общий на обеих сторонах, например bridge.team46")
+    ap.add_argument("--prefix", help="общий на обеих сторонах, по умолчанию bridge.<логин>")
     ap.add_argument("--broker", default="amqp://guest:guest@10.0.114.30:5672/%2F")
     ap.add_argument("--port", type=int, default=8000, help="stand: на каком порту притворяться бэком")
     ap.add_argument("--timeout", type=float, default=30.0, help="stand: сколько ждать ответа")
@@ -400,6 +457,7 @@ def main() -> None:
     ap.add_argument("--no-rewrite", action="store_true", help="local: не трогать rtsp_url в /internal/config")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
+    args.prefix = args.prefix or os.environ.get("BRIDGE_PREFIX") or _dotenv("BRIDGE_PREFIX") or f"bridge.{_login()}"
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("pika").setLevel(logging.WARNING)

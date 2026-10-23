@@ -1,8 +1,9 @@
 import pytest
 
 from shared.schemas import EventType, PpeItem, RuleSettings, Severity, SmokingRule, WorkerCamera, Zone, ZoneType
-from worker.app.rules.checks import check_head_ppe, check_k_of_m, check_no_vest, check_zone, in_upper_part
-from worker.app.rules.engine import RuleEngine
+from worker.app.rules.checks import (check_fall, check_head_ppe, check_k_of_m, check_lying_immobile, check_no_vest,
+                                     check_running, check_vehicle_proximity, check_zone, in_upper_part)
+from worker.app.rules.engine import RuleEngine, evaluate_track
 from worker.app.rules.state import Observation, TrackState
 from worker.app.rules.types import EventClose, EventOpen
 
@@ -13,9 +14,9 @@ HELMET = frozenset({PpeItem.helmet})
 ALL = frozenset({PpeItem.helmet, PpeItem.mask, PpeItem.vest})
 
 
-def obs(t, seen=(), required=HELMET, zones=(), bbox=BOX, height=300.0):
+def obs(t, seen=(), required=HELMET, zones=(), bbox=BOX, height=300.0, vehicles=()):
     return Observation(t=t, bbox=bbox, height_px=height, conf=0.9, seen={c: 0.6 for c in seen},
-                       zones=frozenset(zones), required=frozenset(required))
+                       zones=frozenset(zones), required=frozenset(required), vehicles=vehicles)
 
 
 def series(pattern, start=0.0, fps=FPS, **kw):
@@ -351,3 +352,78 @@ def test_fire_event_lifecycle_and_camera_cooldown():
     assert engine.step_camera(120.0, EventType.fire, hit, box, RULES) == []
     assert len(engine.step_camera(120.0, EventType.smoke, hit, box, RULES)) == 1
     assert len(engine.step_camera(166.0, EventType.fire, hit, box, RULES)) == 1
+
+
+def moving(speed, seconds, start=0.0, h=0.2, w=0.08, **kw):
+    return [obs(start + i / FPS, bbox=(0.1 + speed * i / FPS, 0.5, w, h), **kw) for i in range(int(seconds * FPS))]
+
+
+def test_running_fires_walking_does_not():
+    run = moving(0.5, 3)  # 2.5 роста/с
+    assert check_running(run, run[-1].t, RULES.running).active
+    walk = moving(0.15, 3)  # 0.75 роста/с
+    assert not check_running(walk, walk[-1].t, RULES.running).active
+
+
+def test_short_sprint_does_not_fire():
+    o = moving(0.0, 2) + moving(0.5, 0.8, start=2.0)
+    assert not check_running(o, o[-1].t, RULES.running).active
+
+
+def test_running_in_restricted_zone_is_high():
+    eng, cam = RuleEngine(), camera(required=(), zones=[zone(4, ZoneType.restricted)])
+    tr = TrackState(7)
+    for o in moving(0.5, 3, zones=(4,)):
+        tr.add(o)
+    cands = {c.type: c for c in evaluate_track(tr, tr.last.t, cam, RULES)}
+    assert cands[EventType.running].result.active and cands[EventType.running].severity == Severity.high
+
+
+def near(vehicle, seconds, start=0.0):
+    return [obs(start + i / FPS, bbox=(0.3, 0.3, 0.08, 0.2), vehicles=(vehicle,)) for i in range(int(seconds * FPS))]
+
+
+def test_vehicle_proximity_near_fires_far_does_not():
+    o = near((0.42, 0.3, 0.3, 0.2), 3)  # рядом, ~0.4 роста
+    r = check_vehicle_proximity(o, o[-1].t, RULES.vehicle_proximity)
+    assert r.active
+    o = near((0.8, 0.3, 0.15, 0.2), 3)  # ~2.5 роста
+    assert not check_vehicle_proximity(o, o[-1].t, RULES.vehicle_proximity).active
+
+
+def test_vehicle_proximity_short_episode_does_not_fire():
+    o = near((0.8, 0.3, 0.15, 0.2), 2) + near((0.42, 0.3, 0.3, 0.2), 0.5, start=2.0)
+    assert not check_vehicle_proximity(o, o[-1].t, RULES.vehicle_proximity).active
+
+
+STAND = (0.4, 0.3, 0.1, 0.4)
+LIE = (0.3, 0.6, 0.4, 0.1)
+CROUCH = (0.4, 0.45, 0.1, 0.25)
+
+
+def frames(boxes, start=0.0):
+    return [obs(start + i / FPS, bbox=b) for i, b in enumerate(boxes)]
+
+
+def test_fall_fires():
+    o = frames([STAND] * 6 + [(0.35, 0.5, 0.25, 0.25)] + [LIE] * 3)
+    assert check_fall(o, o[-1].t, RULES.fall).active
+
+
+def test_crouch_or_brief_bend_is_not_fall():
+    o = frames([STAND] * 6 + [CROUCH] * 6)
+    assert not check_fall(o, o[-1].t, RULES.fall).active
+    o = frames([STAND] * 6 + [(0.35, 0.45, 0.25, 0.25)] + [STAND] * 4)
+    assert not check_fall(o, o[-1].t, RULES.fall).active
+
+
+def test_lying_immobile_long_fires_short_does_not():
+    o = frames([LIE] * (11 * FPS))
+    assert check_lying_immobile(o, o[-1].t, RULES.lying_immobile).active
+    o = frames([LIE] * (3 * FPS))
+    assert not check_lying_immobile(o, o[-1].t, RULES.lying_immobile).active
+
+
+def test_lying_but_crawling_is_not_immobile():
+    o = [obs(i / FPS, bbox=(0.1 + 0.05 * i / FPS, 0.6, 0.4, 0.1)) for i in range(11 * FPS)]
+    assert not check_lying_immobile(o, o[-1].t, RULES.lying_immobile).active
