@@ -65,7 +65,7 @@ async def stats(db: Session = Depends(get_db), state: AppState = Depends(get_sta
 async def client_config(state: AppState = Depends(get_state)) -> dict:
     return {"video": state.settings.video_mode, "webrtc_port": state.settings.mediamtx_webrtc_port,
             "hls_port": state.settings.mediamtx_hls_port,
-            "overlay_delay_ms": state.config.worker.overlay_delay_ms}
+            "overlay_delay_ms": state.config.worker.overlay_delay_ms + round(state.settings.sync_lag_s * 1000)}
 
 
 @router.websocket("/ws/detections")

@@ -27,7 +27,7 @@ from worker.app.model_spec import ModelSpec, load_all_specs
 from worker.app.crops import crop_box, merge, only_classes, shift
 from worker.app.pipeline import CameraPipeline, check_classes, norm_box
 from worker.app.rules.state import CIGARETTE, HEAD_CLASSES, PERSON
-from worker.app.postprocess import Detections, decode, preprocess
+from worker.app.postprocess import Detections, decode, hivis_vests, merge_people, preprocess
 from worker.app.rules.types import EventClose, EventOpen
 
 log = logging.getLogger("worker")
@@ -167,6 +167,11 @@ class Worker:
 
         with self._timed("ppe: пред- и постобработка, инференс"):
             all_dets = self._infer_frames("ppe", [frame.image for _, frame in fresh])
+        if "people" in self.specs:
+            with self._timed("people: coco люди и техника"):
+                people = self._infer_frames("people", [frame.image for _, frame in fresh])
+            all_dets = [merge_people(d, spec, p, self.specs["people"]) for d, p in zip(all_dets, people)]
+        all_dets = [hivis_vests(frame.image, d, spec) for (_, frame), d in zip(fresh, all_dets)]
         head = self.config.worker.crop_pass.head
         for (state, frame), dets in zip(fresh, all_dets):
             if head.enabled:

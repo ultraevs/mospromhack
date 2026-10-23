@@ -7,7 +7,9 @@ def test_publish_command_seeks_to_offset():
     m = SourceManager(Path("v"), Path("l"), 8554, 9997, active=False)
     cmd = m.ffmpeg_command(Desired(1, "file", "a.mp4"), Path("v/a.mp4"), 12.3456)
     i = cmd.index("-i")
-    assert cmd[i - 2:i] == ["-ss", "12.346"] and cmd.index("-stream_loop") < i and "libx264" in cmd
+    # -ss после -i, на выходе, иначе на стыке петли ffmpeg встает
+    assert cmd[i + 2:i + 4] == ["-ss", "12.346"] and cmd.index("-stream_loop") < i and "libx264" in cmd
+    assert cmd[cmd.index("-readrate_initial_burst") + 1] == "13.346"
     assert "-ss" not in m.ffmpeg_command(Desired(1, "file", "a.mp4"), Path("v/a.mp4"))
 
 

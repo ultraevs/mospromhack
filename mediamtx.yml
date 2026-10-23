@@ -1,5 +1,7 @@
 logLevel: info
 logDestinations: [stdout]
+# ffmpeg с файлов на слабом cpu стартует секунд по 8, дефолтные 10с рвут его по кругу
+readTimeout: 30s
 
 # через api бэк добавляет rtsp камеры
 api: yes

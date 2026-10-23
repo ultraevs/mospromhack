@@ -10,6 +10,8 @@ CLIP = "clip.mp4"
 _SAFE_ID = re.compile(r"^evt_[0-9A-Z]{10}$")
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_CLIP_BYTES = 80 * 1024 * 1024
+# клипы тяжелые, на диске держим только последние, стоп-кадры не трогаем
+KEEP_CLIPS = 10
 
 
 def event_dir(media_root: Path, event_id: str) -> Path:

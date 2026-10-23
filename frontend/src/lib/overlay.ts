@@ -12,9 +12,10 @@ export interface Layers {
 
 export const DEFAULT_LAYERS: Layers = { people: true, ppe: false, zones: true, labels: true };
 
-export const MAX_AGE_MS = 1000;
+// воркер на стенде шлет рамки раз в 1-2 с, иначе мигают. локально пустые сообщения идут каждый кадр и затирают
+export const MAX_AGE_MS = 2500;
 const OK = "#3fb97f";
-const NEUTRAL = "#9aa5b1";
+const NEUTRAL = "#38bdf8";
 const ALWAYS_VISIBLE: Record<string, string> = { fire: SEVERITY_COLOR.high, smoke: SEVERITY_COLOR.high };
 
 // старше секунды не рисуем, лучше пусто чем рамка не там
@@ -58,7 +59,7 @@ export function drawDetections(ctx: CanvasRenderingContext2D, msg: DetectionsMes
     for (const p of msg.people) {
       const b = toCanvas(p.bbox, rect);
       const color = personColor(p);
-      ctx.lineWidth = p.violations.length ? 3 : 2;
+      ctx.lineWidth = p.violations.length ? 4 : 3;
       ctx.strokeStyle = color;
       ctx.strokeRect(b.x, b.y, b.w, b.h);
       const text = personLabel(p);

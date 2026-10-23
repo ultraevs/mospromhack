@@ -1,7 +1,7 @@
 import { applyEventMessage } from "../hooks/useEvents";
 import { freshByCamera } from "../pages/CamerasPage";
 import type { DetectionsMessage, PersonBox, SafetyEvent } from "../types";
-import { DEFAULT_LAYERS, drawDetections, isStale, personColor, personLabel, worstSeverity } from "./overlay";
+import { DEFAULT_LAYERS, MAX_AGE_MS, drawDetections, isStale, personColor, personLabel, worstSeverity } from "./overlay";
 
 function mockCtx() {
   const calls: { op: string; args: number[] | [string, number, number]; style: string }[] = [];
@@ -88,13 +88,13 @@ describe("статус человека", () => {
 });
 
 describe("isStale", () => {
-  it("рамки старше секунды не рисуются", () => {
-    expect(isStale(message({ ts: 1000 }), 1900)).toBe(false);
-    expect(isStale(message({ ts: 1000 }), 2001)).toBe(true);
+  it("старые рамки не рисуются", () => {
+    expect(isStale(message({ ts: 1000 }), 1000 + MAX_AGE_MS - 100)).toBe(false);
+    expect(isStale(message({ ts: 1000 }), 1000 + MAX_AGE_MS + 1)).toBe(true);
   });
   it("задержка рамок сдвигает границу", () => {
-    expect(isStale(message({ ts: 1000 }), 2200, 300)).toBe(false);
-    expect(isStale(message({ ts: 1000 }), 2301, 300)).toBe(true);
+    expect(isStale(message({ ts: 1000 }), 1000 + MAX_AGE_MS + 200, 300)).toBe(false);
+    expect(isStale(message({ ts: 1000 }), 1000 + MAX_AGE_MS + 301, 300)).toBe(true);
   });
 });
 

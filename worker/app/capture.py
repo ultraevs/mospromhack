@@ -18,7 +18,7 @@ os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp|fflag
 
 import cv2  # noqa: E402
 
-from shared.sync import loop_offset, probe_duration  # noqa: E402
+from shared.sync import loop_input, loop_offset, probe_duration  # noqa: E402
 
 log = logging.getLogger("worker.capture")
 
@@ -64,9 +64,7 @@ def _duration(path: Path) -> float | None:
 def sync_input(url: str, now: float | None = None) -> list[str]:
     path = sync_path(url)
     dur = _duration(path)
-    # декодим всё равно в raw, поэтому входной -ss точный, не по кейфреймам
-    seek = ["-ss", f"{loop_offset(dur, now):.3f}"] if dur else []
-    return ["-re", "-stream_loop", "-1", *seek, "-i", str(path)]
+    return loop_input(path, loop_offset(dur, now) if dur else None)
 
 
 def probe_stream(url: str) -> tuple[str, int, int] | None:

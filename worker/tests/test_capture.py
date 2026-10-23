@@ -221,8 +221,8 @@ def test_ffmpeg_command_syncfile(monkeypatch, tmp_path):
     monkeypatch.setattr(capture, "loop_offset", lambda d, now=None: loop_offset(d, SYNC_EPOCH_S + 27.25))
     cmd = ffmpeg_command("syncfile://a.mp4", "h264", (640, 360), (1280, 720), 6, cuvid=False)
     i = cmd.index("-i")
-    assert cmd[i + 1] == str(tmp_path / "a.mp4") and cmd[i - 2:i] == ["-ss", "7.250"]
-    assert cmd[:i].count("-re") == 1 and cmd[cmd.index("-stream_loop") + 1] == "-1"
+    assert cmd[i + 1] == str(tmp_path / "a.mp4") and cmd[i + 2:i + 4] == ["-ss", "7.250"]
+    assert cmd[cmd.index("-readrate") + 1] == "1" and cmd[cmd.index("-stream_loop") + 1] == "-1"
     assert cmd[cmd.index("-vf") + 1] == "fps=6,scale=640:360" and cmd[-1] == "pipe:1"
     monkeypatch.setattr(capture, "_durations", {tmp_path / "a.mp4": None})
     assert "-ss" not in ffmpeg_command("syncfile://a.mp4", "h264", (640, 360), (640, 360), 0, cuvid=False)

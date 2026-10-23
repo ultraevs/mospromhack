@@ -94,6 +94,8 @@ class Settings(BaseSettings):
     mediamtx_api_port: int = 9997
     mediamtx_hls_port: int = 8888
     video_mode: Literal["webrtc", "hls"] = "webrtc"
+    # на сколько сек ролик в ui отстаёт от воркера; когда воркер далеко (стенд), рамки иначе не успевают
+    sync_lag_s: float = 0.0
     stream_width: int = 0
     stream_maxrate: str = ""
 

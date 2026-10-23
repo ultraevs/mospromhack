@@ -86,6 +86,13 @@ async def upload_clip(event_id: str, clip: UploadFile, db: Session = Depends(get
     row.clip_url = media.save(media_root(state), row.id, media.CLIP, data)
     db.commit()
     log.info("событие %s: клип %.1f МБ", row.id, len(data) / 2 ** 20)
+    for old in db.execute(select(EventRow).where(EventRow.clip_url.is_not(None))
+                          .order_by(EventRow.started_at.desc()).offset(media.KEEP_CLIPS)).scalars():
+        path = media.path_for_url(media_root(state), old.clip_url)
+        if path:
+            path.unlink(missing_ok=True)
+        old.clip_url = None
+    db.commit()
     await state.hub.send_event(svc.message("event_updated", row))
     state.bus.publish(BusMessage("clip_added", svc.to_schema(row)))
     return svc.to_schema(row)

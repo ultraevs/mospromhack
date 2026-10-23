@@ -116,3 +116,52 @@ def decode(output: np.ndarray, spec: ModelSpec, info: LetterboxInfo, max_det: in
     conf, cls = conf[mask], cls[mask]
     keep = nms_per_class(xyxy, conf, cls, spec.nms_iou)[:max_det]
     return Detections(to_source(xyxy[keep], info), conf[keep].astype(np.float32), cls[keep].astype(np.int64))
+
+
+COCO_TO_PPE = {"person": "person", "car": "vehicle", "truck": "vehicle", "bus": "vehicle", "motorcycle": "vehicle"}
+
+
+# люди и техника из coco вместо своих, сизы оставляем от ppe
+def merge_people(ppe: Detections, ppe_spec: ModelSpec, people: Detections, people_spec: ModelSpec) -> Detections:
+    replaced = {ppe_spec.class_id(c) for c in set(COCO_TO_PPE.values()) if c in ppe_spec.classes}
+    keep = ~np.isin(ppe.cls, list(replaced))
+    mapped = [ppe_spec.class_id(COCO_TO_PPE[people_spec.classes[c]]) if people_spec.classes[c] in COCO_TO_PPE else -1
+              for c in people.cls]
+    sel = np.array([m >= 0 for m in mapped], dtype=bool)
+    return Detections(
+        np.concatenate([ppe.xyxy[keep], people.xyxy[sel]]).astype(np.float32),
+        np.concatenate([ppe.conf[keep], people.conf[sel]]).astype(np.float32),
+        np.concatenate([ppe.cls[keep], np.array(mapped, dtype=np.int64)[sel]]).astype(np.int64),
+    )
+
+
+# сигнальный цвет на торсе = жилет. модель на дальних камерах и со спины жилеты теряет
+HIVIS_HSV = (((4, 140, 140), (22, 255, 255)), ((25, 110, 140), (45, 255, 255)))  # оранжевый, салатовый
+HIVIS_MIN_FRACTION = 0.12
+
+
+def hivis_vests(image: np.ndarray, dets: Detections, spec: ModelSpec) -> Detections:
+    if "vest" not in spec.classes or "person" not in spec.classes:
+        return dets
+    person, vest = spec.class_id("person"), spec.class_id("vest")
+    boxes, confs = [], []
+    ih, iw = image.shape[:2]
+    for (x1, y1, x2, y2), c in zip(dets.xyxy, dets.cls):
+        if c != person:
+            continue
+        bh = y2 - y1
+        tx1, tx2 = int(max(0, x1)), int(min(iw, x2))
+        ty1, ty2 = int(max(0, y1 + 0.2 * bh)), int(min(ih, y1 + 0.6 * bh))
+        if tx2 - tx1 < 4 or ty2 - ty1 < 4:
+            continue
+        hsv = cv2.cvtColor(image[ty1:ty2, tx1:tx2], cv2.COLOR_BGR2HSV)
+        mask = sum(cv2.inRange(hsv, np.array(lo), np.array(hi)) > 0 for lo, hi in HIVIS_HSV)
+        frac = float(np.count_nonzero(mask)) / mask.size
+        if frac >= HIVIS_MIN_FRACTION:
+            boxes.append([tx1, ty1, tx2, ty2])
+            confs.append(min(0.9, 0.4 + frac))
+    if not boxes:
+        return dets
+    return Detections(np.concatenate([dets.xyxy, np.array(boxes, np.float32)]).astype(np.float32),
+                      np.concatenate([dets.conf, np.array(confs, np.float32)]).astype(np.float32),
+                      np.concatenate([dets.cls, np.full(len(boxes), vest, np.int64)]).astype(np.int64))

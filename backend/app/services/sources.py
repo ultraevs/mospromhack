@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 
-from shared.sync import loop_offset, probe_duration
+from shared.sync import loop_input, loop_offset, probe_duration
 
 log = logging.getLogger("backend.sources")
 
@@ -48,8 +48,9 @@ def _double(rate: str) -> str:
 
 class SourceManager:
     def __init__(self, videos_dir: Path, logs_dir: Path, rtsp_port: int, api_port: int, active: bool = True,
-                 host: str = "127.0.0.1", width: int = 0, maxrate: str = ""):
+                 host: str = "127.0.0.1", width: int = 0, maxrate: str = "", lag_s: float = 0.0):
         self.width = width
+        self.lag_s = lag_s
         self.maxrate = maxrate
         self.videos_dir = videos_dir
         self.logs_dir = logs_dir
@@ -174,13 +175,11 @@ class SourceManager:
 
 
     def ffmpeg_command(self, d: Desired, path: Path, offset: float | None = None) -> list[str]:
-        # всё равно перекодируем в x264, так что входной -ss точный (декодит от кейфрейма и выкидывает лишнее)
-        seek = ["-ss", f"{offset:.3f}"] if offset else []
         scale = ["-vf", f"scale={self.width}:-2"] if self.width > 0 else []
         rate = ["-maxrate", self.maxrate, "-bufsize", _double(self.maxrate)] if self.maxrate else []
         return [
             "ffmpeg", "-hide_banner", "-loglevel", "warning", "-nostdin",
-            "-re", "-stream_loop", "-1", *seek, "-i", str(path),
+            *loop_input(path, offset),
             "-an", "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
             *scale, "-bf", "0", "-pix_fmt", "yuv420p", *rate,
             "-force_key_frames", "expr:gte(t,n_forced*1)",  # кейфрейм раз в сек, а то webrtc долго стартует
@@ -200,7 +199,7 @@ class SourceManager:
         if path not in self._durations:
             self._durations[path] = probe_duration(path)
         dur = self._durations[path]
-        offset = loop_offset(dur) if dur else None
+        offset = loop_offset(dur, time.time() - self.lag_s) if dur else None
         popen = subprocess.Popen(self.ffmpeg_command(d, path, offset), stdout=log_file, stderr=subprocess.STDOUT,
                                  stdin=subprocess.DEVNULL)
         self._procs[d.camera_id] = _Proc(d, popen, time.monotonic(), log_file)
