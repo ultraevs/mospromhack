@@ -225,7 +225,27 @@ class Worker:
         for item in waiting:
             self._clips_done.put(item)
 
+    # linq raw: кадр пакуется в int8 прямо из uint8, float-тензор не нужен
+    def _infer_packed(self, model: str, images: list[np.ndarray]) -> list[Detections]:
+        spec = self.specs[model]
+        step = self.detector.batch_limit(model) or len(images)
+        with self._timed(f"{model}: упаковка"):
+            if len(images) == 1:
+                prepared = [self.detector.prepare(model, images[0])]
+            else:
+                prepared = list(self._cpu.map(lambda im: self.detector.prepare(model, im), images))
+        outputs = []
+        t0 = time.perf_counter()
+        with self._timed(f"{model}: инференс"):
+            for i in range(0, len(prepared), step):
+                outputs.extend(self.detector.infer(model, np.stack([x for x, _ in prepared[i:i + step]])))
+        self._infer_ms[model].append((time.perf_counter() - t0) * 1000)
+        self._batch[model] = len(images)
+        return [decode(o, spec, info) for o, (_, info) in zip(outputs, prepared)]
+
     def _infer_frames(self, model: str, images: list[np.ndarray]) -> list[Detections]:
+        if getattr(self.detector, "raw", False):
+            return self._infer_packed(model, images)
         spec = self.specs[model]
         size = spec.input_size
         step = self.detector.batch_limit(model) or len(images)

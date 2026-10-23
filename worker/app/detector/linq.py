@@ -11,7 +11,9 @@ from pathlib import Path
 import numpy as np
 import yaml
 
+from worker.app.detector.linq_raw import ImagePacker, load_raw_meta, pack, unpack
 from worker.app.model_spec import ModelSpec
+from worker.app.postprocess import LetterboxInfo, letterbox
 
 log = logging.getLogger("worker.detector")
 
@@ -83,7 +85,8 @@ class PytpuRunner:
 
 
 class CloudRunner:
-    def __init__(self, programs: dict[str, str], broker: str, port: int = 5672, timeout_s: float = 20):
+    def __init__(self, programs: dict[str, str], broker: str, port: int = 5672, timeout_s: float = 20,
+                 raw: bool = False):
         try:
             import pika
             import tpu_pycloud_format as fmt
@@ -92,6 +95,7 @@ class CloudRunner:
                                "(pip install pika hack_materials/stand/tpu_pycloud_format-0.0.1-py3-none-any.whl)") from e
         self.pika, self.fmt = pika, fmt
         self.programs = programs
+        self.raw = raw
         self.params = pika.ConnectionParameters(broker, port, credentials=pika.PlainCredentials("guest", "guest"),
                                                 heartbeat=600, blocked_connection_timeout=timeout_s)
         self.timeout_s = timeout_s
@@ -123,7 +127,7 @@ class CloudRunner:
             ids.append(task)
             ch.basic_publish(exchange=EXCHANGE, routing_key=INPUT_KEY, body=fmt.serialize(fmt.PyTask(x)),
                              properties=self.pika.BasicProperties(headers={
-                                 fmt.TARGET_URI_ATTR_NAME: f"file://{self.programs[model]}?raw=False",
+                                 fmt.TARGET_URI_ATTR_NAME: f"file://{self.programs[model]}?raw={self.raw}",
                                  fmt.RESPONSE_ROUTING_KEYS_ATTR_NAME: json.dumps([queue]),
                                  fmt.MESSAGE_ID_ATTR_NAME: task,
                              }))
@@ -159,27 +163,35 @@ class LinqDetector:
     name = "linq"
 
     def __init__(self, specs: dict[str, ModelSpec], transport: str = "pytpu", broker: str = "10.0.114.30",
-                 port: int = 5672, program_dir: str = "", timeout_s: float = 20, batch: int = 8):
+                 port: int = 5672, program_dir: str = "", timeout_s: float = 20, batch: int = 8, raw: bool = False):
         self.specs = specs
         self.warnings: list[str] = []
         self.meta: dict[str, dict] = {}
         self._tails = {}
         self.timings: dict[str, dict[str, float]] = {}
         self._batch = batch if transport == "cloud" else 1
+        self.raw = raw and transport == "cloud"
+        self._raw: dict[str, tuple[int, dict, dict]] = {}
+        self._packers: dict[str, ImagePacker] = {}
 
         local = {}
         for name, spec in specs.items():
             linq_dir, meta = load_linq_meta(spec)
             self.meta[name] = meta
             self._tails[name] = make_tail(linq_dir, meta)
-            self.timings[name] = {"frames": 0, "tpu_ms": 0.0, "roundtrip_ms": 0.0, "tail_ms": 0.0}
+            self.timings[name] = {"frames": 0, "tpu_ms": 0.0, "roundtrip_ms": 0.0, "tail_ms": 0.0, "pack_ms": 0.0}
             local[name] = linq_dir / meta["program"]
+            if self.raw:
+                # раскладку берём из самой программы, она должна лежать рядом и локально
+                hw, ins, outs = load_raw_meta(local[name])
+                self._raw[name] = (hw["ddr_word_len"], ins, outs)
+                self._packers[name] = ImagePacker(ins[meta["input"]], hw["ddr_word_len"])
 
         if transport == "cloud":
             if not program_dir or "{login}" in program_dir:
                 raise RuntimeError("для transport cloud задай LINQ_LOGIN в .env (папка программ /auto/cache/<логин>)")
             self.runner = CloudRunner({n: f"{program_dir.rstrip('/')}/{p.name}" for n, p in local.items()},
-                                      broker, port, timeout_s)
+                                      broker, port, timeout_s, raw=self.raw)
         elif transport == "pytpu":
             for path in local.values():
                 if not path.exists():
@@ -187,23 +199,40 @@ class LinqDetector:
             self.runner = PytpuRunner(local)
         else:
             raise ValueError(f"неизвестный transport {transport!r}; допустимо: cloud, pytpu")
-        self.device = f"linq ({self.runner.where})"
+        self.device = f"linq ({self.runner.where}{', raw' if self.raw else ''})"
         log.info("LinQ: %s, модели %s", self.runner.where, {n: m["program"] for n, m in self.meta.items()})
 
     def batch_limit(self, model: str) -> int | None:
         return self._batch
 
+    # воркер зовёт вместо preprocess, если метод есть: в raw кадр сразу пакуется из uint8
+    def prepare(self, model: str, image_bgr: np.ndarray) -> tuple[np.ndarray, LetterboxInfo] | None:
+        if not self.raw:
+            return None
+        boxed, info = letterbox(image_bgr, self.specs[model].input_size)
+        return self._packers[model](boxed), info
+
     def infer(self, model: str, batch: np.ndarray) -> np.ndarray:
         meta, tail, stats = self.meta[model], self._tails[model], self.timings[model]
-        inputs = [{meta["input"]: x[None]} for x in np.ascontiguousarray(batch, dtype=np.float32)]
         t0 = time.perf_counter()
-        results = self.runner.run(model, inputs)
+        if self.raw:
+            dwl, ins, outs = self._raw[model]
+            t_in = ins[meta["input"]]
+            # uint8 — уже упаковано в prepare
+            inputs = [{meta["input"]: x if x.dtype == np.uint8 else pack(x[None], t_in, dwl)} for x in batch]
+        else:
+            inputs = [{meta["input"]: x[None]} for x in np.ascontiguousarray(batch, dtype=np.float32)]
         t1 = time.perf_counter()
+        results = self.runner.run(model, inputs)
+        t2 = time.perf_counter()
+        if self.raw:
+            results = [({n: unpack(parts[n], outs[n]) for n in outs}, ms) for parts, ms in results]
         out = np.concatenate([tail(parts) for parts, _ in results])
         stats["frames"] += len(inputs)
         stats["tpu_ms"] += sum(ms for _, ms in results)
-        stats["roundtrip_ms"] += (t1 - t0) * 1000
-        stats["tail_ms"] += (time.perf_counter() - t1) * 1000
+        stats["pack_ms"] += (t1 - t0) * 1000
+        stats["roundtrip_ms"] += (t2 - t1) * 1000
+        stats["tail_ms"] += (time.perf_counter() - t2) * 1000
         return out
 
     def close(self) -> None:

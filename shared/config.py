@@ -46,6 +46,8 @@ class LinqSection(BaseModel):
     program_dir: str = "/auto/cache/{login}"
     timeout_s: float = 20
     batch: int = 8
+    # пакуем int8 сами (linq_raw.py), в облако втрое меньше байт
+    raw: bool = False
 
 
 class WorkerSection(BaseModel):

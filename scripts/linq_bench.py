@@ -76,14 +76,15 @@ def main() -> None:
     ap.add_argument("--login", default=os.environ.get("LINQ_LOGIN", ""))
     ap.add_argument("--broker", default="10.0.114.30")
     ap.add_argument("--tag", default="local", help="где гоняли: local (через vpn) или stand")
+    ap.add_argument("--raw", action="store_true", help="int8 пакуем сами (linq_raw.py)")
     args = ap.parse_args()
     if not args.login:
         raise SystemExit("нужен логин стенда: --login или LINQ_LOGIN")
 
     specs = {m: load_model_spec(ROOT / "models" / m) for m in args.models}
     det = LinqDetector(specs, transport="cloud", broker=args.broker, program_dir=f"/auto/cache/{args.login}",
-                       batch=max(args.batches))
-    report = {"tag": args.tag, "device": det.device.replace(args.login, "<login>"), "models": {}}
+                       batch=max(args.batches), raw=args.raw)
+    report = {"tag": args.tag, "raw": args.raw, "device": det.device.replace(args.login, "<login>"), "models": {}}
     try:
         for model, spec in specs.items():
             ref = np.load(ROOT / "data" / "linq" / f"ref_{model}.npz")

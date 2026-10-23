@@ -1,6 +1,6 @@
 worker:
   detector: onnx
-  linq: {transport: cloud, broker: 10.0.114.30, port: 5672, program_dir: "/auto/cache/{login}", timeout_s: 20, batch: 8}
+  linq: {transport: cloud, broker: 10.0.114.30, port: 5672, program_dir: "/auto/cache/{login}", timeout_s: 20, batch: 8, raw: true}
   precision: auto
   ppe_fps: 6  # больше 6 на cpu не тянет
   hazard_fps: 1
@@ -33,7 +33,7 @@ rules:
     close_after_s: 5
     cooldown_s: 60
     retrack_iou: 0.3  # чтоб не плодить события когда трекер теряет id
-    retrack_window_s: 60
+    retrack_window_s: 120
     camera_cooldown_s: 60
     track_lost_s: 2
 
