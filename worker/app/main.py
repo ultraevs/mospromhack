@@ -76,7 +76,11 @@ class Worker:
         self._pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="evidence")
         self._cpu = ThreadPoolExecutor(max_workers=4, thread_name_prefix="prep")
         # people в облако параллельно с ppe, у каждого потока своё соединение
-        self._side = ThreadPoolExecutor(max_workers=1, thread_name_prefix="people")
+        inflight = config.worker.inflight
+        self._side = ThreadPoolExecutor(max_workers=inflight, thread_name_prefix="people")
+        # пачки кадров в полёте: пока облако считает одну, правила разбирают предыдущую
+        self._detect_pool = ThreadPoolExecutor(max_workers=inflight, thread_name_prefix="detect")
+        self._inflight: deque = deque()
         self._clips = ClipBuilder(self._pool, lambda key, path: self._clips_done.put((key, path)))
         self.clips_built = 0
         self.clips_failed = 0
@@ -152,7 +156,6 @@ class Worker:
 
 
     def tick_ppe(self) -> int:
-        spec = self.specs["ppe"]
         with self._timed("клипы: сбор и отправка"):
             self._collect_clips()
         fresh = []
@@ -168,9 +171,24 @@ class Worker:
                 state.last_seq = frame.seq
                 state.next_due = max(state.next_due + self.period_s, now + self.period_s / 2)
                 fresh.append((state, frame))
-        if not fresh:
-            return 0
+        if fresh:
+            if self.config.worker.inflight == 1:
+                return self._finish_ppe(fresh, self._detect(fresh))
+            self._inflight.append((fresh, self._detect_pool.submit(self._detect, fresh)))
+        return self.drain_inflight()
 
+    def drain_inflight(self) -> int:
+        done = 0
+        # по порядку, иначе у камеры кадры перепутаются; если в полёте лишнее — ждём самую старую пачку
+        while self._inflight and (self._inflight[0][1].done() or len(self._inflight) > self.config.worker.inflight):
+            batch, future = self._inflight.popleft()
+            with self._timed("ppe: ожидание пачки из полёта"):
+                all_dets = future.result()
+            done += self._finish_ppe(batch, all_dets)
+        return done
+
+    def _detect(self, fresh: list) -> list[Detections]:
+        spec = self.specs["ppe"]
         images = [frame.image for _, frame in fresh]
         people = self._side.submit(self._infer_frames, "people", images) if "people" in self.specs else None
         with self._timed("ppe: пред- и постобработка, инференс"):
@@ -179,7 +197,10 @@ class Worker:
             with self._timed("people: ожидание (идёт параллельно с ppe)"):
                 people = people.result()
             all_dets = [merge_people(d, spec, p, self.specs["people"]) for d, p in zip(all_dets, people)]
-        all_dets = [hivis_vests(frame.image, d, spec) for (_, frame), d in zip(fresh, all_dets)]
+        return [hivis_vests(frame.image, d, spec) for (_, frame), d in zip(fresh, all_dets)]
+
+    def _finish_ppe(self, fresh: list, all_dets: list[Detections]) -> int:
+        spec = self.specs["ppe"]
         head = self.config.worker.crop_pass.head
         for (state, frame), dets in zip(fresh, all_dets):
             if head.enabled:
@@ -498,7 +519,12 @@ class Worker:
                 next_stats = now + STATS_PERIOD_S
             done = time.monotonic()
             self._busy.append((done, done - now))
-            time.sleep(max(0.0, min(next_ppe, next_config, next_stats) - done))
+            wake = min(next_ppe, next_config, next_stats)
+            if self._inflight:
+                wake = min(wake, done + 0.01)  # готовую пачку забираем сразу, а не на следующем тике
+                if now < next_ppe and self.remote and self.drain_inflight():
+                    self.tick_hazard_due()
+            time.sleep(max(0.0, wake - time.monotonic()))
 
     def stop(self) -> None:
         self._running = False
@@ -511,6 +537,7 @@ class Worker:
         self._pool.shutdown(wait=False, cancel_futures=True)
         self._cpu.shutdown(wait=False, cancel_futures=True)
         self._side.shutdown(wait=False, cancel_futures=True)
+        self._detect_pool.shutdown(wait=False, cancel_futures=True)
         self._clips.cleanup()
         # LinqDetector держит открытыми устройство и сессии TPU
         close = getattr(self.detector, "close", None)

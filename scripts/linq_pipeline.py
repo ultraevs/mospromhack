@@ -70,7 +70,7 @@ class Sender:
         pass
 
 
-def summary(stats: list[dict], events: list[dict], cams: int, fps: float, seconds: float) -> dict:
+def summary(stats: list[dict], events: list[dict], cams: int, fps: float, seconds: float, inflight: int) -> dict:
     # первые секунды прогрев: подключение камер, первые запросы в облако
     tail = stats[len(stats) // 3:] or stats
     per_cam = [np.mean([c["proc_fps"] for c in s["cameras"].values()]) for s in tail if s["cameras"]]
@@ -83,7 +83,7 @@ def summary(stats: list[dict], events: list[dict], cams: int, fps: float, second
         for k, v in s["loop_ms_per_s"].items():
             loop[k] = loop.get(k, 0) + v / len(tail)
     return {
-        "cameras": cams, "target_fps": fps, "seconds": seconds,
+        "cameras": cams, "target_fps": fps, "seconds": seconds, "inflight": inflight,
         "proc_fps_per_cam": round(float(np.mean(per_cam)), 2) if per_cam else 0.0,
         "proc_fps_total": round(float(np.mean(per_cam)) * cams, 1) if per_cam else 0.0,
         "loop_load": round(float(np.mean([s["loop_load"] for s in tail])), 2),
@@ -120,8 +120,9 @@ def run_once(config, specs, detector, videos: list[str], cams: int, fps: float, 
     worker._pool.shutdown(wait=False, cancel_futures=True)
     worker._cpu.shutdown(wait=False, cancel_futures=True)
     worker._side.shutdown(wait=False, cancel_futures=True)
+    worker._detect_pool.shutdown(wait=False, cancel_futures=True)
     worker._clips.cleanup()
-    return summary(backend.stats, backend.events, cams, fps, seconds)
+    return summary(backend.stats, backend.events, cams, fps, seconds, config.worker.inflight)
 
 
 def main() -> None:
@@ -133,6 +134,7 @@ def main() -> None:
     ap.add_argument("--detector", default="linq", help="linq (стенд) | onnx (для сверки у себя)")
     ap.add_argument("--tag", default="stand")
     ap.add_argument("--no-raw", action="store_true", help="старый путь: float32, пакует облако")
+    ap.add_argument("--inflight", type=int, default=1, help="пачек кадров в полёте (worker.inflight)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     for name in ("httpx", "pika", "worker.capture"):
@@ -146,6 +148,7 @@ def main() -> None:
     config.worker.decode.hwaccel = "none"
     # config.yaml на стенде мог остаться старым, raw задаём явно
     config.worker.linq.raw = not args.no_raw
+    config.worker.inflight = args.inflight
     specs = load_all_specs(settings.models_dir)
     check_classes(specs["ppe"], specs.get("hazard"))
     linq = config.worker.linq.model_dump()

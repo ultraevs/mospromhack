@@ -56,6 +56,8 @@ class WorkerSection(BaseModel):
     precision: Literal["auto", "fp32", "fp16"] = "auto"
     ppe_fps: float = 6
     hazard_fps: float = 1
+    # сколько пачек кадров одновременно в инференсе; >1 когда модель далеко (облако linq) и цикл ждёт ответа
+    inflight: int = Field(default=1, ge=1, le=8)
     crop_pass: CropPass = Field(default_factory=CropPass)
     decode: DecodeSection = Field(default_factory=DecodeSection)
     overlay_delay_ms: int = 0
