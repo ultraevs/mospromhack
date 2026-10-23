@@ -65,11 +65,24 @@ async def create_event(request: Request, db: Session = Depends(get_db), state: A
         row.snapshot_clean_url = media.save(root, row.id, media.CLEAN, files["clean"])
     if files:
         db.commit()
+        prune_media(db, root)
     log.info("событие %s: %s, камера %s, задержка %s мс, стоп-кадров %s", row.id, row.type, row.camera_id,
              row.latency_ms, len(files))
     await state.hub.send_event(svc.message("event_created", row))
     state.bus.publish(BusMessage("opened", svc.to_schema(row), body.captured_ts))
     return svc.to_schema(row)
+
+
+def prune_media(db: Session, root) -> None:
+    has_media = (EventRow.snapshot_url.is_not(None) | EventRow.snapshot_clean_url.is_not(None)
+                 | EventRow.clip_url.is_not(None))
+    old = db.execute(select(EventRow).where(has_media).order_by(EventRow.started_at.desc())
+                     .offset(media.KEEP_EVENTS)).scalars().all()
+    for row in old:
+        media.drop(root, row.id)
+        row.snapshot_url = row.snapshot_clean_url = row.clip_url = None
+    if old:
+        db.commit()
 
 
 @router.post("/events/{event_id}/clip", response_model=Event, dependencies=[Depends(require_internal)])
@@ -86,13 +99,7 @@ async def upload_clip(event_id: str, clip: UploadFile, db: Session = Depends(get
     row.clip_url = media.save(media_root(state), row.id, media.CLIP, data)
     db.commit()
     log.info("событие %s: клип %.1f МБ", row.id, len(data) / 2 ** 20)
-    for old in db.execute(select(EventRow).where(EventRow.clip_url.is_not(None))
-                          .order_by(EventRow.started_at.desc()).offset(media.KEEP_CLIPS)).scalars():
-        path = media.path_for_url(media_root(state), old.clip_url)
-        if path:
-            path.unlink(missing_ok=True)
-        old.clip_url = None
-    db.commit()
+    prune_media(db, media_root(state))
     await state.hub.send_event(svc.message("event_updated", row))
     state.bus.publish(BusMessage("clip_added", svc.to_schema(row)))
     return svc.to_schema(row)

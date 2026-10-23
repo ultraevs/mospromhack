@@ -6,7 +6,7 @@ worker:
   hazard_fps: 1
   crop_pass:
     cigarette: {enabled: true, max_per_tick: 6, top_fraction: 0.6, margin: 0.2}
-    head: {enabled: false, max_per_frame: 4, top_fraction: 0.5, margin: 0.15, max_person_height_px: 200}
+    head: {enabled: true, max_per_frame: 4, top_fraction: 0.5, margin: 0.15, max_person_height_px: 200}
   decode: {backend: ffmpeg, width: 1280, hwaccel: auto}
   overlay_delay_ms: 0
   fake_scenario: null
@@ -18,8 +18,8 @@ evidence:
 
 # дефолты, потом правятся из ui
 rules:
-  no_helmet: {window_s: 4, min_observations: 8, fraction: 0.35}
-  no_mask: {window_s: 4, min_observations: 8, fraction: 0.35}
+  no_helmet: {window_s: 4, min_observations: 12, fraction: 0.6}
+  no_mask: {window_s: 4, min_observations: 12, fraction: 0.6}
   no_vest: {window_s: 6, min_observations: 15, max_fraction: 0.1, min_person_height_px: 120}
   zone_intrusion: {window_s: 1.5, fraction: 0.7, min_observations: 4}
   smoking: {k: 3, m: 5, upper_fraction: 0.33, everywhere: false}
@@ -33,7 +33,7 @@ rules:
     close_after_s: 5
     cooldown_s: 60
     retrack_iou: 0.3  # чтоб не плодить события когда трекер теряет id
-    retrack_window_s: 10
+    retrack_window_s: 60
     camera_cooldown_s: 60
     track_lost_s: 2
 

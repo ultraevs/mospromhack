@@ -30,6 +30,7 @@ class _Open:
     type: EventType
     last_true: float
     bbox: BBox | None
+    first_bbox: BBox | None = None
 
 
 def _requirement_zone(camera: WorkerCamera, track: TrackState, item: PpeItem) -> int | None:
@@ -140,11 +141,12 @@ class RuleEngine:
             for (other_id, typ), other in self._open.items():
                 if typ == cand.type and other_id != key[0] and other.bbox and iou_xywh(cand.bbox, other.bbox) > life.retrack_iou:
                     return
+            # сверяем и с концом и с началом закрытого: человек мог уйти, а потом вернуться туда же
             for typ, bbox, closed_t in self._closed:
                 if typ == cand.type and bbox and iou_xywh(cand.bbox, bbox) > life.retrack_iou:
                     self._not_before[key] = closed_t + cooldown_s
                     return
-        new = _Open(next(_keys), cand.type, t, cand.bbox)
+        new = _Open(next(_keys), cand.type, t, cand.bbox, cand.bbox)
         self._open[key] = new
         actions.append(EventOpen(key=new.key, type=cand.type, severity=cand.severity, t=t,
                                  confidence=round(cand.result.confidence, 3), bbox=cand.bbox, track_id=key[0],
@@ -153,5 +155,7 @@ class RuleEngine:
     def _close(self, key, t: float, cooldown_s: float, actions) -> None:
         op = self._open.pop(key)
         self._closed.append((op.type, op.bbox, t))
+        if op.first_bbox and op.first_bbox != op.bbox:
+            self._closed.append((op.type, op.first_bbox, t))
         self._not_before[key] = t + cooldown_s
         actions.append(EventClose(op.key, t))

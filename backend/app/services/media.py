@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 
 SNAPSHOT = "snapshot.jpg"
@@ -10,8 +11,8 @@ CLIP = "clip.mp4"
 _SAFE_ID = re.compile(r"^evt_[0-9A-Z]{10}$")
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_CLIP_BYTES = 80 * 1024 * 1024
-# клипы тяжелые, на диске держим только последние, стоп-кадры не трогаем
-KEEP_CLIPS = 10
+# на диске держим медиа только последних событий, в журнале старые остаются без картинок
+KEEP_EVENTS = 10
 
 
 def event_dir(media_root: Path, event_id: str) -> Path:
@@ -25,6 +26,10 @@ def save(media_root: Path, event_id: str, name: str, data: bytes) -> str:
     folder.mkdir(parents=True, exist_ok=True)
     (folder / name).write_bytes(data)
     return f"/media/events/{event_id}/{name}"
+
+
+def drop(media_root: Path, event_id: str) -> None:
+    shutil.rmtree(event_dir(media_root, event_id), ignore_errors=True)
 
 
 def path_for_url(media_root: Path, url: str | None) -> Path | None:
