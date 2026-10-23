@@ -31,6 +31,9 @@ export function ZonePanel({ zones, draft, error, onNew, onEdit, onChange, onSave
   if (!draft) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
+        <div className="border-b border-line p-3">
+          <button onClick={onNew} className="w-full rounded bg-accent px-3 py-1.5 font-medium text-bg">Новая зона</button>
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {zones.length === 0 && <div className="p-3 text-muted">Зон нет</div>}
           {zones.map((z) => (
@@ -44,9 +47,6 @@ export function ZonePanel({ zones, draft, error, onNew, onEdit, onChange, onSave
               </div>
             </button>
           ))}
-        </div>
-        <div className="border-t border-line p-3">
-          <button onClick={onNew} className="w-full rounded bg-accent px-3 py-1.5 font-medium text-bg">Новая зона</button>
         </div>
       </div>
     );
