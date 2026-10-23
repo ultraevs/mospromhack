@@ -245,3 +245,6 @@ auto.key
 /hack_materials/
 
 .playwright-mcp
+# заметки для себя/агента, не в репо
+/TODO.md
+/STRATEGY.md

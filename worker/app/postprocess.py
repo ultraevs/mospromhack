@@ -121,6 +121,22 @@ def decode(output: np.ndarray, spec: ModelSpec, info: LetterboxInfo, max_det: in
 COCO_TO_PPE = {"person": "person", "car": "vehicle", "truck": "vehicle", "bus": "vehicle", "motorcycle": "vehicle"}
 
 
+# coco любит давать вторую рамку "человек + станок" вокруг человека, nms по iou ее не режет
+def _nested(xyxy: np.ndarray, conf: np.ndarray, cls: np.ndarray, cover: float = 0.8) -> np.ndarray:
+    drop = np.zeros(len(conf), dtype=bool)
+    area = np.clip(xyxy[:, 2] - xyxy[:, 0], 0, None) * np.clip(xyxy[:, 3] - xyxy[:, 1], 0, None)
+    for i in range(len(conf)):
+        for j in range(len(conf)):
+            if i == j or cls[i] != cls[j] or cls[i] < 0 or conf[i] > conf[j]:
+                continue
+            iw = min(xyxy[i, 2], xyxy[j, 2]) - max(xyxy[i, 0], xyxy[j, 0])
+            ih = min(xyxy[i, 3], xyxy[j, 3]) - max(xyxy[i, 1], xyxy[j, 1])
+            inter = max(0.0, iw) * max(0.0, ih)
+            if inter >= cover * min(area[i], area[j]):
+                drop[i] = True
+    return drop
+
+
 # люди и техника из coco вместо своих, сизы оставляем от ppe
 def merge_people(ppe: Detections, ppe_spec: ModelSpec, people: Detections, people_spec: ModelSpec) -> Detections:
     replaced = {ppe_spec.class_id(c) for c in set(COCO_TO_PPE.values()) if c in ppe_spec.classes}
@@ -128,6 +144,7 @@ def merge_people(ppe: Detections, ppe_spec: ModelSpec, people: Detections, peopl
     mapped = [ppe_spec.class_id(COCO_TO_PPE[people_spec.classes[c]]) if people_spec.classes[c] in COCO_TO_PPE else -1
               for c in people.cls]
     sel = np.array([m >= 0 for m in mapped], dtype=bool)
+    sel &= ~_nested(people.xyxy, people.conf, np.array(mapped, dtype=np.int64))
     return Detections(
         np.concatenate([ppe.xyxy[keep], people.xyxy[sel]]).astype(np.float32),
         np.concatenate([ppe.conf[keep], people.conf[sel]]).astype(np.float32),
