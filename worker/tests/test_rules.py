@@ -209,7 +209,7 @@ def test_event_closes_5_seconds_after_condition_stops():
 def test_event_closes_when_track_is_lost():
     sim = Sim()
     sim.run(100.0, 4, {7: NO_HELMET})
-    sim.run(104.0, 3, {8: CLEAN})
+    sim.run(104.0, 3, {9: CLEAN})
     assert len(sim.closes()) == 1
     assert sim.closes()[0].t == pytest.approx(104.0 - 1 / FPS + RULES.lifecycle.track_lost_s, abs=0.2)
 
@@ -427,3 +427,29 @@ def test_lying_immobile_long_fires_short_does_not():
 def test_lying_but_crawling_is_not_immobile():
     o = [obs(i / FPS, bbox=(0.1 + 0.05 * i / FPS, 0.6, 0.4, 0.1)) for i in range(11 * FPS)]
     assert not check_lying_immobile(o, o[-1].t, RULES.lying_immobile).active
+
+
+def test_retrack_matches_first_bbox_of_closed_event():
+    # человек сдвинулся, событие закрылось; новый трек у начальной позиции в окне - события нет
+    start, end = (0.2, 0.2, 0.1, 0.4), (0.7, 0.2, 0.1, 0.4)
+    sim = Sim()
+    sim.run(100.0, 2, {7: {**NO_HELMET, "bbox": start}})
+    sim.run(102.0, 2, {7: {**NO_HELMET, "bbox": end}})
+    assert len(sim.opens()) == 1
+    sim.run(104.0, 3, {9: CLEAN})
+    assert len(sim.closes()) == 1
+    t = sim.closes()[0].t
+    assert 107.0 - t < RULES.lifecycle.retrack_window_s
+    sim.run(107.0, 2, {8: {**NO_HELMET, "bbox": start}})
+    assert len(sim.opens()) == 1
+
+
+def test_retrack_far_from_closed_event_opens_new():
+    start, end, far = (0.2, 0.2, 0.1, 0.4), (0.7, 0.2, 0.1, 0.4), (0.45, 0.2, 0.1, 0.4)
+    sim = Sim()
+    sim.run(100.0, 2, {7: {**NO_HELMET, "bbox": start}})
+    sim.run(102.0, 2, {7: {**NO_HELMET, "bbox": end}})
+    sim.run(104.0, 3, {9: CLEAN})
+    assert len(sim.closes()) == 1
+    sim.run(107.0, 2, {8: {**NO_HELMET, "bbox": far}})
+    assert len(sim.opens()) == 2 and sim.opens()[1].track_id == 8

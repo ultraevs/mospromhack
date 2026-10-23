@@ -77,3 +77,25 @@ def test_image_packer_matches_float_path(tmp_path):
     assert packer.fast
     x, _ = preprocess(img, 64)
     np.testing.assert_array_equal(packer(letterbox(img, 64)[0]), pack(x[None], ins["images"], hw["ddr_word_len"]))
+
+
+def test_pack_cache_runs_once_per_image():
+    import threading
+    from worker.app.detector.linq import _PackCache
+
+    cache, calls, img = _PackCache(), [], np.zeros((4, 4, 3), np.uint8)
+
+    def make():
+        calls.append(1)
+        return "packed"
+
+    results = []
+    threads = [threading.Thread(target=lambda: results.append(cache.get(("k", 1), img, make))) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert results == ["packed"] * 4 and len(calls) == 1
+    # другой кадр с тем же ключом (id переиспользован) пересчитывается
+    other = np.zeros((4, 4, 3), np.uint8)
+    assert cache.get(("k", 1), other, make) == "packed" and len(calls) == 2

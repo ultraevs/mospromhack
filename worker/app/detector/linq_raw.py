@@ -99,6 +99,8 @@ class ImagePacker:
         # ровно как preprocess (p / 255 во float32) и потом _quant
         x = (np.arange(256, dtype=np.float32) / np.float32(255)).reshape(1, 1, 1, 256)
         self.lut = _quant(x, t).reshape(256) if self.fast else None
+        # одинаковая подпись = одинаковые байты на выходе, кэш упаковки делится между программами
+        self.signature = (dwl, t.tpu_shape, t.tpu_order, t.user_order, t.scales.tobytes(), t.zero_points.tobytes())
         if self.fast:
             # 4 канала: r, g, b и нулевой паддинг; cv2.LUT по rgba в разы быстрее numpy-выборки
             b = t.tpu_shape[-1]

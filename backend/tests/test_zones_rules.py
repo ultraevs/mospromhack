@@ -76,13 +76,13 @@ def test_deleting_camera_deletes_its_zones(client, camera):
 
 def test_rules_defaults_come_from_config_yaml(client):
     rules = client.get("/api/settings/rules").json()
-    assert rules["no_helmet"] == {"window_s": 4, "min_observations": 8, "fraction": 0.35}
-    assert rules["no_mask"] == {"window_s": 4, "min_observations": 8, "fraction": 0.35}
+    assert rules["no_helmet"] == {"window_s": 4, "min_observations": 12, "fraction": 0.6}
+    assert rules["no_mask"] == {"window_s": 4, "min_observations": 12, "fraction": 0.6}
     assert rules["no_vest"] == {"window_s": 6, "min_observations": 15, "max_fraction": 0.1, "min_person_height_px": 120}
     assert rules["zone_intrusion"] == {"window_s": 1.5, "fraction": 0.7, "min_observations": 4}
     assert rules["smoking"] == {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": False}
     assert rules["fire"] == rules["smoke"] == {"k": 3, "m": 5}
-    assert rules["lifecycle"] == {"close_after_s": 5, "cooldown_s": 60, "retrack_iou": 0.3, "retrack_window_s": 10,
+    assert rules["lifecycle"] == {"close_after_s": 5, "cooldown_s": 60, "retrack_iou": 0.3, "retrack_window_s": 120,
                                   "camera_cooldown_s": 60, "track_lost_s": 2}
 
 

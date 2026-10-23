@@ -70,7 +70,7 @@ def test_internal_config_lists_enabled_cameras_and_bumps_version(client):
     assert cfg["version"] == v0 + 2
     assert [(c["id"], c["rtsp_url"], c["required_ppe"]) for c in cfg["cameras"]] == [
         (a["id"], f"rtsp://127.0.0.1:8554/cam-{a['id']}", ["helmet"])]
-    assert cfg["rules"]["no_helmet"] == {"window_s": 4, "min_observations": 8, "fraction": 0.35}
+    assert cfg["rules"]["no_helmet"] == {"window_s": 4, "min_observations": 12, "fraction": 0.6}
     assert cfg["rules"]["no_vest"]["min_person_height_px"] == 120
 
     client.patch(f"/api/cameras/{b['id']}", json={"enabled": True})

@@ -5,6 +5,8 @@ import logging
 import threading
 import time
 import uuid
+import weakref
+from collections import OrderedDict
 from contextlib import ExitStack
 from pathlib import Path
 
@@ -159,6 +161,34 @@ class CloudRunner:
                 pass
 
 
+# ppe, people и hazard берут один и тот же кадр, а вход у программ одинаковый: пакуем один раз.
+# ppe и people зовут prepare одновременно из разных потоков, второй ждёт первого
+class _PackCache:
+    def __init__(self, size: int = 64):
+        self._lock = threading.Lock()
+        self._items: OrderedDict = OrderedDict()
+        self._size = size
+
+    def get(self, key, image: np.ndarray, make):
+        with self._lock:
+            hit = self._items.get(key)
+            owner = hit is None or hit[0]() is not image
+            if owner:
+                hit = (weakref.ref(image), threading.Event(), [None])
+                self._items[key] = hit
+                while len(self._items) > self._size:
+                    self._items.popitem(last=False)
+        _, ready, box = hit
+        if owner:
+            try:
+                box[0] = make()
+            finally:
+                ready.set()
+        else:
+            ready.wait()
+        return box[0] if box[0] is not None else make()
+
+
 class LinqDetector:
     name = "linq"
 
@@ -173,6 +203,7 @@ class LinqDetector:
         self.raw = raw and transport == "cloud"
         self._raw: dict[str, tuple[int, dict, dict]] = {}
         self._packers: dict[str, ImagePacker] = {}
+        self._pack_cache = _PackCache()
 
         local = {}
         for name, spec in specs.items():
@@ -209,8 +240,13 @@ class LinqDetector:
     def prepare(self, model: str, image_bgr: np.ndarray) -> tuple[np.ndarray, LetterboxInfo] | None:
         if not self.raw:
             return None
-        boxed, info = letterbox(image_bgr, self.specs[model].input_size)
-        return self._packers[model](boxed), info
+        packer, size = self._packers[model], self.specs[model].input_size
+
+        def make():
+            boxed, info = letterbox(image_bgr, size)
+            return packer(boxed), info
+
+        return self._pack_cache.get((id(image_bgr), size, packer.signature), image_bgr, make)
 
     def infer(self, model: str, batch: np.ndarray) -> np.ndarray:
         meta, tail, stats = self.meta[model], self._tails[model], self.timings[model]

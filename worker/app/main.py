@@ -5,6 +5,7 @@ import logging
 import math
 import queue
 import signal
+import threading
 import time
 import uuid
 from collections import deque
@@ -74,6 +75,8 @@ class Worker:
         self._clips_done: queue.Queue = queue.Queue()
         self._pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="evidence")
         self._cpu = ThreadPoolExecutor(max_workers=4, thread_name_prefix="prep")
+        # people в облако параллельно с ppe, у каждого потока своё соединение
+        self._side = ThreadPoolExecutor(max_workers=1, thread_name_prefix="people")
         self._clips = ClipBuilder(self._pool, lambda key, path: self._clips_done.put((key, path)))
         self.clips_built = 0
         self.clips_failed = 0
@@ -93,6 +96,7 @@ class Worker:
         self._spent: dict[str, float] = {}
         self._spent_since = time.monotonic()
         self._cpu_seen: tuple[float, float, dict[int, float]] | None = None
+        self._spent_lock = threading.Lock()  # _timed зовут и из потока people
 
     @contextlib.contextmanager
     def _timed(self, name: str):
@@ -100,13 +104,15 @@ class Worker:
         try:
             yield
         finally:
-            self._spent[name] = self._spent.get(name, 0.0) + time.perf_counter() - t0
+            with self._spent_lock:
+                self._spent[name] = self._spent.get(name, 0.0) + time.perf_counter() - t0
 
     def loop_breakdown(self) -> dict:
         now = time.monotonic()
         dt = max(1e-3, now - self._spent_since)
-        out = {name: round(seconds / dt * 1000) for name, seconds in sorted(self._spent.items(), key=lambda kv: -kv[1])}
-        self._spent, self._spent_since = {}, now
+        with self._spent_lock:
+            spent, self._spent, self._spent_since = self._spent, {}, now
+        out = {name: round(seconds / dt * 1000) for name, seconds in sorted(spent.items(), key=lambda kv: -kv[1])}
         return out
 
     def _default_reader(self, cam_id: int, url: str) -> CameraReader:
@@ -165,11 +171,13 @@ class Worker:
         if not fresh:
             return 0
 
+        images = [frame.image for _, frame in fresh]
+        people = self._side.submit(self._infer_frames, "people", images) if "people" in self.specs else None
         with self._timed("ppe: пред- и постобработка, инференс"):
-            all_dets = self._infer_frames("ppe", [frame.image for _, frame in fresh])
-        if "people" in self.specs:
-            with self._timed("people: coco люди и техника"):
-                people = self._infer_frames("people", [frame.image for _, frame in fresh])
+            all_dets = self._infer_frames("ppe", images)
+        if people is not None:
+            with self._timed("people: ожидание (идёт параллельно с ppe)"):
+                people = people.result()
             all_dets = [merge_people(d, spec, p, self.specs["people"]) for d, p in zip(all_dets, people)]
         all_dets = [hivis_vests(frame.image, d, spec) for (_, frame), d in zip(fresh, all_dets)]
         head = self.config.worker.crop_pass.head
@@ -502,6 +510,7 @@ class Worker:
         self.client.close()
         self._pool.shutdown(wait=False, cancel_futures=True)
         self._cpu.shutdown(wait=False, cancel_futures=True)
+        self._side.shutdown(wait=False, cancel_futures=True)
         self._clips.cleanup()
         # LinqDetector держит открытыми устройство и сессии TPU
         close = getattr(self.detector, "close", None)

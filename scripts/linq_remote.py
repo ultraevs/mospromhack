@@ -18,7 +18,7 @@ REPO = f"{BASE}/repo"
 ENV = "~/work/linq/sdkenv"
 PY = f"{ENV}/bin/python"
 CODE = ["scripts/linq_calib.py", "scripts/linq_compile.py", "scripts/linq_eval.py", "scripts/eval_map.py",
-        "scripts/linq_bench.py", "scripts/linq_cams.py", "scripts/linq_bridge.py", "scripts/linq_probe.py",
+        "scripts/linq_bench.py", "scripts/linq_cams.py", "scripts/linq_bridge.py", "scripts/linq_probe.py", "scripts/linq_pipeline.py",
         "worker/__init__.py", "worker/app", "shared"]
 MODEL_FILES = ["model.yaml", "best.onnx"]
 RESULTS = ["meta.yaml", "strides.npy", "thresholds.json", "scales.json"]
