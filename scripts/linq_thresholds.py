@@ -36,6 +36,7 @@ def main() -> None:
     ap.add_argument("--model", required=True)
     ap.add_argument("--merged", required=True, type=Path, help="папка merged с <model>/images/val и labels/val")
     ap.add_argument("--limit", type=int, default=200)
+    ap.add_argument("--min-boxes", type=int, default=40, help="меньше рамок класса в выборке — порог по сжатию крупных")
     ap.add_argument("--dry", action="store_true", help="только напечатать, meta.yaml не трогать")
     args = ap.parse_args()
 
@@ -56,6 +57,26 @@ def main() -> None:
         chosen[name] = best_f1(np.array(stats[c][0], bool), np.array(stats[c][1]), int(n_gt[c]))
         print(f"  {name}: {spec.thresholds[c]:.3f} -> {chosen[name]['conf']:.3f} "
               f"(P {chosen[name]['precision']:.2f} / R {chosen[name]['recall']:.2f}, рамок {n_gt[c]})")
+    # на редких классах max F1 по паре десятков рамок — шум: берём порог float, сжатый как у крупных классов
+    big = [chosen[n]["conf"] / float(spec.thresholds[c]) for c, n in enumerate(spec.classes)
+           if n in chosen and n_gt[c] >= args.min_boxes]
+    if big:
+        ratio = float(np.median(big))
+        for c, name in enumerate(spec.classes):
+            if name in chosen and n_gt[c] < args.min_boxes:
+                chosen[name] = {"conf": round(float(spec.thresholds[c]) * ratio, 3),
+                                "rule": f"float x {ratio:.2f} (рамок {n_gt[c]} < {args.min_boxes})"}
+                print(f"  {name}: мало рамок, беру {spec.thresholds[c]:.3f} x {ratio:.2f} = {chosen[name]['conf']:.3f}")
+    # порог float в model.yaml мог быть поднят руками над max F1 (срезать ложные) — переносим тот же сдвиг
+    f1_float = {c: v["conf"] for c, v in (yaml.safe_load(spec.onnx_path.parent.joinpath("model.yaml").read_text(
+        encoding="utf-8")).get("thresholds_info") or {}).items()}
+    for c, name in enumerate(spec.classes):
+        if name in chosen and name in f1_float and "max F1" in chosen[name].get("rule", ""):
+            k = float(spec.thresholds[c]) / f1_float[name]
+            if abs(k - 1) > 0.01:
+                chosen[name]["conf"] = round(chosen[name]["conf"] * k, 3)
+                chosen[name]["rule"] += f", x {k:.2f} как поднят порог float"
+                print(f"  {name}: порог float поднят над max F1 в {k:.2f} раза, int8 -> {chosen[name]['conf']:.3f}")
     if args.dry or not chosen:
         return
     meta["thresholds"] = {name: chosen[name]["conf"] if name in chosen else float(round(spec.thresholds[c], 3))
