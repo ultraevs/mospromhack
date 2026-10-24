@@ -195,7 +195,7 @@ powershell -ExecutionPolicy Bypass -File scripts\demo.ps1
 
 Нужны Python 3.12, Node.js 20+ и ffmpeg, либо Docker.
 
-1. **Модели** (в git их нет): `models/{ppe,hazard,people,heads,pose}/best.onnx` и `model.yaml`, для TPU — `models/<модель>/linq/`. `people` и `pose` собирают `scripts\make_people_model.py` и `scripts\make_pose_model.py`.
+1. **Модели и демо-ролики** лежат в репозитории: `models/{ppe,hazard,people,heads,pose}/best.onnx` и `model.yaml`, программы TPU — `models/<модель>/linq/`, ролики для камер — `data/videos`. Переобучить: `scripts\sync_models.ps1` (ppe, hazard), `scripts\make_people_model.py`, `scripts\make_pose_model.py`.
 2. **Настройки:** `Copy-Item .env.example .env` — токен бота MAX, секрет воркера, пароли учёток. Остальное — в `config.yaml` и в интерфейсе.
 3. **Бэкенд инференса** — `worker.detector` в `config.yaml`: `linq` (TPU LinQ) или `onnx` (ONNX Runtime, для серверов без ускорителя).
 4. **Запуск:**

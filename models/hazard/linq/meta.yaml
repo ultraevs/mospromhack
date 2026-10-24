@@ -1,0 +1,43 @@
+model: hazard
+source_onnx: best.onnx
+input: images
+tpu_outputs:
+- /model.22/Div_1_output_0
+- /model.22/Sub_1_output_0
+- /model.22/Sigmoid_output_0
+tail_onnx: tail.onnx
+tail: yolo_detect
+strides: strides.npy
+quantized: quant_hazard.qm.onnx
+calibration:
+  file: data/linq/calib_hazard.npy
+  frames: 64
+  samplewise_percentile: null
+  activation_percentile: null
+  finetune_epochs: 0
+program: hazard_b1_o1_h1m.tpu
+preset: o1
+timings:
+  optimization_s: 2.5
+  quantization_s: 28.3
+  compilation_s: 53.2
+thresholds:
+  fire: 0.059
+  smoke: 0.3
+  cigarette: 0.053
+thresholds_info:
+  fire:
+    conf: 0.059
+    precision: 0.797
+    recall: 0.653
+    rule: max F1, int8
+  smoke:
+    conf: 0.3
+    rule: 'руками: на solo-worker пыльная стена даёт дым 0.16–0.21; в float дым тоже
+      держали строгим (0.75 при max F1 0.31). полноту по дыму проверить не на чем'
+  cigarette:
+    conf: 0.053
+    precision: 0.8
+    recall: 0.457
+    rule: max F1, int8
+  images: 150

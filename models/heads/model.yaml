@@ -1,0 +1,41 @@
+model: heads
+weights:
+  onnx: weights/best.onnx
+  pt: weights/best.pt
+generated: '2026-10-24 03:47:40'
+input:
+  name: images
+  shape:
+  - 1
+  - 3
+  - 640
+  - 640
+  layout: NCHW
+  color: RGB
+  scale: 0..1
+  letterbox: true
+output:
+  name: output0
+  shape:
+  - 1
+  - 6
+  - 8400
+  format: cx, cy, w, h в пикселях входа, затем score по классам; NMS не включён
+nms_iou: 0.7
+classes:
+- helmet
+- no_helmet
+thresholds:
+  helmet: 0.334
+  no_helmet: 0.444
+thresholds_info:
+  helmet:
+    conf: 0.334
+    precision: 0.911
+    recall: 0.912
+    rule: max F1
+  no_helmet:
+    conf: 0.444
+    precision: 0.916
+    recall: 0.843
+    rule: max F1

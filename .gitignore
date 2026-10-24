@@ -228,12 +228,37 @@ __marimo__/
 !.env.example
 
 # данные, модели, внешние бинарники
-/data/
-/models/
 /tools/
 /logs/
 *.onnx
 *.pt
+
+# в гит только то, что нужно воркеру: веса onnx + программы tpu, без промежуточного от компиляции
+/models/*
+!/models/*/
+/models/*/*
+!/models/*/model.yaml
+!/models/*/best.onnx
+!/models/*/best.fp16.onnx
+!/models/*/best.dynamic.onnx
+!/models/*/linq/
+/models/*/linq/*
+!/models/*/linq/meta.yaml
+!/models/*/linq/strides.npy
+!/models/ppe/linq/ppe_b1_o1_h1m.tpu
+!/models/hazard/linq/hazard_b1_o1_h1m.tpu
+!/models/people/linq/people_b1_o1_h1m.tpu
+!/models/heads/linq/heads2c_b1_o1_h1m.tpu
+
+# из data только демо-ролики, остальное (бд, датасеты, клипы) локальное
+/data/*
+!/data/videos/
+/data/videos/*
+!/data/videos/ptz_yard.mp4
+!/data/videos/fall_test.mp4
+!/data/videos/factory_floor.mp4
+!/data/videos/solo-worker.mp4
+!/data/videos/fire-explosion.mp4
 
 # frontend
 node_modules/

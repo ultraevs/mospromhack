@@ -1,0 +1,76 @@
+model: ppe
+weights:
+  onnx: weights/best.onnx
+  pt: weights/best.pt
+generated: '2026-10-03 23:56:02'
+input:
+  name: images
+  shape:
+  - 1
+  - 3
+  - 640
+  - 640
+  layout: NCHW
+  color: RGB
+  scale: 0..1
+  letterbox: true
+output:
+  name: output0
+  shape:
+  - 1
+  - 11
+  - 8400
+  format: cx, cy, w, h в пикселях входа, затем score по классам; NMS не включён
+nms_iou: 0.7
+classes:
+- person
+- helmet
+- no_helmet
+- vest
+- mask
+- no_mask
+- vehicle
+thresholds:
+  person: 0.515
+  helmet: 0.354
+  no_helmet: 0.48
+  vest: 0.3
+  mask: 0.266
+  no_mask: 0.429
+  vehicle: 0.428
+thresholds_info:
+  person:
+    conf: 0.515
+    precision: 0.924
+    recall: 0.837
+    rule: max F1
+  helmet:
+    conf: 0.354
+    precision: 0.81
+    recall: 0.751
+    rule: recall >= 0.75
+  no_helmet:
+    conf: 0.388
+    precision: 0.944
+    recall: 0.848
+    rule: max F1
+  vest:
+    conf: 0.3
+    precision: 0.667
+    recall: 0.611
+    rule: 'вручную: recall 0.80-0.85 на css; на sh17 цель недостижима'
+  mask:
+    conf: 0.266
+    precision: 0.86
+    recall: 0.751
+    rule: recall >= 0.75
+  no_mask:
+    conf: 0.429
+    precision: 0.961
+    recall: 0.85
+    rule: max F1
+  vehicle:
+    conf: 0.428
+    precision: 0.879
+    recall: 0.753
+    rule: max F1

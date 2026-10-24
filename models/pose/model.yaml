@@ -1,0 +1,25 @@
+model: pose
+source: yolov8n-pose.pt
+input:
+  name: images
+  shape:
+  - 1
+  - 3
+  - 640
+  - 640
+  layout: NCHW
+  color: RGB
+  scale: 0..1
+  letterbox: true
+output:
+  name: output0
+  shape:
+  - 1
+  - 56
+  - 8400
+nms_iou: 0.7
+classes:
+- person
+keypoints: 17
+thresholds:
+  person: 0.4

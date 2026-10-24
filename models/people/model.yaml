@@ -1,0 +1,34 @@
+model: people
+source: yolov8s.pt
+input:
+  name: images
+  shape:
+  - 1
+  - 3
+  - 640
+  - 640
+  layout: NCHW
+  color: RGB
+  scale: 0..1
+  letterbox: true
+output:
+  name: output0
+  shape:
+  - 1
+  - 10
+  - 8400
+nms_iou: 0.7
+classes:
+- person
+- car
+- motorcycle
+- bus
+- truck
+- cell phone
+thresholds:
+  person: 0.5
+  car: 0.6
+  motorcycle: 0.6
+  bus: 0.6
+  truck: 0.6
+  cell phone: 0.35  # вручную, на разметке не подбирали

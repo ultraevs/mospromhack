@@ -1,0 +1,38 @@
+model: heads
+source_onnx: best.onnx
+input: images
+tpu_outputs:
+- /model.22/Div_1_output_0
+- /model.22/Sub_1_output_0
+- /model.22/Sigmoid_output_0
+tail_onnx: tail.onnx
+tail: yolo_detect
+strides: strides.npy
+quantized: quant_heads.qm.onnx
+calibration:
+  file: data/linq/calib_heads.npy
+  frames: 178
+  samplewise_percentile: null
+  activation_percentile: null
+  finetune_epochs: 0
+program: heads2c_b1_o1_h1m.tpu
+preset: o1
+timings:
+  optimization_s: 3.8
+  quantization_s: 100.2
+  compilation_s: 51.3
+thresholds:
+  helmet: 0.087
+  no_helmet: 0.058
+thresholds_info:
+  helmet:
+    conf: 0.087
+    precision: 0.81
+    recall: 0.88
+    rule: max F1, int8
+  no_helmet:
+    conf: 0.058
+    precision: 0.91
+    recall: 0.89
+    rule: max F1, int8
+  images: 150

@@ -22,7 +22,8 @@ foreach ($d in "data\videos", "data\media", "models", "tools", "logs") {
     New-Item -ItemType Directory -Force (Join-Path $root $d) | Out-Null
 }
 
-& (Join-Path $PSScriptRoot "sync_models.ps1")
+# модели уже положены руками/из архива - тогда TRAIN_RUNS_DIR не нужен
+if (-not (Test-Path (Join-Path $root "models\ppe\best.onnx"))) { & (Join-Path $PSScriptRoot "sync_models.ps1") }
 
 # mediamtx качаем в tools/, в гит не кладем
 $mtxVersion = "v1.21.1"

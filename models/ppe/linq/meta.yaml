@@ -1,0 +1,60 @@
+model: ppe
+source_onnx: best.onnx
+input: images
+tpu_outputs:
+- /model.22/Div_1_output_0
+- /model.22/Sub_1_output_0
+- /model.22/Sigmoid_output_0
+tail_onnx: tail.onnx
+quantized: quant_ppe.qm.onnx
+calibration:
+  file: data/linq/calib_ppe.npy
+  frames: 64
+  samplewise_percentile: null
+  activation_percentile: null
+  finetune_epochs: 0
+program: ppe_b1_o1_h1m.tpu
+preset: o1
+timings:
+  optimization_s: 2.5
+  quantization_s: 31.4
+  compilation_s: 43.2
+tail: yolo_detect
+strides: strides.npy
+thresholds:
+  person: 0.159
+  helmet: 0.091
+  no_helmet: 0.154
+  vest: 0.077
+  mask: 0.069
+  no_mask: 0.076
+  vehicle: 0.111
+thresholds_info:
+  person:
+    conf: 0.159
+    precision: 0.902
+    recall: 0.824
+    rule: max F1, int8
+  helmet:
+    conf: 0.091
+    rule: float x 0.26 (рамок 28 < 40)
+  no_helmet:
+    conf: 0.154
+    precision: 0.939
+    recall: 0.794
+    rule: max F1, int8, x 1.24 как поднят порог float
+  vest:
+    conf: 0.077
+    rule: float x 0.26 (рамок 15 < 40)
+  mask:
+    conf: 0.069
+    rule: float x 0.26 (рамок 25 < 40)
+  no_mask:
+    conf: 0.076
+    precision: 0.931
+    recall: 0.851
+    rule: max F1, int8
+  vehicle:
+    conf: 0.111
+    rule: float x 0.26 (рамок 17 < 40)
+  images: 150

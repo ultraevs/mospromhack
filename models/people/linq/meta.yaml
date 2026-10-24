@@ -1,0 +1,23 @@
+model: people
+source_onnx: best.onnx
+input: images
+tpu_outputs:
+- /model.22/Div_1_output_0
+- /model.22/Sub_1_output_0
+- /model.22/Sigmoid_output_0
+tail_onnx: tail.onnx
+tail: yolo_detect
+strides: strides.npy
+quantized: quant_people.qm.onnx
+calibration:
+  file: data/linq/calib_people.npy
+  frames: 64
+  samplewise_percentile: null
+  activation_percentile: null
+  finetune_epochs: 0
+program: people_b1_o1_h1m.tpu
+preset: o1
+timings:
+  optimization_s: 5.1
+  quantization_s: 96.3
+  compilation_s: 101.9
