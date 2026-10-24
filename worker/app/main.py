@@ -25,10 +25,10 @@ from worker.app.client import BackendClient, DetectionsSender
 from worker.app.detector import Detector, create_detector
 from worker.app.evidence import (JPEG_QUALITY_SNAPSHOT, CameraEvidence, ClipBuilder, annotate, encode_jpeg)
 from worker.app.model_spec import ModelSpec, load_all_specs
-from worker.app.crops import crop_box, merge, only_classes, shift
+from worker.app.crops import crop_box, merge, only_classes, shift, tile_spans
 from worker.app.pipeline import CameraPipeline, check_classes, norm_box
 from worker.app.rules.state import CIGARETTE, HEAD_CLASSES, PERSON
-from worker.app.postprocess import Detections, decode, hivis_vests, merge_people, preprocess
+from worker.app.postprocess import Detections, decode, hivis_vests, merge_heads, merge_people, preprocess
 from worker.app.rules.types import EventClose, EventOpen
 
 log = logging.getLogger("worker")
@@ -77,7 +77,7 @@ class Worker:
         self._cpu = ThreadPoolExecutor(max_workers=4, thread_name_prefix="prep")
         # people в облако параллельно с ppe, у каждого потока своё соединение
         inflight = config.worker.inflight
-        self._side = ThreadPoolExecutor(max_workers=inflight, thread_name_prefix="people")
+        self._side = ThreadPoolExecutor(max_workers=inflight * 2, thread_name_prefix="people")
         # пачки кадров в полёте: пока облако считает одну, правила разбирают предыдущую
         self._detect_pool = ThreadPoolExecutor(max_workers=inflight, thread_name_prefix="detect")
         self._inflight: deque = deque()
@@ -191,13 +191,30 @@ class Worker:
         spec = self.specs["ppe"]
         images = [frame.image for _, frame in fresh]
         people = self._side.submit(self._infer_frames, "people", images) if "people" in self.specs else None
+        heads_src = "heads" if "heads" in self.specs else ("ppe" if self.config.worker.tiles else None)
+        heads = self._side.submit(self._infer_heads, heads_src, images) if heads_src else None
         with self._timed("ppe: пред- и постобработка, инференс"):
             all_dets = self._infer_frames("ppe", images)
         if people is not None:
             with self._timed("people: ожидание (идёт параллельно с ppe)"):
                 people = people.result()
             all_dets = [merge_people(d, spec, p, self.specs["people"]) for d, p in zip(all_dets, people)]
+        if heads is not None:
+            with self._timed("heads: ожидание (идёт параллельно с ppe)"):
+                heads = heads.result()
+            all_dets = [merge_heads(d, spec, h, self.specs[heads_src]) for d, h in zip(all_dets, heads)]
         return [hivis_vests(frame.image, d, spec) for (_, frame), d in zip(fresh, all_dets)]
+
+    def _infer_heads(self, model: str, images: list[np.ndarray]) -> list[Detections]:
+        if not self.config.worker.tiles:
+            return self._infer_frames(model, images)
+        jobs = [(i, x1, x2) for i, img in enumerate(images) for x1, x2 in tile_spans(img.shape[1], img.shape[0])]
+        with self._timed(f"{model}: плитки"):
+            found = self._infer_frames(model, [images[i][:, x1:x2] for i, x1, x2 in jobs])
+        out = [Detections.empty() for _ in images]
+        for (i, x1, _), d in zip(jobs, found):
+            out[i] = merge(out[i], shift(d, x1, 0), self.specs[model].nms_iou)
+        return out
 
     def _finish_ppe(self, fresh: list, all_dets: list[Detections]) -> int:
         spec = self.specs["ppe"]
@@ -321,7 +338,14 @@ class Worker:
             return dets
         self._crop_times.extend([time.monotonic()] * len(boxes))
         head_ids = {spec.class_id(name) for name in HEAD_CLASSES}
-        for (x1, y1, x2, y2), found in zip(boxes, self._infer_frames("ppe", [image[y1:y2, x1:x2] for x1, y1, x2, y2 in boxes])):
+        crops = [image[y1:y2, x1:x2] for x1, y1, x2, y2 in boxes]
+        if "heads" in self.specs:
+            heads_spec = self.specs["heads"]
+            for (x1, y1, _, _), found in zip(boxes, self._infer_frames("heads", crops)):
+                found = merge_heads(Detections.empty(), spec, found, heads_spec)
+                dets = merge(dets, shift(found, x1, y1), spec.nms_iou)
+            return dets
+        for (x1, y1, x2, y2), found in zip(boxes, self._infer_frames("ppe", crops)):
             dets = merge(dets, shift(only_classes(found, head_ids), x1, y1), spec.nms_iou)
         return dets
 

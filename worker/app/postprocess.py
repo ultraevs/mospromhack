@@ -152,6 +152,23 @@ def merge_people(ppe: Detections, ppe_spec: ModelSpec, people: Detections, peopl
     )
 
 
+# каска / без каски из отдельной модели голов вместо ppe: у ppe no_helmet учился на производной разметке sh17
+HEADS_TO_PPE = {"helmet": "helmet", "no_helmet": "no_helmet"}
+
+
+def merge_heads(ppe: Detections, ppe_spec: ModelSpec, heads: Detections, heads_spec: ModelSpec) -> Detections:
+    replaced = {ppe_spec.class_id(c) for c in HEADS_TO_PPE.values() if c in ppe_spec.classes}
+    keep = ~np.isin(ppe.cls, list(replaced))
+    mapped = np.array([ppe_spec.class_id(HEADS_TO_PPE[heads_spec.classes[c]]) if heads_spec.classes[c] in HEADS_TO_PPE
+                       else -1 for c in heads.cls], dtype=np.int64)
+    sel = mapped >= 0
+    return Detections(
+        np.concatenate([ppe.xyxy[keep], heads.xyxy[sel]]).astype(np.float32),
+        np.concatenate([ppe.conf[keep], heads.conf[sel]]).astype(np.float32),
+        np.concatenate([ppe.cls[keep], mapped[sel]]).astype(np.int64),
+    )
+
+
 # сигнальный цвет на торсе = жилет. модель на дальних камерах и со спины жилеты теряет
 HIVIS_HSV = (((4, 140, 140), (22, 255, 255)), ((25, 110, 140), (45, 255, 255)))  # оранжевый, салатовый
 HIVIS_MIN_FRACTION = 0.12

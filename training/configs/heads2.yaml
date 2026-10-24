@@ -1,0 +1,28 @@
+# heads v2: к Hard Hats (каски со всех ракурсов) добавлены головы рабочих из sh17 как no_helmet —
+# v1 без них принимала кепки и волосы за каску. баланс касок/без касок ~33k/23k
+output: merged/heads2
+val_fraction: 0.1
+classes: [helmet, no_helmet]
+
+sources:
+  - name: hardhats
+    path: datasets/hardhats
+    map:
+      hardhat: helmet
+      no-hardhat: no_helmet
+
+  - name: css
+    path: datasets/css
+    map:
+      Hardhat: helmet
+      NO-Hardhat: no_helmet
+
+  - name: sh17
+    path: datasets/sh17
+    split_files: {train: train_files.txt, val: val_files.txt}
+    names: [person, ear, ear-mufs, face, face-guard, face-mask-medical, foot, tools, glasses,
+            gloves, helmet, hands, head, medical-suit, shoes, safety-suit, safety-vest]
+    map:
+      helmet: helmet
+    derive:
+      - {from: head, unless_overlaps: [helmet], to: no_helmet, keep_top: 0.8}

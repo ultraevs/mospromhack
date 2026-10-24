@@ -1,0 +1,18 @@
+# отдельная модель голов: только каска / без каски, с настоящей разметкой.
+# производный no_helmet из sh17 (голова без пересечения с каской) не берём — он учил «любая голова = без каски»
+output: merged/heads
+val_fraction: 0.1
+classes: [helmet, no_helmet]
+
+sources:
+  - name: hardhats
+    path: datasets/hardhats
+    map:
+      hardhat: helmet
+      no-hardhat: no_helmet
+
+  - name: css
+    path: datasets/css
+    map:
+      Hardhat: helmet
+      NO-Hardhat: no_helmet

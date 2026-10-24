@@ -64,10 +64,19 @@ def main() -> None:
             (out / f"probe_par_b{b}.txt").write_text(sh(f"{py} scripts/linq_probe_par.py --batch {b}", log),
                                                      encoding="utf-8")
         videos = "--videos factory_floor_sub.mp4 warehouse_sub.mp4"
+        # база — те же три модели, что вечером 23.10, чтобы сравнение было честным
+        base = "--models ppe people hazard"
         sh(f"{py} scripts/linq_pipeline.py --cams {args.cams} --seconds {args.seconds} --inflight {args.inflight} "
-           f"{videos} --tag night_{tag}_sub", log)
+           f"{videos} {base} --tag night_{tag}_sub", log)
         sh(f"{py} scripts/linq_pipeline.py --cams 1 2 4 --seconds {args.seconds} --inflight {args.inflight} "
-           f"--tag night_{tag}_full", log)
+           f"{base} --tag night_{tag}_full", log)
+        # модель голов, если её успели залить: 4 модели + плитки
+        if (ROOT / "models" / "heads" / "linq" / "meta.yaml").exists():
+            for b in (1, 8):
+                (out / f"probe_heads_b{b}.txt").write_text(
+                    sh(f"{py} scripts/linq_probe.py --model heads --n 10 --batch {b}", log), encoding="utf-8")
+            sh(f"{py} scripts/linq_pipeline.py --cams 2 4 6 --seconds {args.seconds} --inflight {args.inflight} "
+               f"{videos} --tiles --tag night_{tag}_heads_tiles", log)
         snapshot(out, "after", log)
     print(f"готово: {out}", flush=True)
 

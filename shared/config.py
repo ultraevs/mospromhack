@@ -58,6 +58,9 @@ class WorkerSection(BaseModel):
     hazard_fps: float = 1
     # сколько пачек кадров одновременно в инференсе; >1 когда модель далеко (облако linq) и цикл ждёт ответа
     inflight: int = Field(default=1, ge=1, le=8)
+    # каски с двух квадратных плиток широкого кадра: голова на входе модели в ~1.8 раза крупнее.
+    # на эталоне Цеха вердикт по каске 0.2 -> 0.67, цена — модель голов дважды на кадр
+    tiles: bool = False
     crop_pass: CropPass = Field(default_factory=CropPass)
     decode: DecodeSection = Field(default_factory=DecodeSection)
     overlay_delay_ms: int = 0

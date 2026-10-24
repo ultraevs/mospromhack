@@ -135,6 +135,8 @@ def main() -> None:
     ap.add_argument("--tag", default="stand")
     ap.add_argument("--no-raw", action="store_true", help="старый путь: float32, пакует облако")
     ap.add_argument("--inflight", type=int, default=1, help="пачек кадров в полёте (worker.inflight)")
+    ap.add_argument("--tiles", action="store_true", help="каски с двух плиток кадра (worker.tiles)")
+    ap.add_argument("--models", nargs="+", help="только эти модели из models/ (по умолчанию все)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     for name in ("httpx", "pika", "worker.capture"):
@@ -149,7 +151,10 @@ def main() -> None:
     # config.yaml на стенде мог остаться старым, raw задаём явно
     config.worker.linq.raw = not args.no_raw
     config.worker.inflight = args.inflight
+    config.worker.tiles = args.tiles
     specs = load_all_specs(settings.models_dir)
+    if args.models:
+        specs = {k: v for k, v in specs.items() if k in args.models}
     check_classes(specs["ppe"], specs.get("hazard"))
     linq = config.worker.linq.model_dump()
     linq["program_dir"] = linq["program_dir"].replace("{login}", settings.linq_login or os.environ.get("LINQ_LOGIN", ""))

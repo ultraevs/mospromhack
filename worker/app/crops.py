@@ -37,3 +37,10 @@ def merge(a: Detections, b: Detections, iou: float) -> Detections:
     cls = np.concatenate([a.cls, b.cls])
     keep = nms_per_class(xyxy, conf, cls, iou)
     return Detections(xyxy[keep], conf[keep], cls[keep])
+
+
+# квадраты по высоте кадра слева и справа; узкий кадр целиком
+def tile_spans(w: int, h: int) -> list[tuple[int, int]]:
+    if w <= h * 1.2:
+        return [(0, w)]
+    return [(0, h), (w - h, w)]

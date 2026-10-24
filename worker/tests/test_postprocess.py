@@ -167,3 +167,27 @@ def test_preprocess_writes_into_given_buffer_and_matches_reference_formula():
     np.testing.assert_array_equal(batch[1], expected)
     np.testing.assert_array_equal(preprocess(img, 640)[0], expected)
     assert info.pad_y == 140
+
+
+def test_merge_heads_replaces_ppe_head_classes(tmp_path):
+    from worker.app.model_spec import load_model_spec
+    from worker.app.postprocess import Detections, merge_heads
+    from worker.tests.conftest import write_model_yaml
+
+    ppe = load_model_spec(write_model_yaml(tmp_path / "ppe", "ppe", {"person": 0.5, "helmet": 0.5, "no_helmet": 0.5,
+                                                                    "vest": 0.5}))
+    heads = load_model_spec(write_model_yaml(tmp_path / "heads", "heads", {"helmet": 0.5, "no_helmet": 0.5}))
+    base = Detections(np.array([[0, 0, 10, 30], [2, 0, 8, 6], [0, 10, 10, 20]], np.float32),
+                      np.array([0.9, 0.6, 0.7], np.float32), np.array([0, 2, 3]))  # человек, без каски, жилет
+    found = Detections(np.array([[2, 0, 8, 6]], np.float32), np.array([0.8], np.float32), np.array([0]))  # каска
+    out = merge_heads(base, ppe, found, heads)
+    assert sorted(ppe.classes[c] for c in out.cls) == ["helmet", "person", "vest"]
+
+
+def test_tile_spans_cover_wide_frame():
+    from worker.app.crops import tile_spans
+
+    assert tile_spans(1280, 720) == [(0, 720), (560, 1280)]
+    assert tile_spans(640, 640) == [(0, 640)]
+    assert tile_spans(960, 720) == [(0, 720), (240, 960)]
+    assert tile_spans(800, 720) == [(0, 800)]

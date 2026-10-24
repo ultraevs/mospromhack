@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 ap = argparse.ArgumentParser()
-ap.add_argument("name", choices=["ppe", "hazard"])
+ap.add_argument("name", choices=["ppe", "hazard", "heads", "heads2"])
 ap.add_argument("--model", default="yolov8s.pt")
 ap.add_argument("--epochs", type=int, default=80)
 ap.add_argument("--batch", type=int, default=16)
@@ -16,6 +16,7 @@ ap.add_argument("--imgsz", type=int, default=640)
 ap.add_argument("--resume", action="store_true")
 ap.add_argument("--workers", type=int, default=2)
 ap.add_argument("--fraction", type=float, default=1.0, help="доля train для быстрой проверки")
+ap.add_argument("--scale", type=float, default=0.5, help="разброс масштаба аугментации; больше = больше мелких объектов")
 ap.add_argument("--run-name", default=None, help="имя папки прогона, по умолчанию имя модели")
 
 
@@ -108,7 +109,7 @@ if __name__ == "__main__":
             epochs=a.epochs, imgsz=a.imgsz, batch=a.batch,
             project=str(runs), name=run_name, exist_ok=True,
             patience=20, workers=a.workers, cache=False, fraction=a.fraction,
-            mosaic=1.0, close_mosaic=10, fliplr=0.5,
+            mosaic=1.0, close_mosaic=10, fliplr=0.5, scale=a.scale,
         )
     save_dir = Path(model.trainer.save_dir)
     print(f"Результаты: {save_dir}")

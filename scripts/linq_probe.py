@@ -27,7 +27,9 @@ def main() -> None:
     ap.add_argument("--login", default=os.environ.get("LINQ_LOGIN", ""))
     args = ap.parse_args()
     spec = load_model_spec(ROOT / "models" / args.model)
-    frames = np.load(ROOT / "data" / "linq" / f"ref_{args.model}.npz")["frames"]
+    ref = ROOT / "data" / "linq" / f"ref_{args.model}.npz"
+    # для скорости кадры любые, у новой модели эталона может не быть
+    frames = np.load(ref if ref.exists() else ROOT / "data" / "linq" / "ref_ppe.npz")["frames"]
     x = np.stack([preprocess(f, spec.input_size)[0] for f in frames[:args.batch]])
     for raw in (False, True):
         det = LinqDetector({args.model: spec}, transport="cloud", program_dir=f"/auto/cache/{args.login}",

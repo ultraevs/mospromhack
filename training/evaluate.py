@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 import time
 from pathlib import Path
 
@@ -101,7 +102,7 @@ def write_model_yaml(name, model, chosen):
 
 
 if __name__ == "__main__":
-    for name in ("ppe", "hazard"):
+    for name in sys.argv[1:] or ("ppe", "hazard"):
         model = YOLO(str(RUNS / name / "weights" / "best.pt"))
         data = Path("merged") / name / "data.yaml"
         full = run_val(model, data, f"{name}_eval_val")
