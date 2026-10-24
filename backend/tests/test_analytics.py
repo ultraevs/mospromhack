@@ -1,4 +1,9 @@
+import time
+from datetime import datetime
+
+from backend.app.db.models import EventRow
 from backend.tests.conftest import INTERNAL, event_body
+from backend.tests.test_auth import admin, app, viewer  # noqa: F401
 
 SQUARE = [[0, 0], [1, 0], [1, 1], [0, 1]]
 
@@ -72,3 +77,63 @@ def test_summary_period_camera_and_timezone(client, camera):
     assert (hours[11], hours[1], hours[12]) == (1, 1, 1)
     assert s["by_day"] == [{"day": "2026-10-04", "total": 1}, {"day": "2026-10-05", "total": 2}]
     assert client.get("/api/analytics/summary", params={"tz_offset_min": 5000}).status_code == 422
+
+
+def test_shifts_settings(client):
+    assert client.get("/api/settings/shifts").json()["shifts"][1] == {"name": "Ночная", "start": "20:00", "end": "08:00"}
+    body = {"shifts": [{"name": "A", "start": "07:00", "end": "15:00"}, {"name": "B", "start": "15:00", "end": "23:00"},
+                       {"name": "C", "start": "23:00", "end": "07:00"}]}
+    assert client.put("/api/settings/shifts", json=body).status_code == 200
+    assert client.get("/api/settings/shifts").json() == body
+    assert client.put("/api/settings/shifts", json={"shifts": []}).status_code == 422
+    assert client.put("/api/settings/shifts", json={"shifts": [{"name": "x", "start": "25:00", "end": "08:00"}]}).status_code == 422
+    assert client.put("/api/settings/shifts", json={"shifts": body["shifts"] * 2}).status_code == 422
+
+
+def test_shifts_admin_only(admin, viewer):
+    assert viewer.get("/api/settings/shifts").status_code == 200
+    body = {"shifts": [{"name": "Одна", "start": "00:00", "end": "00:00"}]}
+    assert viewer.put("/api/settings/shifts", json=body).status_code == 403
+    assert admin.put("/api/settings/shifts", json=body).status_code == 200
+
+
+def test_summary_shifts_and_heatmap(client, camera):
+    post(client, camera["id"], started_at="2026-10-05T09:00:00Z")  # пн 12:00 мск
+    post(client, camera["id"], started_at="2026-10-05T19:30:00Z")  # пн 22:30
+    post(client, camera["id"], type="fire", severity="high", track_id=None, started_at="2026-10-05T23:30:00Z")  # вт 02:30
+    s = client.get("/api/analytics/summary", params={"tz_offset_min": 180}).json()
+    assert s["by_shift"] == [{"name": "Дневная", "total": 1}, {"name": "Ночная", "total": 2}]
+    assert {(x["name"], x["type"]): x["total"] for x in s["by_shift_type"]} == {
+        ("Дневная", "no_helmet"): 1, ("Ночная", "no_helmet"): 1, ("Ночная", "fire"): 1}
+    heat = s["heatmap"]
+    assert len(heat) == 7 and all(len(r) == 24 for r in heat)
+    assert (heat[0][12], heat[0][22], heat[1][2], sum(map(sum, heat))) == (1, 1, 1, 3)
+
+
+def test_summary_reaction(client, camera):
+    assert client.get("/api/analytics/summary").json()["reaction"] == {"n": 0, "median_s": None, "p90_s": None, "high_median_s": None}
+    a = post(client, camera["id"], started_at="2026-10-05T09:00:00Z")
+    b = post(client, camera["id"], started_at="2026-10-05T10:00:00Z")
+    c = post(client, camera["id"], type="fire", severity="high", track_id=None, started_at="2026-10-05T11:00:00Z")
+    post(client, camera["id"], started_at="2026-10-05T12:00:00Z")
+    for e, v in ((a, "confirmed"), (b, "false_positive"), (c, "confirmed")):
+        review(client, e, v)
+    with client.app.state.app.session_factory() as db:
+        for e, at in ((a, "09:01:00"), (b, "10:05:00"), (c, "11:00:30")):
+            db.get(EventRow, e["id"]).reviewed_at = datetime.fromisoformat(f"2026-10-05T{at}")
+        db.commit()
+    r = client.get("/api/analytics/summary").json()["reaction"]
+    assert r == {"n": 3, "median_s": 60.0, "p90_s": 300.0, "high_median_s": 30.0}
+
+
+def test_capacity(client):
+    r = client.get("/api/capacity", params={"cameras": 20, "fps": 6, "tiles": True}).json()
+    assert r["source"] == "reference" and r["note"] and r["infer_per_s"] == 25
+    assert (r["per_accelerator"], r["accelerators"]) == (13, 2)
+    assert client.get("/api/capacity", params={"tiles": False}).json()["infer_per_s"] == 19
+    state = client.app.state.app
+    state.worker_stats = {"detector": "onnx", "inference": {m: {"avg_ms": 4.0, "batch": 2} for m in ("ppe", "people", "heads", "hazard")}}
+    state.worker_seen = time.monotonic()
+    r = client.get("/api/capacity", params={"cameras": 50}).json()
+    assert r["source"] == "measured" and r["detector"] == "onnx" and r["note"] is None
+    assert (r["per_accelerator"], r["accelerators"]) == (20, 3)

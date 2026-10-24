@@ -1,0 +1,304 @@
+{
+ "heads": {
+  "data": "/mh/heads",
+  "images": 150,
+  "iou": "0.5 для P/R/F1 и mAP50, 0.5:0.95 шаг 0.05",
+  "float32": {
+   "helmet": {
+    "thr": 0.334,
+    "precision": 0.861,
+    "recall": 0.876,
+    "f1": 0.868,
+    "map50": 0.897,
+    "map50_95": 0.537,
+    "boxes": 233
+   },
+   "no_helmet": {
+    "thr": 0.444,
+    "precision": 0.935,
+    "recall": 0.855,
+    "f1": 0.893,
+    "map50": 0.947,
+    "map50_95": 0.663,
+    "boxes": 117
+   }
+  },
+  "int8": {
+   "helmet": {
+    "thr": 0.087,
+    "precision": 0.876,
+    "recall": 0.815,
+    "f1": 0.844,
+    "map50": 0.888,
+    "map50_95": 0.522,
+    "boxes": 233
+   },
+   "no_helmet": {
+    "thr": 0.058,
+    "precision": 0.91,
+    "recall": 0.863,
+    "f1": 0.886,
+    "map50": 0.941,
+    "map50_95": 0.651,
+    "boxes": 117
+   }
+  },
+  "float32_mean": {
+   "map50": 0.922,
+   "map50_95": 0.6
+  },
+  "int8_mean": {
+   "map50": 0.914,
+   "map50_95": 0.587
+  }
+ },
+ "ppe": {
+  "data": "/merged/ppe",
+  "images": 150,
+  "iou": "0.5 для P/R/F1 и mAP50, 0.5:0.95 шаг 0.05",
+  "float32": {
+   "person": {
+    "thr": 0.515,
+    "precision": 0.927,
+    "recall": 0.805,
+    "f1": 0.862,
+    "map50": 0.89,
+    "map50_95": 0.705,
+    "boxes": 267
+   },
+   "helmet": {
+    "thr": 0.354,
+    "precision": 0.923,
+    "recall": 0.857,
+    "f1": 0.889,
+    "map50": 0.869,
+    "map50_95": 0.557,
+    "boxes": 28
+   },
+   "no_helmet": {
+    "thr": 0.48,
+    "precision": 0.949,
+    "recall": 0.79,
+    "f1": 0.862,
+    "map50": 0.852,
+    "map50_95": 0.663,
+    "boxes": 214
+   },
+   "vest": {
+    "thr": 0.3,
+    "precision": 0.857,
+    "recall": 0.4,
+    "f1": 0.545,
+    "map50": 0.51,
+    "map50_95": 0.276,
+    "boxes": 15
+   },
+   "mask": {
+    "thr": 0.266,
+    "precision": 0.917,
+    "recall": 0.44,
+    "f1": 0.595,
+    "map50": 0.485,
+    "map50_95": 0.33,
+    "boxes": 25
+   },
+   "no_mask": {
+    "thr": 0.429,
+    "precision": 0.959,
+    "recall": 0.816,
+    "f1": 0.882,
+    "map50": 0.917,
+    "map50_95": 0.635,
+    "boxes": 174
+   },
+   "vehicle": {
+    "thr": 0.428,
+    "precision": 1.0,
+    "recall": 0.647,
+    "f1": 0.786,
+    "map50": 0.86,
+    "map50_95": 0.522,
+    "boxes": 17
+   }
+  },
+  "int8": {
+   "person": {
+    "thr": 0.159,
+    "precision": 0.901,
+    "recall": 0.82,
+    "f1": 0.859,
+    "map50": 0.889,
+    "map50_95": 0.686,
+    "boxes": 267
+   },
+   "helmet": {
+    "thr": 0.091,
+    "precision": 0.885,
+    "recall": 0.821,
+    "f1": 0.852,
+    "map50": 0.864,
+    "map50_95": 0.543,
+    "boxes": 28
+   },
+   "no_helmet": {
+    "thr": 0.154,
+    "precision": 0.948,
+    "recall": 0.771,
+    "f1": 0.851,
+    "map50": 0.866,
+    "map50_95": 0.667,
+    "boxes": 214
+   },
+   "vest": {
+    "thr": 0.077,
+    "precision": 0.714,
+    "recall": 0.333,
+    "f1": 0.455,
+    "map50": 0.531,
+    "map50_95": 0.321,
+    "boxes": 15
+   },
+   "mask": {
+    "thr": 0.069,
+    "precision": 1.0,
+    "recall": 0.44,
+    "f1": 0.611,
+    "map50": 0.539,
+    "map50_95": 0.353,
+    "boxes": 25
+   },
+   "no_mask": {
+    "thr": 0.076,
+    "precision": 0.93,
+    "recall": 0.845,
+    "f1": 0.886,
+    "map50": 0.909,
+    "map50_95": 0.614,
+    "boxes": 174
+   },
+   "vehicle": {
+    "thr": 0.111,
+    "precision": 0.917,
+    "recall": 0.647,
+    "f1": 0.759,
+    "map50": 0.822,
+    "map50_95": 0.535,
+    "boxes": 17
+   }
+  },
+  "float32_mean": {
+   "map50": 0.769,
+   "map50_95": 0.527
+  },
+  "int8_mean": {
+   "map50": 0.774,
+   "map50_95": 0.531
+  }
+ },
+ "hazard": {
+  "data": "/merged/hazard",
+  "images": 150,
+  "iou": "0.5 для P/R/F1 и mAP50, 0.5:0.95 шаг 0.05",
+  "float32": {
+   "fire": {
+    "thr": 0.338,
+    "precision": 0.722,
+    "recall": 0.722,
+    "f1": 0.722,
+    "map50": 0.76,
+    "map50_95": 0.381,
+    "boxes": 72
+   },
+   "smoke": {
+    "thr": 0.75,
+    "precision": 0.962,
+    "recall": 0.543,
+    "f1": 0.694,
+    "map50": 0.859,
+    "map50_95": 0.487,
+    "boxes": 46
+   },
+   "cigarette": {
+    "thr": 0.362,
+    "precision": 0.694,
+    "recall": 0.486,
+    "f1": 0.571,
+    "map50": 0.58,
+    "map50_95": 0.212,
+    "boxes": 70
+   }
+  },
+  "int8": {
+   "fire": {
+    "thr": 0.059,
+    "precision": 0.783,
+    "recall": 0.653,
+    "f1": 0.712,
+    "map50": 0.718,
+    "map50_95": 0.384,
+    "boxes": 72
+   },
+   "smoke": {
+    "thr": 0.3,
+    "precision": 0.909,
+    "recall": 0.435,
+    "f1": 0.588,
+    "map50": 0.825,
+    "map50_95": 0.459,
+    "boxes": 46
+   },
+   "cigarette": {
+    "thr": 0.053,
+    "precision": 0.8,
+    "recall": 0.457,
+    "f1": 0.582,
+    "map50": 0.545,
+    "map50_95": 0.219,
+    "boxes": 70
+   }
+  },
+  "float32_mean": {
+   "map50": 0.733,
+   "map50_95": 0.36
+  },
+  "int8_mean": {
+   "map50": 0.696,
+   "map50_95": 0.354
+  }
+ },
+ "people": {
+  "data": "/merged/ppe",
+  "images": 150,
+  "iou": "0.5 для P/R/F1 и mAP50, 0.5:0.95 шаг 0.05",
+  "float32": {
+   "person": {
+    "thr": 0.5,
+    "precision": 0.906,
+    "recall": 0.828,
+    "f1": 0.865,
+    "map50": 0.887,
+    "map50_95": 0.717,
+    "boxes": 267
+   }
+  },
+  "int8": {
+   "person": {
+    "thr": 0.5,
+    "precision": 0.898,
+    "recall": 0.794,
+    "f1": 0.843,
+    "map50": 0.888,
+    "map50_95": 0.694,
+    "boxes": 267
+   }
+  },
+  "float32_mean": {
+   "map50": 0.887,
+   "map50_95": 0.717
+  },
+  "int8_mean": {
+   "map50": 0.888,
+   "map50_95": 0.694
+  }
+ }
+}

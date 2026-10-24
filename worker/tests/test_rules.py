@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from shared.schemas import EventType, PpeItem, RuleSettings, Severity, SmokingRule, WorkerCamera, Zone, ZoneType
-from worker.app.rules.checks import (check_fall, check_head_ppe, check_k_of_m, check_lying_immobile, check_no_vest,
+from worker.app.rules.checks import (check_fall, check_head_ppe, check_k_of_m, check_lying_immobile, check_lying_spot, check_no_vest,
                                      check_running, check_vehicle_proximity, check_zone, in_upper_part)
 from worker.app.rules.engine import RuleEngine, evaluate_track
 from worker.app.rules.state import Observation, TrackState
@@ -454,6 +454,21 @@ def test_lying_but_crawling_is_not_immobile():
     assert not check_lying_immobile(o, o[-1].t, RULES.lying_immobile).active
 
 
+def test_lying_spot_survives_flicker():
+    p = RULES.lying_immobile
+    frames = [(i / FPS, [LIE] if i % 5 not in (1, 3) else []) for i in range(7 * FPS)]  # рамка мерцает: 40% кадров её нет
+    r, bbox = check_lying_spot(frames, frames[-1][0], 1.0, p)
+    assert r.active and bbox == LIE
+
+
+def test_lying_spot_ignores_walking_and_standing():
+    p = RULES.lying_immobile
+    walking = [(i / FPS, [(0.1 + 0.03 * i, 0.6, 0.4, 0.1)]) for i in range(7 * FPS)]
+    assert not check_lying_spot(walking, walking[-1][0], 1.0, p)[0].active
+    standing = [(i / FPS, [STAND]) for i in range(7 * FPS)]
+    assert not check_lying_spot([(t, []) for t, _ in standing], standing[-1][0], 1.0, p)[0].active
+
+
 def test_retrack_matches_first_bbox_of_closed_event():
     # человек сдвинулся, событие закрылось; новый трек у начальной позиции в окне - события нет
     start, end = (0.2, 0.2, 0.1, 0.4), (0.7, 0.2, 0.1, 0.4)
@@ -478,6 +493,29 @@ def test_retrack_far_from_closed_event_opens_new():
     assert len(sim.closes()) == 1
     sim.run(107.0, 2, {8: {**NO_HELMET, "bbox": far}})
     assert len(sim.opens()) == 2 and sim.opens()[1].track_id == 8
+
+
+def test_retrack_lost_track_nearby_is_same_person():
+    a, b = (0.2, 0.2, 0.1, 0.4), (0.32, 0.2, 0.1, 0.4)  # не пересекаются, центры в 0.3 роста
+    sim = Sim()
+    sim.run(100.0, 3, {7: {**NO_HELMET, "bbox": a}})
+    sim.run(103.0, 4, {8: {**NO_HELMET, "bbox": b}})
+    assert len(sim.opens()) == 1
+
+
+def test_two_people_side_by_side_get_two_events():
+    a, b = (0.2, 0.2, 0.1, 0.4), (0.32, 0.2, 0.1, 0.4)
+    sim = Sim()
+    sim.run(100.0, 4, {7: {**NO_HELMET, "bbox": a}, 8: {**NO_HELMET, "bbox": b}})
+    assert len(sim.opens()) == 2
+
+
+def test_new_person_appears_where_old_one_still_stands():
+    a, b = (0.2, 0.2, 0.1, 0.4), (0.32, 0.2, 0.1, 0.4)
+    sim = Sim()
+    sim.run(100.0, 3, {7: {**NO_HELMET, "bbox": a}})
+    sim.run(103.0, 3, {7: {**CLEAN, "bbox": a}, 8: {**NO_HELMET, "bbox": b}})
+    assert len(sim.opens()) == 2
 
 
 def test_stills_camera_skips_motion_rules():

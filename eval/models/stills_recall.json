@@ -1,0 +1,3861 @@
+{
+ "seconds": 8,
+ "fps": 6,
+ "required_ppe": [
+  "helmet",
+  "vest",
+  "mask"
+ ],
+ "scaled_models": [
+  "ppe",
+  "heads"
+ ],
+ "tiles": true,
+ "table": [
+  "| порог | no_helmet: recall (n) | no_helmet: ложные (n) | no_vest: recall (n) | no_vest: ложные (n) | no_mask: recall (n) | no_mask: ложные (n) |",
+  "|---|---|---|---|---|---|---|",
+  "| x1.0 | 0.91 (106) | 0.06 (16) | 0.91 (135) | 0.12 (16) | 0.89 (98) | 0.00 (16) |",
+  "| x0.8 | 0.92 (106) | 0.06 (16) | 0.90 (135) | 0.12 (16) | 0.89 (98) | 0.00 (16) |",
+  "| x0.6 | 0.93 (106) | 0.06 (16) | 0.90 (135) | 0.12 (16) | 0.89 (98) | 0.00 (16) |"
+ ],
+ "images": [
+  {
+   "path": "merged/ppe/images/test/css_youtube-126_jpg.rf.786824e90daf3276130ca73ca610a8da.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_IMG_3100_mp4-12_jpg.rf.58849ca6a931c2cfe1b17fb4206d9d82.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_004763_jpg.rf.46484e6ca73caeaa9de45822cf1085a9.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_ppe_1073_jpg.rf.72ea8a293a4f3e1135219e33701b1099.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 11,
+   "events": {
+    "1.0": [
+     "no_mask"
+    ],
+    "0.8": [
+     "no_mask"
+    ],
+    "0.6": [
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_IMG_0871_mp4-23_jpg.rf.03f872b1ed87ad7fadc85e09475ad37a.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-263_jpg.rf.374e343e12ead395440dbd81417e1be9.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_IMG_0871_MOV-12_jpg.rf.36858a9d51613f9a39b7855b54dfa098.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-840_jpg.rf.974a83a7c5aee7c16e83435b043c6d96.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "vehicle_proximity"
+    ],
+    "0.8": [
+     "no_mask",
+     "vehicle_proximity"
+    ],
+    "0.6": [
+     "no_mask",
+     "vehicle_proximity"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-631_jpg.rf.7c6ecf859c1b0a659f8ea057ad27aebd.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-192_jpg.rf.93bea040de8cd55f34ffb12f6ffe30b1.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_class2_131_jpg.rf.ad8314a9273471f1280ce8789ea75376.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_2009_000496_jpg.rf.9a2d210fe0f5ea4b572aeb07e41ecbae.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_003357_jpg.rf.9867f91e88089bb68dc95947d5116d14.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-53_jpg.rf.e96f8f81389f4e63a79663095680a617.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_NX_img_177_jpg.rf.c03709e5fadfe2109411f05a9e9bc25f.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 5,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_thumbnail-ba5c72edb320b49a69e86b05775c49b2-scaled-1_jpeg_jpg.rf.3bb460e284098219861b894fb0db13d5.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 10,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_class2_145_jpg.rf.b8ed5a5357ee41f8fb1aa9b01a400d51.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_2008_008320_jpg.rf.bd34011d46f82f9410d95f00e560b8ea.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_maksssksksss17_png_jpg.rf.f685b497756b1facbf3d4c2d2d22c0d2.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_777_jpg.rf.92dc6945342410ced7ac93f3dfbff0c5.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_class1_150_jpg.rf.5995dce34d38deb9eb0b6e36cae78f17.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-108_jpg.rf.9dc7ed5f816f07d520f3dbfaad08d40f.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_mask"
+    ],
+    "0.8": [
+     "no_mask"
+    ],
+    "0.6": [
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-34_jpg.rf.03eacc444bae3c5caa3fef5c736c3e40.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-263_jpg.rf.bb17b89dd2ec9a090ce53b728f48865e.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_-4405-_png_jpg.rf.82b5c10b2acd1cfaa24259ada8e599fe.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-738_jpg.rf.6f300b76e12b325f7c373c95ef319005.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_mask"
+    ],
+    "0.8": [
+     "no_mask"
+    ],
+    "0.6": [
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_000005_jpg.rf.96e9379ccae638140c4a90fc4b700a2b.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-186_jpg.rf.1f1d93447d4be3233c22c4ce9f6e0601.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_RPReplay_Final1667001201_MP4-100_jpg.rf.9a1b50c4301c53b3ae534c6353337df9.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_IMG_5846_jpg.rf.0b9984069116e2acd928568eb7a8e214.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 21,
+   "events": {
+    "1.0": [
+     "no_mask"
+    ],
+    "0.8": [
+     "no_mask"
+    ],
+    "0.6": [
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_IMG_3103_mp4-9_jpg.rf.b31bd2d816465a27aa1eb072f90bb5aa.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_ppe_0018_jpg.rf.be66fabcc8627f60d963454b5a227095.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-152_jpg.rf.9147878e3ddda845e58f7d9c041f1338.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 5,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-114_jpg.rf.5e02b6574ace1f4b3689befbc5051cd0.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_mask"
+    ],
+    "0.8": [
+     "no_mask"
+    ],
+    "0.6": [
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_002551_jpg.rf.ce4b9f934161faa72c80dc6898d37b2d.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_Movie-on-10-31-22-at-10_08-AM_mov-24_jpg.rf.c50014f3510a484e5bd565460fd0fd5c.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_IMG_0871_mp4-11_jpg.rf.432092b53ebeb84f4b9b27b40343c9aa.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-510_jpg.rf.62f82e36d134d53587edb48f291986f4.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_IMG_3100_mp4-9_jpg.rf.413ccf5fe4a7ee67f71e07c2c43b6756.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_Image36_jpg.rf.8704f3450f736cdd01a61dcee588f2c2.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 19,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-237_jpg.rf.d07a927721fe259757237c3706ea22e5.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-596_jpg.rf.11a8a4ac01d8aadb80eeb0406dfa579a.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_006672_jpg.rf.87d5978c486feb53177408cf00a0d87f.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 6,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "smoke"
+    ],
+    "0.8": [
+     "no_mask",
+     "smoke"
+    ],
+    "0.6": [
+     "no_mask",
+     "smoke"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_Movie-on-10-31-22-at-10_08-AM_mov-20_jpg.rf.aea4278b41550cdb75df5891a26052e7.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_0_jpg.rf.2ff49f74309118f169e07aa12564df87.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 5,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_2009_000059_jpg.rf.50e8398a37eb33f33fd9f662feeea083.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_006463_jpg.rf.02f19082420ecc5537b9d59abbe6050c.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 11,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_004063_jpg.rf.1b7cdc4035bcb24ef69b8798b444053e.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 6,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_ka_01181_png_jpg.rf.154ee4ef254eabd62e316be50470c578.jpg",
+   "split": "test",
+   "no_helmet": true,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": false,
+   "persons": 7,
+   "events": {
+    "1.0": [
+     "fire"
+    ],
+    "0.8": [
+     "fire"
+    ],
+    "0.6": [
+     "fire"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5710901.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7483030.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-15753262.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-9875417.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5029763.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 5,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6205623.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-280076.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5642043.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7492888.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-13944023.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-12902912.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7495163.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 4,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-3861952.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5530489.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6790046.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-2915155.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7513092.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-9158503.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4491866.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/css_Movie-on-10-31-22-at-10_08-AM_mov-6_jpg.rf.344372295a53aaf103587c9714ec98f7.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/css_youtube-504_jpg.rf.23771986686856ac7d350cea84ddf611.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "vehicle_proximity"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "vehicle_proximity"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "vehicle_proximity"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4349961.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6205718.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5974391.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-12911203.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7652391.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 4,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8297446.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5711890.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7812846.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7464691.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/css_youtube-455_jpg.rf.35acd2e91608806a26f3ac4e784ea512.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_mask"
+    ],
+    "0.8": [
+     "no_mask"
+    ],
+    "0.6": [
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7925778.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5686080.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4489773.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest",
+     "vehicle_proximity"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest",
+     "vehicle_proximity"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest",
+     "vehicle_proximity"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6712937.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6474302.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-10375945.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7674607.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8447893.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-3790833.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7483041.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/css_IMG_3100_mp4-1_jpg.rf.7b4a6df995ec2702dee6e7f8c5b47e14.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5974021.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-3769742.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5410090.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7652189.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7089629.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-3801690.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8976842.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet"
+    ],
+    "0.8": [
+     "no_helmet"
+    ],
+    "0.6": [
+     "no_helmet"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7688455.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4570780.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5684440.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-3794743.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5490196.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5726813.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8948308.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4637546.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-10383595.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 5,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5409763.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-3811082.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 5,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7256900.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6231732.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6195111.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-11015459.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 4,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "vehicle_proximity"
+    ],
+    "0.8": [
+     "no_helmet",
+     "vehicle_proximity"
+    ],
+    "0.6": [
+     "no_helmet",
+     "vehicle_proximity"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5726812.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5668873.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4484076.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5239777.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4307818.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5231085.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4904525.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8427896.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-15059778.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-3688501.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-9107443.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7888929.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4353573.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5974253.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5999794.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4621914.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6912868.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6177620.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5410107.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-3957980.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 5,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5821000.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5614277.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-9363125.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-11429199.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-6077982.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8460370.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8519124.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7652181.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 3,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-4687173.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-12902865.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8067767.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5974252.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7688453.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5688670.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-5327866.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-7652137.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": true,
+   "clean": false,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_helmet",
+     "no_mask",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-2076727.jpg",
+   "split": "val",
+   "no_helmet": true,
+   "no_vest": true,
+   "no_mask": false,
+   "clean": false,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.8": [
+     "no_helmet",
+     "no_vest"
+    ],
+    "0.6": [
+     "no_helmet",
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-462_jpg.rf.df73aa5089a04b8fbf3adf9d614a6740.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 2,
+   "events": {
+    "1.0": [
+     "vehicle_proximity"
+    ],
+    "0.8": [
+     "vehicle_proximity"
+    ],
+    "0.6": [
+     "vehicle_proximity"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_image_55_jpg.rf.27ae4341a9b9647d73a8929ff7a22369.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_image_53_jpg.rf.3446e366b5d4d905a32e1aedc8fe87de.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/test/css_youtube-198_jpg.rf.e89faeb9765c6bd6cece5434d140f4af.jpg",
+   "split": "test",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8853525.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile"
+    ],
+    "0.8": [
+     "lying_immobile"
+    ],
+    "0.6": [
+     "lying_immobile"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-2760242.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8853507.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 2,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-12384336.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/css_youtube-392_jpg.rf.7e49e3a8486caaa4e9d82246de93e68e.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-8853538.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_vest"
+    ],
+    "0.8": [
+     "no_vest"
+    ],
+    "0.6": [
+     "no_vest"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-18543179.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo-9328720.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "no_helmet"
+    ],
+    "0.8": [
+     "no_helmet"
+    ],
+    "0.6": [
+     "no_helmet"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/css_youtube-226_jpg.rf.e6dcacf16dc2dbcfd29f6705b7c1a224.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/css_construction-823-_jpg.rf.640d8abfc7c7689d4a19e6aa00ac8984.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile"
+    ],
+    "0.8": [
+     "lying_immobile"
+    ],
+    "0.6": [
+     "lying_immobile"
+    ]
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/css_youtube-287_jpg.rf.c9a7d5b17f75d0c9ed62ad4127141aa2.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [],
+    "0.8": [],
+    "0.6": []
+   }
+  },
+  {
+   "path": "merged/ppe/images/val/sh17_pexels-photo.jpg",
+   "split": "val",
+   "no_helmet": false,
+   "no_vest": false,
+   "no_mask": false,
+   "clean": true,
+   "persons": 1,
+   "events": {
+    "1.0": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.8": [
+     "lying_immobile",
+     "no_vest"
+    ],
+    "0.6": [
+     "lying_immobile",
+     "no_vest"
+    ]
+   }
+  }
+ ]
+}

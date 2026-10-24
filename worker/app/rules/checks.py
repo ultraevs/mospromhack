@@ -212,6 +212,27 @@ def check_lying_immobile(obs: Sequence[Observation], t: float, p: LyingImmobileR
     return RuleResult(active, fraction, n, fraction, p.window_s)
 
 
+# то же по месту в кадре, а не по треку: рамка лежащего мерцает и трек рвётся, а человек лежит там же
+def check_lying_spot(frames: Sequence[tuple[float, list[tuple[float, float, float, float]]]], t: float, aspect: float,
+                     p: LyingImmobileRule) -> tuple[RuleResult, tuple[float, float, float, float] | None]:
+    w = [f for f in frames if t - f[0] <= p.window_s]
+    if not w or w[-1][0] - w[0][0] < p.window_s * 0.9:
+        return INACTIVE, None
+    ref = next((boxes[-1] for _, boxes in reversed(w) if boxes), None)
+    if ref is None:
+        return RuleResult(False, 0.0, len(w), 0.0, p.window_s), None
+    size = max(ref[2] * aspect, ref[3])
+    cx, cy = ref[0] + ref[2] / 2, ref[1] + ref[3] / 2
+
+    def here(b) -> bool:
+        return math.hypot((b[0] + b[2] / 2 - cx) * aspect, b[1] + b[3] / 2 - cy) < p.spot_radius * size
+
+    hits = sum(1 for _, boxes in w if any(here(b) for b in boxes))
+    fraction = hits / len(w)
+    active = hits >= p.min_observations and fraction >= p.spot_fraction
+    return RuleResult(active, fraction, len(w), fraction, p.window_s), ref
+
+
 # ось полосы ограждения: самое длинное ребро, x в пикселях через aspect
 def _strip_axes(polygon, aspect: float):
     pts = [(x * aspect, y) for x, y in polygon]

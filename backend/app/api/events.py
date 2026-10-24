@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import html
 import io
+import zipfile
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 
@@ -12,9 +13,11 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.app.db.models import EventRow
+from backend.app.db.models import EventRow, UserRow
 from backend.app.services import events as svc
-from backend.app.state import AppState, get_db, get_current_user, get_state
+from backend.app.services.auth import now_utc
+from backend.app.services.media import path_for_url
+from backend.app.state import AppState, get_db, get_current_user, get_state, media_root, require_admin
 from shared.schemas import Event, EventReview, EventStatus, EventType, Review, Severity
 
 router = APIRouter(prefix="/api", tags=["events"], dependencies=[Depends(get_current_user)])
@@ -83,7 +86,7 @@ REVIEW_LABEL = {"none": "Не разобрано", "confirmed": "Подтвер�
                 "forwarded": "Передано мастеру"}
 EXPORT_LIMIT = 50_000
 EXPORT_HEAD = ["ID", "Начало", "Окончание", "Длительность", "Камера", "Зона", "Нарушение", "Важность", "Состояние",
-               "Разбор", "Уверенность", "Стоп-кадр"]
+               "Разбор", "Разобрал", "Когда разобрано", "Реакция, мин", "Комментарий", "Уверенность", "Стоп-кадр"]
 
 
 def _local(dt: datetime | None) -> str:
@@ -98,10 +101,17 @@ def _duration(r: EventRow) -> str:
     return f"{sec // 3600}:{sec // 60 % 60:02d}:{sec % 60:02d}"
 
 
+def _reaction(r: EventRow) -> float | str:
+    if r.reviewed_at is None:
+        return ""
+    return round(max(0.0, (r.reviewed_at - r.started_at).total_seconds()) / 60, 1)
+
+
 def _export_row(r: EventRow) -> list:
     return [r.id, _local(r.started_at), _local(r.ended_at), _duration(r), r.camera_name, r.zone_name or "",
             TYPE_LABEL.get(r.type, r.type), SEVERITY_LABEL.get(r.severity, r.severity),
-            STATUS_LABEL.get(r.status, r.status), REVIEW_LABEL.get(r.review, r.review), round(r.confidence, 2),
+            STATUS_LABEL.get(r.status, r.status), REVIEW_LABEL.get(r.review, r.review), r.reviewed_by or "", _local(r.reviewed_at), _reaction(r),
+            r.review_note or "", round(r.confidence, 2),
             r.snapshot_url or ""]
 
 
@@ -128,7 +138,7 @@ async def export_events(conds: list = Depends(_filters), format: str = Query(def
         for row in data:
             ws.append(row)
         ws.freeze_panes = "A2"
-        for col, width in zip("ABCDEFGHIJKL", (16, 20, 20, 12, 24, 20, 20, 11, 11, 18, 12, 40)):
+        for col, width in zip("ABCDEFGHIJKLMNOP", (16, 20, 20, 12, 24, 20, 20, 11, 11, 18, 20, 20, 12, 30, 12, 40)):
             ws.column_dimensions[col].width = width
         buf = io.BytesIO()
         wb.save(buf)
@@ -187,18 +197,66 @@ async def report_events(conds: list = Depends(_filters), camera_id: int | None =
                    + "".join(f"<tr><td>{e(c)}</td><td>{e(z or '—')}</td><td>{n}</td></tr>" for (c, z), n in places)
                    + "</table>")
     out.append("<h2>Журнал</h2><table><tr><th>№</th><th>Время</th><th>Нарушение</th><th>Камера / зона</th>"
-               "<th>Разбор</th><th>Комментарий</th><th>Кадр</th></tr>")
+               "<th>Разбор</th><th>Разобрал / когда</th><th>Реакция, мин</th><th>Комментарий</th><th>Кадр</th></tr>")
     for i, r in enumerate(rows, 1):
         place = r.camera_name + (f" / {r.zone_name}" if r.zone_name else "")
-        note = r.details.get("comment", "") if isinstance(r.details, dict) else ""  # комментарий оператора лежит в details
+        old = r.details.get("comment", "") if isinstance(r.details, dict) else ""
+        note = "; ".join(x for x in (r.review_note, old) if x)
+        who = " / ".join(x for x in (r.reviewed_by, _local(r.reviewed_at)) if x)
         img = f"<img src='{e(r.snapshot_url)}' alt=''>" if r.snapshot_url else ""
         out.append(f"<tr><td>{i}</td><td>{e(_local(r.started_at))}</td><td>{e(TYPE_LABEL.get(r.type, r.type))}</td>"
-                   f"<td>{e(place)}</td><td>{e(REVIEW_LABEL.get(r.review, r.review))}</td><td>{e(note)}</td>"
+                   f"<td>{e(place)}</td><td>{e(REVIEW_LABEL.get(r.review, r.review))}</td><td>{e(who)}</td>"
+                   f"<td>{e(_reaction(r))}</td><td>{e(note)}</td>"
                    f"<td>{img}</td></tr>")
     if not rows:
-        out.append("<tr><td colspan='7'>Нарушений за период нет</td></tr>")
+        out.append("<tr><td colspan='9'>Нарушений за период нет</td></tr>")
     out.append("</table><p class='sign'>Подпись ответственного: ______________________ / ______________ /</p></body></html>")
     return HTMLResponse("".join(out))
+
+
+DATASET_LIMIT = 2000
+
+
+@router.get("/events/export/dataset", dependencies=[Depends(require_admin)])
+async def export_dataset(conds: list = Depends(_filters), db: Session = Depends(get_db),
+                         state: AppState = Depends(get_state)):
+    rows = db.execute(select(EventRow).where(*conds, EventRow.review.in_(("confirmed", "forwarded", "false_positive")))
+                      .order_by(EventRow.started_at.desc(), EventRow.id.desc()).limit(DATASET_LIMIT)).scalars().all()
+    names = [t.value for t in EventType]
+    root = media_root(state)
+    pos = neg = skipped = 0
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for r in rows:
+            path = path_for_url(root, r.snapshot_clean_url) or path_for_url(root, r.snapshot_url)
+            if path is None:
+                skipped += 1
+                continue
+            if r.review == "false_positive":
+                z.write(path, f"negatives/{r.id}.jpg")
+                neg += 1
+                continue
+            if not r.bbox or r.type not in names:
+                skipped += 1
+                continue
+            # bbox из воркера: нормированный x y w h от левого верхнего угла
+            x, y, w, h = (min(1.0, max(0.0, float(v))) for v in r.bbox)
+            z.write(path, f"images/{r.id}.jpg")
+            z.writestr(f"labels/{r.id}.txt", f"{names.index(r.type)} {x + w / 2:.6f} {y + h / 2:.6f} {w:.6f} {h:.6f}\n")
+            pos += 1
+        z.writestr("data.yaml", "names:\n" + "".join(f"  - {n}\n" for n in names) + f"nc: {len(names)}\n")
+        z.writestr("README.txt", "\n".join((
+            "Выгрузка разборов оператора для дообучения моделей.",
+            f"images/ + labels/ - подтверждённые нарушения ({pos} шт.), разметка YOLO: класс cx cy w h (0..1).",
+            f"negatives/ - ложные срабатывания ({neg} шт.), hard negatives без разметки.",
+            f"Пропущено без кадра на диске или без рамки: {skipped}.",
+            "Номер класса = позиция в names из data.yaml (порядок типов событий).",
+            "Чтобы влить в обучение: скопировать images/labels в train датасета, negatives - в images с пустыми .txt.",
+            "Классы надо сопоставить с классами конкретной модели (каска, жилет и т.д.) перед дообучением.",
+        )) + "\n")
+    name = f"dataset_{date.today().isoformat()}.zip"
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @router.get("/events/{event_id}", response_model=Event)
@@ -211,11 +269,17 @@ async def get_event(event_id: str, db: Session = Depends(get_db)):
 
 @router.patch("/events/{event_id}", response_model=Event)
 async def review_event(event_id: str, body: EventReview, db: Session = Depends(get_db),
-                       state: AppState = Depends(get_state)):
+                       state: AppState = Depends(get_state), user: UserRow = Depends(get_current_user)):
     row = db.get(EventRow, event_id)
     if row is None:
         raise HTTPException(404, "событие не найдено")
     row.review = body.review.value
+    if body.review == Review.none:
+        row.reviewed_at = row.reviewed_by = row.review_note = None
+    else:
+        row.reviewed_at = now_utc()
+        row.reviewed_by = user.display_name or user.login
+        row.review_note = (body.note or "").strip() or None
     db.commit()
     await state.hub.send_event(svc.message("event_updated", row))
     return svc.to_schema(row)

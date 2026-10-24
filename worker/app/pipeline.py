@@ -10,7 +10,7 @@ from worker.app.association import anchor, assign_items, point_in_polygon
 from worker.app.model_spec import ModelSpec
 from worker.app.postprocess import Detections, iou_matrix
 from worker.app.crops import crop_box
-from worker.app.rules.checks import check_k_of_m, in_upper_part, in_window
+from worker.app.rules.checks import RuleResult, check_k_of_m, check_lying_spot, in_upper_part, in_window, is_lying
 from worker.app.rules.engine import Candidate, RuleEngine
 from worker.app.rules.state import (ATTACHABLE, CIGARETTE, HAZARD_EVENTS, HEAD_CLASSES, OPTIONAL_ATTACHABLE, PERSON,
                                     PPE_CLASSES, VEHICLE, Observation, TrackState)
@@ -66,6 +66,7 @@ class CameraPipeline:
         self._cigarette_objects: dict[int, ObjectBox] = {}
         self._hazard_t = 0.0
         self._crop_cursor = 0
+        self._lying: deque[tuple[float, list]] = deque()
 
 
     def process_hazard(self, dets: Detections, spec: ModelSpec, w: int, h: int, ts_ms: int,
@@ -176,6 +177,8 @@ class CameraPipeline:
                                   phones=mine, keypoints=pose_of.get(p)))
 
         actions, evaluated = self.engine.step(t, self.tracks, camera, rules)
+        if not camera.stills:
+            actions += self._lying_spot(t, w / h if h else 1.0, rules)
         horizon = max(rules.lifecycle.track_lost_s, self.tracker.max_age_s)
         for track_id in [tid for tid, tr in self.tracks.items() if t - tr.last.t > horizon]:
             del self.tracks[track_id]
@@ -205,3 +208,14 @@ class CameraPipeline:
 
         msg = DetectionsMessage(camera_id=camera.id, ts=ts_ms, frame=FrameSize(w=w, h=h), people=people, objects=objects)
         return msg, actions
+
+    def _lying_spot(self, t: float, aspect: float, rules: RuleSettings) -> list[EventOpen | EventClose]:
+        p = rules.lying_immobile
+        self._lying.append((t, [tr.last.bbox for tr in self.tracks.values()
+                                if tr.obs and tr.last.t == t and is_lying(tr.last, p.lying_ratio)]))
+        while self._lying and t - self._lying[0][0] > p.window_s:
+            self._lying.popleft()
+        result, bbox = check_lying_spot(self._lying, t, aspect, p)
+        if result.active and self.engine.open_on_tracks(EventType.lying_immobile):
+            result = RuleResult(False, result.fraction, result.observations, result.confidence, result.window_s)
+        return self.engine.step_camera(t, EventType.lying_immobile, result, bbox, rules)

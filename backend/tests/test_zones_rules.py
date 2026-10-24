@@ -83,6 +83,7 @@ def test_rules_defaults_come_from_config_yaml(client):
     assert rules["smoking"] == {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": True}
     assert rules["fire"] == rules["smoke"] == {"k": 3, "m": 5}
     assert rules["lifecycle"] == {"close_after_s": 5, "cooldown_s": 60, "retrack_iou": 0.3, "retrack_window_s": 120,
+                                  "retrack_dist_heights": 0.5,
                                   "camera_cooldown_s": 60, "track_lost_s": 2}
 
 

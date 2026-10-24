@@ -62,7 +62,11 @@ class EventRow(Base):
     snapshot_url: Mapped[str | None] = mapped_column(String, nullable=True)
     snapshot_clean_url: Mapped[str | None] = mapped_column(String, nullable=True)
     clip_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    clip_anon_url: Mapped[str | None] = mapped_column(String, nullable=True)
     review: Mapped[str] = mapped_column(String, index=True, default="none")
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    review_note: Mapped[str | None] = mapped_column(String, nullable=True)
     details: Mapped[dict] = mapped_column(JSON, default=dict)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 

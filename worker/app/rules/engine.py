@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import math
 from dataclasses import dataclass
 
 from shared.schemas import EventType, PpeItem, RuleSettings, Severity, WorkerCamera, ZoneType
@@ -13,6 +14,7 @@ from worker.app.rules.state import HARNESS, PPE_CLASSES, SEVERITY, TrackState
 from worker.app.rules.types import EventClose, EventOpen
 
 _keys = itertools.count(1)
+ALIVE_S = 1.0  # трек виден не дольше этого назад - человек точно в кадре, по расстоянию с ним не склеиваем
 
 BBox = tuple[float, float, float, float]
 
@@ -122,14 +124,28 @@ def evaluate_track(track: TrackState, t: float, camera: WorkerCamera, rules: Rul
     return out
 
 
+def _near(a: BBox, b: BBox, life, aspect: float, by_distance: bool) -> bool:
+    if iou_xywh(a, b) > life.retrack_iou:
+        return True
+    if not by_distance or life.retrack_dist_heights <= 0:
+        return False
+    # x в долях ширины, y в долях высоты кадра: переводим dx в высоты
+    dx = (a[0] + a[2] / 2 - b[0] - b[2] / 2) * aspect
+    dy = a[1] + a[3] / 2 - b[1] - b[3] / 2
+    return math.hypot(dx, dy) < life.retrack_dist_heights * max(a[3], b[3])
+
+
 class RuleEngine:
     def __init__(self) -> None:
         self._open: dict[tuple[int | None, EventType], _Open] = {}
-        self._closed: list[tuple[EventType, BBox | None, float]] = []
+        self._closed: list[tuple[EventType, BBox | None, float, int | None]] = []
         self._not_before: dict[tuple[int | None, EventType], float] = {}
 
     def open_types(self, track_id: int | None) -> list[EventType]:
         return [typ for (tid, typ) in self._open if tid == track_id]
+
+    def open_on_tracks(self, event_type: EventType) -> bool:
+        return any(typ == event_type and tid is not None for tid, typ in self._open)
 
     def step(self, t: float, tracks: dict[int, TrackState], camera: WorkerCamera,
              rules: RuleSettings) -> tuple[list[EventOpen | EventClose], dict[int, list[Candidate]]]:
@@ -137,6 +153,7 @@ class RuleEngine:
         self._closed = [c for c in self._closed if t - c[2] < life.retrack_window_s]
         actions: list[EventOpen | EventClose] = []
         evaluated: dict[int, list[Candidate]] = {}
+        alive = frozenset(tid for tid, tr in tracks.items() if tr.obs and t - tr.last.t < ALIVE_S)
 
         for track_id, track in tracks.items():
             if not track.obs or track.last.t != t:
@@ -145,7 +162,8 @@ class RuleEngine:
             for cand in evaluated[track_id]:
                 if cand.result.active:
                     self._activate((track_id, cand.type), cand, t, life.cooldown_s, life, actions,
-                                   retrack=not camera.stills)  # на слайдшоу каждая картинка новая сцена
+                                   retrack=not camera.stills,  # на слайдшоу каждая картинка новая сцена
+                                   alive=alive, aspect=track.last.aspect)
 
         for key, op in list(self._open.items()):
             track_id = key[0]
@@ -171,21 +189,24 @@ class RuleEngine:
             self._close(key, t, cooldown, actions)
         return actions
 
-    def _activate(self, key, cand: Candidate, t: float, cooldown_s: float, life, actions, retrack: bool) -> None:
+    def _activate(self, key, cand: Candidate, t: float, cooldown_s: float, life, actions, retrack: bool,
+                  alive: frozenset[int] = frozenset(), aspect: float = 1.0) -> None:
         op = self._open.get(key)
         if op:
             op.last_true, op.bbox = t, cand.bbox
             return
         if t < self._not_before.get(key, float("-inf")):
             return
-        # трекер дал новый id тому же человеку - не плодим событие
+        # трекер дал новый id тому же человеку - не плодим событие.
+        # по расстоянию склеиваем только с пропавшими треками: два живых трека - это два человека
         if retrack and cand.bbox is not None:
             for (other_id, typ), other in self._open.items():
-                if typ == cand.type and other_id != key[0] and other.bbox and iou_xywh(cand.bbox, other.bbox) > life.retrack_iou:
+                if (typ == cand.type and other_id != key[0] and other.bbox
+                        and _near(cand.bbox, other.bbox, life, aspect, other_id not in alive)):
                     return
             # сверяем и с концом и с началом закрытого: человек мог уйти, а потом вернуться туда же
-            for typ, bbox, closed_t in self._closed:
-                if typ == cand.type and bbox and iou_xywh(cand.bbox, bbox) > life.retrack_iou:
+            for typ, bbox, closed_t, tid in self._closed:
+                if typ == cand.type and bbox and _near(cand.bbox, bbox, life, aspect, tid not in alive):
                     self._not_before[key] = closed_t + cooldown_s
                     return
         new = _Open(next(_keys), cand.type, t, cand.bbox, cand.bbox)
@@ -196,8 +217,8 @@ class RuleEngine:
 
     def _close(self, key, t: float, cooldown_s: float, actions) -> None:
         op = self._open.pop(key)
-        self._closed.append((op.type, op.bbox, t))
+        self._closed.append((op.type, op.bbox, t, key[0]))
         if op.first_bbox and op.first_bbox != op.bbox:
-            self._closed.append((op.type, op.first_bbox, t))
+            self._closed.append((op.type, op.first_bbox, t, key[0]))
         self._not_before[key] = t + cooldown_s
         actions.append(EventClose(op.key, t))

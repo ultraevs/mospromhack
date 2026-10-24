@@ -75,18 +75,18 @@ async def create_event(request: Request, db: Session = Depends(get_db), state: A
 
 def prune_media(db: Session, root) -> None:
     has_media = (EventRow.snapshot_url.is_not(None) | EventRow.snapshot_clean_url.is_not(None)
-                 | EventRow.clip_url.is_not(None))
+                 | EventRow.clip_url.is_not(None) | EventRow.clip_anon_url.is_not(None))
     old = db.execute(select(EventRow).where(has_media).order_by(EventRow.started_at.desc())
                      .offset(media.KEEP_EVENTS)).scalars().all()
     for row in old:
         media.drop(root, row.id)
-        row.snapshot_url = row.snapshot_clean_url = row.clip_url = None
+        row.snapshot_url = row.snapshot_clean_url = row.clip_url = row.clip_anon_url = None
     if old:
         db.commit()
 
 
 @router.post("/events/{event_id}/clip", response_model=Event, dependencies=[Depends(require_internal)])
-async def upload_clip(event_id: str, clip: UploadFile, db: Session = Depends(get_db),
+async def upload_clip(event_id: str, clip: UploadFile, anon: bool = False, db: Session = Depends(get_db),
                       state: AppState = Depends(get_state)):
     row = db.get(EventRow, event_id)
     if row is None:
@@ -96,12 +96,16 @@ async def upload_clip(event_id: str, clip: UploadFile, db: Session = Depends(get
         raise HTTPException(422, "пустой файл клипа")
     if len(data) > media.MAX_CLIP_BYTES:
         raise HTTPException(413, f"клип больше {media.MAX_CLIP_BYTES // 2 ** 20} МБ")
-    row.clip_url = media.save(media_root(state), row.id, media.CLIP, data)
+    if anon:
+        row.clip_anon_url = media.save(media_root(state), row.id, media.CLIP_ANON, data)
+    else:
+        row.clip_url = media.save(media_root(state), row.id, media.CLIP, data)
     db.commit()
-    log.info("событие %s: клип %.1f МБ", row.id, len(data) / 2 ** 20)
+    log.info("событие %s: клип%s %.1f МБ", row.id, " без лиц" if anon else "", len(data) / 2 ** 20)
     prune_media(db, media_root(state))
     await state.hub.send_event(svc.message("event_updated", row))
-    state.bus.publish(BusMessage("clip_added", svc.to_schema(row)))
+    if not anon:
+        state.bus.publish(BusMessage("clip_added", svc.to_schema(row)))
     return svc.to_schema(row)
 
 

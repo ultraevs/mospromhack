@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { CriticalAlerts } from "./components/CriticalAlerts";
 import { Icon, type IconName } from "./components/Icons";
 import { useLiveEvents, type LiveState } from "./hooks/useLiveEvents";
+import { emitLive } from "./lib/alerts";
 import { linkHandler, navigate, useLocation } from "./lib/router";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { CamerasPage } from "./pages/CamerasPage";
@@ -11,7 +13,7 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { PerformancePage } from "./pages/PerformancePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { UsersPage } from "./pages/UsersPage";
-import type { AuthUser } from "./types";
+import type { AuthUser, EventMessage } from "./types";
 
 interface Route {
   path: string;
@@ -60,7 +62,10 @@ function Workspace({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       setTick((t) => t + 1);
     }, 1000);
   }, []);
-  const live = useLiveEvents(bump);
+  const live = useLiveEvents(useCallback((m: EventMessage) => {
+    emitLive(m);
+    bump();
+  }, [bump]));
 
   const isAdmin = user.role === "admin";
   const routes = ROUTES.filter((r) => isAdmin || !r.adminOnly);
@@ -121,6 +126,7 @@ function Workspace({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       </aside>
       {menuOpen && <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />}
       <main className="content" id="main">
+        <CriticalAlerts />
         {route && <Page path={route.path} tick={tick} user={user} />}
       </main>
     </div>

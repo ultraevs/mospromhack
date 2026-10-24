@@ -111,7 +111,8 @@
 | `GET /events/export?format=xlsx\|csv` | журнал файлом для отчёта, см. ниже |
 | `GET /events/report` | печатный HTML-отчёт за смену (те же фильтры, без периода - последние 12 ч), Ctrl+P → PDF |
 | `GET /events/{id}` | одно событие |
-| `PATCH /events/{id}` | разбор: `{"review": "confirmed"}`, `false_positive`, `forwarded` (передано мастеру) или `none` |
+| `PATCH /events/{id}` | разбор: `{"review": "confirmed", "note": "комментарий"}`, `false_positive`, `forwarded` (передано мастеру) или `none`; сервис сам пишет `reviewed_by` и `reviewed_at` |
+| `GET /events/export/dataset` | только админ: zip в формате YOLO для дообучения. `images/` и `labels/` — подтверждённые и переданные мастеру, `negatives/` — ложные; те же фильтры, до 2000 событий |
 
 Параметры `GET /events`: `camera_id`, `type`, `severity`, `status`, `review`, `from`, `to` (по `started_at`), `limit` (1–500, по умолчанию 50), `offset`. Ответ:
 
@@ -127,8 +128,9 @@
   "camera_id": 2, "camera_name": "Цех (запись)", "zone_id": null, "zone_name": null, "track_id": null,
   "started_at": "2026-10-03T21:38:47.749000Z", "ended_at": null, "confidence": 0.622,
   "bbox": [0.8013, 0.6774, 0.0253, 0.0287],
-  "snapshot_url": null, "snapshot_clean_url": null, "clip_url": null,
-  "review": "none", "details": {"fraction": 0.38, "window_s": 4.0, "observations": 24}
+  "snapshot_url": null, "snapshot_clean_url": null, "clip_url": null, "clip_anon_url": null,
+  "review": "none", "reviewed_at": null, "reviewed_by": null, "review_note": null,
+  "details": {"fraction": 0.38, "window_s": 4.0, "observations": 24}
 }
 ```
 
@@ -220,11 +222,15 @@ valid = hmac.compare_digest(expected, request.headers["X-Signature"])
 }
 ```
 
+Ещё в ответе: `by_shift` и `by_shift_type` — по сменам; `heatmap` — 7×24, день недели (0 — понедельник) × час, местное время; `reaction` — `{n, median_s, p90_s, high_median_s}`, от начала события до разбора оператором.
+
+Смены: `GET /settings/shifts` (любой пользователь) и `PUT /settings/shifts` (админ), тело `[{"name": "Дневная", "start": "08:00", "end": "20:00"}, ...]`, от 1 до 4 смен, через полночь можно.
+
 `false_share` — ложные / (ложные + подтверждённые), `null`, если размеченных нет. `by_type` содержит все семь типов, `by_hour` — все 24 часа. `by_camera` и `by_zone` отсортированы по убыванию.
 
 ### Файлы доказательств
 
-`GET /media/events/<id>/snapshot.jpg` (кадр с рамкой нарушителя и зоной), `clean.jpg` (чистый кадр), `clip.mp4` (H.264, по умолчанию 5 секунд до и 5 после). Адреса приходят в полях события `snapshot_url`, `snapshot_clean_url`, `clip_url`; клип появляется через `post_seconds` после открытия.
+`GET /media/events/<id>/snapshot.jpg` (кадр с рамкой нарушителя и зоной), `clean.jpg` (чистый кадр), `clip.mp4` (H.264, по умолчанию 5 секунд до и 5 после), `clip_anon.mp4` (тот же клип, головы людей пикселизованы, для инструктажей). Адреса приходят в полях события `snapshot_url`, `snapshot_clean_url`, `clip_url`; клип появляется через `post_seconds` после открытия.
 
 ### Состояние
 
@@ -233,6 +239,7 @@ valid = hmac.compare_digest(expected, request.headers["X-Signature"])
 | `GET /health` | состояние процессов; `status` равен `ok` или `degraded`, причины в `problems` |
 | `GET /stats` | то, что прислал воркер: детектор, устройство, fps по камерам, время инференса |
 | `GET /client-config` | `{"webrtc_port": 8889, "overlay_delay_ms": 0}` для браузера |
+| `GET /capacity?cameras=20&fps=6&tiles=true` | сколько камер потянет ускоритель и сколько ускорителей нужно: по живым замерам воркера, без них — по справочным 3 мс на инференс |
 
 Пример `GET /stats`:
 
@@ -292,7 +299,7 @@ valid = hmac.compare_digest(expected, request.headers["X-Signature"])
 |---|---|
 | `GET /internal/config` | номер версии, включённые камеры с адресом `rtsp://127.0.0.1:8554/cam-N`, зонами и требованиями, параметры правил |
 | `POST /internal/events` | открыть событие, ответ 201 с полным событием. Тело: JSON либо multipart с полем `event` (тот же JSON) и файлами `snapshot`, `clean` (JPEG) |
-| `POST /internal/events/{id}/clip` | догрузить клип: multipart с файлом `clip` (mp4) |
+| `POST /internal/events/{id}/clip` | догрузить клип: multipart с файлом `clip` (mp4); с `?anon=true` это клип без лиц |
 | `PATCH /internal/events/{id}` | закрыть: `{"status": "closed", "ended_at": "..."}` |
 | `POST /internal/stats` | статистика и пульс воркера, раз в секунду |
 | `WS /internal/detections` | поток сообщений `detections`, backend пересылает их подписчикам `/ws/detections` |

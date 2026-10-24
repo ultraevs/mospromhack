@@ -38,14 +38,14 @@ export interface RuleSettings {
   running: { window_s: number; min_observations: number; fraction: number; speed_heights_s: number };
   vehicle_proximity: { window_s: number; min_observations: number; fraction: number; distance_heights: number; min_vehicle_speed: number };
   fall: { window_s: number; min_observations: number; upright_ratio: number; lying_ratio: number; drop_heights: number };
-  lying_immobile: { window_s: number; min_observations: number; fraction: number; lying_ratio: number; max_speed: number };
+  lying_immobile: { window_s: number; min_observations: number; fraction: number; lying_ratio: number; max_speed: number; spot_fraction: number; spot_radius: number };
   phone_usage: { window_s: number; min_observations: number; fraction: number; upper_fraction: number };
   barrier_crossing: { window_s: number; min_observations: number };
   under_load: { window_s: number; fraction: number; min_observations: number };
   no_harness: { window_s: number; min_observations: number; max_fraction: number };
   unsafe_carry: { window_s: number; min_observations: number; fraction: number; min_speed_heights_s: number };
   lifecycle: {
-    close_after_s: number; cooldown_s: number; retrack_iou: number; retrack_window_s: number;
+    close_after_s: number; cooldown_s: number; retrack_iou: number; retrack_window_s: number; retrack_dist_heights: number;
     camera_cooldown_s: number; track_lost_s: number;
   };
 }
@@ -88,7 +88,11 @@ export interface SafetyEvent {
   snapshot_url: string | null;
   snapshot_clean_url: string | null;
   clip_url: string | null;
+  clip_anon_url: string | null;
   review: Review;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  review_note: string | null;
   details: Record<string, unknown>;
 }
 
@@ -228,6 +232,31 @@ export interface AnalyticsSummary extends ReviewCounts {
   without_zone: number;
   by_hour: { hour: number; total: number }[];
   by_day: { day: string; total: number }[];
+  by_shift: { name: string; total: number }[];
+  by_shift_type: { name: string; type: EventType; total: number }[];
+  heatmap: number[][];
+  reaction: { n: number; median_s: number | null; p90_s: number | null; high_median_s: number | null };
+}
+
+export interface Shift {
+  name: string;
+  start: string;
+  end: string;
+}
+
+export interface Capacity {
+  cameras: number;
+  fps: number;
+  tiles: boolean;
+  infer_per_s: number;
+  models: { model: string; per_s: number; ms: number; measured: boolean }[];
+  chip_s_per_camera_s: number;
+  per_accelerator: number;
+  accelerators: number | null;
+  source: "measured" | "reference";
+  detector: string | null;
+  note: string | null;
+  reference: string[];
 }
 
 export interface ClientConfig {

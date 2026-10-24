@@ -1,6 +1,6 @@
 import type {
-  AnalyticsSummary, AuthUser, Camera, CameraInput, ClientConfig, Delivery, EventPage, Health, Review, RuleSettings, SafetyEvent,
-  Stats, TelegramSettings, TelegramStatus, UserRole, Webhook, WebhookInput, Zone, ZoneInput,
+  AnalyticsSummary, AuthUser, Camera, Capacity, CameraInput, ClientConfig, Delivery, EventPage, Health, Review, RuleSettings, SafetyEvent,
+  Shift, Stats, TelegramSettings, TelegramStatus, UserRole, Webhook, WebhookInput, Zone, ZoneInput,
 } from "./types";
 
 export class ApiError extends Error {
@@ -71,7 +71,9 @@ export const api = {
   // печатный отчёт за смену, тоже ссылкой в новой вкладке
   eventsReportUrl: (params: Query = {}) => `/api/events/report${query(params)}`,
   event: (id: string) => request<SafetyEvent>(`/api/events/${id}`),
-  reviewEvent: (id: string, review: Review) => request<SafetyEvent>(`/api/events/${id}`, json("PATCH", { review })),
+  reviewEvent: (id: string, review: Review, note?: string) =>
+    request<SafetyEvent>(`/api/events/${id}`, json("PATCH", note ? { review, note } : { review })),
+  eventsDatasetUrl: (params: Query = {}) => `/api/events/export/dataset${query(params)}`,
 
   analytics: (params: Query = {}) => request<AnalyticsSummary>(`/api/analytics/summary${query(params)}`, { cache: "no-store" }),
   stats: () => request<Stats>("/api/stats"),
@@ -84,6 +86,9 @@ export const api = {
   setTelegramEnabled: (enabled: boolean) => request<TelegramStatus>("/api/telegram", json("PUT", { enabled })),
   telegramSettings: () => request<TelegramSettings>("/api/settings/telegram"),
   saveTelegramSettings: (body: TelegramSettings) => request<TelegramSettings>("/api/settings/telegram", json("PUT", body)),
+  shifts: () => request<{ shifts: Shift[] }>("/api/settings/shifts").then((r) => r.shifts),
+  saveShifts: (shifts: Shift[]) => request<{ shifts: Shift[] }>("/api/settings/shifts", json("PUT", { shifts })).then((r) => r.shifts),
+  capacity: (params: Query) => request<Capacity>(`/api/capacity${query(params)}`, { cache: "no-store" }),
 
   webhooks: () => request<Webhook[]>("/api/webhooks"),
   createWebhook: (body: WebhookInput) => request<Webhook>("/api/webhooks", json("POST", body)),

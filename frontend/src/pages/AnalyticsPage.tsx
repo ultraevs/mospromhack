@@ -65,11 +65,29 @@ export function AnalyticsPage({ tick }: { tick: number }) {
             <Figure label="Подтверждено" value={formatCount(data.confirmed)} />
             <Figure label="Ложных" value={formatCount(data.false_positive)} note={data.false_share !== null ? `${formatPercent(data.false_share)} от разобранных` : "ещё не размечали"} />
             <Figure label="Передано мастеру" value={formatCount(data.forwarded)} />
+            <Figure label="Время реакции" value={data.reaction.n ? dur(data.reaction.median_s) : "—"}
+              note={data.reaction.n ? `медиана; p90 ${dur(data.reaction.p90_s)}, критичные ${dur(data.reaction.high_median_s)}` : "нет разобранных"} />
           </section>
 
           <section className="panel">
             <h2 className="panel-title">По часам</h2>
             <Bars items={data.by_hour.map((h) => ({ key: String(h.hour), value: h.total, label: h.hour % 3 === 0 ? String(h.hour).padStart(2, "0") : "", title: `${h.hour}:00–${h.hour + 1}:00` }))} />
+          </section>
+
+          <section className="panel">
+            <h2 className="panel-title">День недели × час</h2>
+            <Heatmap rows={data.heatmap} />
+          </section>
+
+          <section className="panel">
+            <h2 className="panel-title">По сменам</h2>
+            <Ranking items={data.by_shift.map((s) => ({ key: s.name, label: s.name, value: s.total }))} />
+            <div className="shift-types">
+              {data.by_shift.filter((s) => s.total > 0).map((s) => (
+                <p key={s.name}><b>{s.name}:</b> {data.by_shift_type.filter((t) => t.name === s.name).slice(0, 3)
+                  .map((t) => `${EVENT_LABEL[t.type] ?? t.type} ${formatCount(t.total)}`).join(", ")}</p>
+              ))}
+            </div>
           </section>
 
           {data.by_day.length > 1 && (
@@ -118,6 +136,30 @@ export function AnalyticsPage({ tick }: { tick: number }) {
   );
 }
 
+const WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+
+function dur(s: number | null): string {
+  if (s === null) return "—";
+  if (s < 60) return `${Math.round(s)} с`;
+  if (s < 3600) return `${Math.round(s / 60)} мин`;
+  return `${(s / 3600).toFixed(1)} ч`;
+}
+
+function Heatmap({ rows }: { rows: number[][] }) {
+  const max = Math.max(1, ...rows.flat());
+  return (
+    <div className="heatmap" role="img" aria-label="Нарушения по дням недели и часам">
+      <span />
+      {Array.from({ length: 24 }, (_, h) => <small key={h}>{h % 3 === 0 ? String(h).padStart(2, "0") : ""}</small>)}
+      {rows.map((r, d) => [
+        <small key={`d${d}`}>{WEEKDAYS[d]}</small>,
+        ...r.map((v, h) => (
+          <i key={`${d}-${h}`} title={`${WEEKDAYS[d]} ${h}:00 — ${v}`} style={{ opacity: v ? 0.15 + 0.85 * (v / max) : 0.05 }} />
+        )),
+      ])}
+    </div>
+  );
+}
 
 function Bars({ items }: { items: { key: string; value: number; label: string; title: string }[] }) {
   const max = Math.max(1, ...items.map((i) => i.value));

@@ -21,6 +21,7 @@ def test_worker_event_is_stored_in_contract_shape(client, camera):
         "track_id": 17, "started_at": "2026-10-04T12:31:05.120000Z", "ended_at": None, "confidence": 0.62,
         "bbox": [0.41, 0.22, 0.08, 0.31], "snapshot_url": None, "snapshot_clean_url": None, "clip_url": None,
         "review": "none", "details": {"fraction": 0.58, "window_s": 4, "observations": 19},
+        "clip_anon_url": None, "reviewed_at": None, "reviewed_by": None, "review_note": None,
     }
     assert client.get(f"/api/events/{ev['id']}").json() == ev
     assert client.get("/api/cameras").json()[0]["open_events"] == 1
@@ -218,6 +219,7 @@ def test_export_csv_and_xlsx(client, camera):
     assert r.content.startswith(b"\xef\xbb\xbf")
     lines = r.content.decode("utf-8-sig").strip().splitlines()
     assert len(lines) == 3 and lines[0].startswith("ID;Начало")
+    assert "Разобрал;Когда разобрано;Реакция, мин;Комментарий" in lines[0]
     row = next(l for l in lines if a["id"] in l).split(";")
     assert row[3] == "0:01:04" and row[6] == "Без каски" and row[8] == "Закрыто"
 
@@ -241,3 +243,42 @@ def test_shift_report_html(client, camera):
     assert "<b>1</b>Нарушений" in t
     # без периода - последние 12 часов, старые события не попадают
     assert "Нарушений за период нет" in client.get("/api/events/report").text
+
+
+def test_review_records_who_and_when(client, camera):
+    ev = post_event(client, camera["id"])
+    r = client.patch(f"/api/events/{ev['id']}", json={"review": "confirmed", "note": "  мастер предупредил  "})
+    got = r.json()
+    assert got["reviewed_by"] == "Тестовый администратор" and got["reviewed_at"] and got["review_note"] == "мастер предупредил"
+    lines = client.get("/api/events/export?format=csv").content.decode("utf-8-sig").strip().splitlines()
+    assert "Тестовый администратор" in lines[1] and "мастер предупредил" in lines[1]
+    assert "мастер предупредил" in client.get("/api/events/report?from=2026-10-04T00:00:00Z").text
+
+    got = client.patch(f"/api/events/{ev['id']}", json={"review": "none"}).json()
+    assert got["reviewed_by"] is None and got["reviewed_at"] is None and got["review_note"] is None
+
+
+def test_dataset_export(client, camera):
+    import io
+    import zipfile
+
+    jpeg = b"\xff\xd8\xff\xe0" + b"x" * 50
+
+    def post(**over):
+        r = client.post("/internal/events", headers=INTERNAL, data={"event": json.dumps(event_body(camera["id"], **over))},
+                        files={"snapshot": ("s.jpg", jpeg, "image/jpeg"), "clean": ("c.jpg", jpeg, "image/jpeg")})
+        assert r.status_code == 201, r.text
+        return r.json()
+
+    good, bad, skip = post(), post(type="fire"), post()
+    client.patch(f"/api/events/{good['id']}", json={"review": "confirmed"})
+    client.patch(f"/api/events/{bad['id']}", json={"review": "false_positive"})
+    r = client.get("/api/events/export/dataset")
+    assert r.status_code == 200 and re.search(r'filename="dataset_\d{4}-\d{2}-\d{2}\.zip"', r.headers["content-disposition"])
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    names = set(z.namelist())
+    assert {f"images/{good['id']}.jpg", f"labels/{good['id']}.txt", f"negatives/{bad['id']}.jpg",
+            "data.yaml", "README.txt"} <= names
+    assert not any(skip["id"] in n for n in names)
+    assert z.read(f"labels/{good['id']}.txt").decode() == "0 0.450000 0.375000 0.080000 0.310000\n"
+    assert z.read("data.yaml").decode().startswith("names:\n  - no_helmet\n")

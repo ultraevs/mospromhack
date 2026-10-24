@@ -7,6 +7,7 @@ from pathlib import Path
 SNAPSHOT = "snapshot.jpg"
 CLEAN = "clean.jpg"
 CLIP = "clip.mp4"
+CLIP_ANON = "clip_anon.mp4"
 
 _SAFE_ID = re.compile(r"^evt_[0-9A-Z]{10}$")
 MAX_IMAGE_BYTES = 8 * 1024 * 1024

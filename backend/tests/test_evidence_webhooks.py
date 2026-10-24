@@ -126,6 +126,15 @@ def test_clip_upload_updates_event_and_notifies(client, camera):
                        files={"clip": ("clip.mp4", b"", "video/mp4")}).status_code == 422
 
 
+def test_anon_clip_is_stored_separately(client, camera):
+    ev = post_event(client, camera["id"])
+    r = client.post(f"/internal/events/{ev['id']}/clip", headers=INTERNAL, params={"anon": "true"},
+                    files={"clip": ("clip_anon.mp4", MP4, "video/mp4")})
+    assert r.status_code == 200
+    assert r.json()["clip_anon_url"] == f"/media/events/{ev['id']}/clip_anon.mp4" and r.json()["clip_url"] is None
+    assert client.get(r.json()["clip_anon_url"]).content == MP4
+
+
 def test_media_path_cannot_escape(client):
     assert client.get("/media/../db.sqlite").status_code == 404
     assert client.get("/media/events/nope/snapshot.jpg").status_code == 404

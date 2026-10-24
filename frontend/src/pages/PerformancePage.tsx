@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, errorText } from "../api";
 import { Figure, Loading, Notice, PageHeader } from "../components/Ui";
 import { usePoll } from "../hooks/usePoll";
-import type { Camera, Health, LatencySummary, Stats } from "../types";
+import type { Camera, Capacity, Health, LatencySummary, Stats } from "../types";
 
 const ms = (v?: number) => (v === undefined ? "—" : `${v} мс`);
 
@@ -73,6 +73,8 @@ export function PerformancePage() {
         )}
       </section>
 
+      <CapacityPanel />
+
       <section className="panel">
         <h2 className="panel-title">Камеры</h2>
         <table className="table">
@@ -101,4 +103,53 @@ export function PerformancePage() {
 
 function latencyNote(l: LatencySummary | null, what: string): string {
   return l ? `p95 ${l.p95_ms} мс, по ${l.events} ${what}` : "событий с отметкой кадра ещё нет";
+}
+
+function CapacityPanel() {
+  const [cameras, setCameras] = useState(20);
+  const [fps, setFps] = useState(6);
+  const [tiles, setTiles] = useState(true);
+  const [data, setData] = useState<Capacity | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!(cameras >= 1 && fps > 0)) return;
+    const t = window.setTimeout(() => {
+      api.capacity({ cameras, fps, tiles: String(tiles) })
+        .then((d) => { setData(d); setError(null); })
+        .catch((e) => setError(errorText(e, "Не удалось посчитать")));
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [cameras, fps, tiles]);
+
+  return (
+    <section className="panel">
+      <h2 className="panel-title">Сколько камер потянет</h2>
+      <div className="form form-grid">
+        <label className="field"><span>Камер</span>
+          <input type="number" min={1} max={1000} value={cameras} onChange={(e) => setCameras(Number(e.target.value))} /></label>
+        <label className="field"><span>Кадров/с на камеру</span>
+          <input type="number" min={1} max={30} value={fps} onChange={(e) => setFps(Number(e.target.value))} /></label>
+        <label className="field"><span>Головы по плиткам</span>
+          <select value={tiles ? "1" : "0"} onChange={(e) => setTiles(e.target.value === "1")}>
+            <option value="1">вкл</option><option value="0">выкл</option>
+          </select></label>
+      </div>
+      {error && <Notice>{error}</Notice>}
+      {data && (
+        <>
+          <section className="figures" aria-label="Расчёт">
+            <Figure label="Инференсов/с на камеру" value={String(data.infer_per_s)}
+              note={data.models.map((m) => `${m.model} ${m.per_s}`).join(", ")} />
+            <Figure label="Камер на ускоритель" value={String(data.per_accelerator)}
+              note={`${data.chip_s_per_camera_s} с чипа на секунду камеры`} />
+            <Figure label="Нужно ускорителей" value={data.accelerators === null ? "—" : String(data.accelerators)} note={`для ${data.cameras} камер`} />
+            <Figure label="Время инференса" value={data.source === "measured" ? "замер сейчас" : "справочно"}
+              note={data.source === "measured" ? `детектор ${data.detector ?? "?"}${data.detector === "linq" ? "" : ", это не LinQ"}: ${data.models.map((m) => `${m.model} ${m.ms} мс`).join(", ")}` : data.note ?? "3 мс на инференс"} />
+          </section>
+          <p className="muted">Справочно: {data.reference.join("; ")}.</p>
+        </>
+      )}
+    </section>
+  );
 }

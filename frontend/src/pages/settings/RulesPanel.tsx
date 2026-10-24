@@ -37,6 +37,7 @@ const FIELD_LABEL: Record<string, string> = {
   cooldown_s: "Пауза до нового события того же человека, с",
   retrack_iou: "Смена трека: пересечение рамок, от",
   retrack_window_s: "Смена трека: окно, с",
+  retrack_dist_heights: "Смена трека: центры ближе, ростов",
   camera_cooldown_s: "Пауза на камеру для огня и дыма, с",
   track_lost_s: "Человек ушёл, если не виден, с",
   upper_fraction: "Сигарета в верхней доле рамки, до",
@@ -49,6 +50,8 @@ const FIELD_LABEL: Record<string, string> = {
   lying_ratio: "Лежит: ширина к высоте, от",
   drop_heights: "Падение центра в ростах, от",
   max_speed: "Скорость, рамок в секунду, до",
+  spot_fraction: "По месту в кадре: доля кадров с лежащим, от",
+  spot_radius: "По месту в кадре: радиус, рамок",
 };
 
 // где общая подпись не по смыслу

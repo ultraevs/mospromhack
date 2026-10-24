@@ -35,8 +35,9 @@ def to_schema(row: EventRow) -> Event:
         camera_id=row.camera_id, camera_name=row.camera_name, zone_id=row.zone_id, zone_name=row.zone_name,
         track_id=row.track_id, started_at=_aware(row.started_at), ended_at=_aware(row.ended_at),
         confidence=row.confidence, bbox=row.bbox, snapshot_url=row.snapshot_url,
-        snapshot_clean_url=row.snapshot_clean_url, clip_url=row.clip_url, review=row.review,
-        details=row.details or {},
+        snapshot_clean_url=row.snapshot_clean_url, clip_url=row.clip_url, clip_anon_url=row.clip_anon_url,
+        review=row.review, reviewed_at=_aware(row.reviewed_at), reviewed_by=row.reviewed_by,
+        review_note=row.review_note, details=row.details or {},
     )
 
 

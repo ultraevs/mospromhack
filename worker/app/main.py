@@ -23,7 +23,7 @@ from shared.schemas import EventCreate, WorkerCamera, WorkerConfig, ZoneType
 from worker.app.capture import CameraReader, open_capture
 from worker.app.client import BackendClient, DetectionsSender
 from worker.app.detector import Detector, create_detector
-from worker.app.evidence import (JPEG_QUALITY_SNAPSHOT, CameraEvidence, ClipBuilder, annotate, encode_jpeg)
+from worker.app.evidence import (JPEG_QUALITY_SNAPSHOT, CameraEvidence, ClipBuilder, annotate, anon_path, encode_jpeg)
 from worker.app.model_spec import ModelSpec, load_all_specs, load_pose_spec
 from worker.app.crops import crop_box, merge, only_classes, shift, tile_spans
 from worker.app.pipeline import CameraPipeline, check_classes, norm_box
@@ -245,7 +245,7 @@ class Worker:
         for state in self.cameras.values():
             for key, frames in state.evidence.ready_clips(now_ms):
                 if len(frames) >= 2:
-                    self._clips.submit(key, frames)
+                    self._clips.submit(key, frames, state.evidence.people_at([ts for ts, _ in frames]))
                 else:
                     log.error("клип события %s не собран: в буфере %s кадров", self._clip_ids.get(key) or key, len(frames))
                     self._clip_ids.pop(key, None)
@@ -270,6 +270,9 @@ class Worker:
                 self.clips_built += 1
                 self._clip_ids.pop(key, None)
                 log.info("событие %s: клип догружен", event_id)
+                upload_anon = getattr(self.client, "upload_clip_anon", None)
+                if upload_anon and anon_path(path).exists():
+                    upload_anon(event_id, anon_path(path))
             except Exception as e:  # noqa: BLE001
                 log.error("событие %s: клип не догружен: %s", event_id, e)
                 self.clips_failed += 1
@@ -277,6 +280,7 @@ class Worker:
             finally:
                 try:
                     path.unlink(missing_ok=True)
+                    anon_path(path).unlink(missing_ok=True)
                 except OSError:
                     pass
         for item in waiting:
@@ -457,6 +461,7 @@ class Worker:
                                                       getattr(frame, "px_scale", 1.0), phones, poses)
         with self._timed("рамки: JSON и отправка"):
             self.sender.send(msg.model_dump_json())
+        state.evidence.set_people(frame.ts_ms, [p.bbox for p in msg.people])
         with self._timed("события: стоп-кадры"):
             self._queue(state, frame, actions)
         with self._timed("события: отправка в backend"):

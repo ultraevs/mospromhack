@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+import math
+
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.app.api.analytics import SHIFTS_KEY, Shifts, load_shifts
 from backend.app.db.models import EventRow
 
 from backend.app.services.auth import websocket_user
-from backend.app.state import AppState, get_current_user, get_db, get_state, get_state_ws
+from backend.app.state import AppState, get_current_user, get_db, get_state, get_state_ws, require_admin, set_setting
 
 router = APIRouter(tags=["public"])
 
@@ -59,6 +62,54 @@ async def stats(_user=Depends(get_current_user), db: Session = Depends(get_db), 
             "latency": {"capture_to_event": _summary(list(recent)),
                         "capture_to_telegram": _summary(list(state.notifier.latency_ms)) if state.notifier else None},
             "subscribers": state.hub.counts()}
+
+
+@router.get("/api/settings/shifts", response_model=Shifts)
+async def get_shifts(_user=Depends(get_current_user), db: Session = Depends(get_db)):
+    return {"shifts": load_shifts(db)}
+
+
+@router.put("/api/settings/shifts", response_model=Shifts)
+async def put_shifts(body: Shifts, _user=Depends(require_admin), db: Session = Depends(get_db)):
+    set_setting(db, SHIFTS_KEY, [s.model_dump() for s in body.shifts])
+    db.commit()
+    return body
+
+
+REFERENCE_MS = 3.0
+CAPACITY_REFERENCE = [
+    "свободный чип LinQ: инференс 2–3 мс → 13–20 камер с плитками (расчёт)",
+    "общий стенд организаторов: 1–2 камеры (замер)",
+    "камера = 25 инференсов/с: ppe 6, people 6, heads 12, hazard 1",
+]
+
+
+@router.get("/api/capacity")
+async def capacity(cameras: int = Query(default=20, ge=1, le=1000), fps: float = Query(default=6, gt=0, le=30),
+                   tiles: bool = True, _user=Depends(get_current_user), state: AppState = Depends(get_state)) -> dict:
+    hazard = state.config.worker.hazard_fps
+    rates = {"ppe": fps, "people": fps, "heads": fps * 2 if tiles else fps, "hazard": hazard}
+    alive = state.worker_alive()
+    infer = (state.worker_stats.get("inference") or {}) if alive else {}
+    rows, chip_ms = [], 0.0
+    for model, rate in rates.items():
+        m = infer.get(model)
+        # avg_ms в воркере — на весь пакет
+        ms = m["avg_ms"] / max(1, m.get("batch") or 1) if m else REFERENCE_MS
+        chip_ms += rate * ms
+        rows.append({"model": model, "per_s": rate, "ms": round(ms, 2), "measured": m is not None})
+    measured = any(r["measured"] for r in rows)
+    per_chip = math.floor(1000 / chip_ms) if chip_ms > 0 else 0
+    return {
+        "cameras": cameras, "fps": fps, "tiles": tiles,
+        "infer_per_s": round(sum(rates.values()), 1), "models": rows,
+        "chip_s_per_camera_s": round(chip_ms / 1000, 4), "per_accelerator": per_chip,
+        "accelerators": math.ceil(cameras / per_chip) if per_chip else None,
+        "source": "measured" if measured else "reference",
+        "detector": state.worker_stats.get("detector") if alive else None,
+        "note": None if alive else f"воркер не отвечает, справочно {REFERENCE_MS:g} мс на инференс",
+        "reference": CAPACITY_REFERENCE,
+    }
 
 
 @router.get("/api/client-config")

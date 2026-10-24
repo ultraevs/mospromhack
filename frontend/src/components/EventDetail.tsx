@@ -32,10 +32,12 @@ export function EventDetail({ event, onChange, onClose }: { event: SafetyEvent; 
   const [view, setView] = useState<View>("snapshot");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState("");
 
   useEffect(() => {
     setView("snapshot");
     setError(null);
+    setNote("");
   }, [event.id]);
 
   const media: Record<View, string | null> = { snapshot: event.snapshot_url, clean: event.snapshot_clean_url, clip: event.clip_url };
@@ -44,7 +46,9 @@ export function EventDetail({ event, onChange, onClose }: { event: SafetyEvent; 
   const mark = async (review: Review) => {
     setBusy(true);
     try {
-      onChange(await api.reviewEvent(event.id, event.review === review ? "none" : review));
+      const next = event.review === review ? "none" : review;
+      onChange(await api.reviewEvent(event.id, next, next === "none" ? undefined : note.trim() || undefined));
+      setNote("");
       setError(null);
     } catch (e) {
       setError(errorText(e, "Не удалось сохранить разбор"));
@@ -56,6 +60,10 @@ export function EventDetail({ event, onChange, onClose }: { event: SafetyEvent; 
   const cameraLink = `/cameras?camera=${event.camera_id}`;
   const facts: [string, ReactNode][] = [
     ["Разбор", <ReviewChip review={event.review} />],
+    ...(event.reviewed_by || event.reviewed_at
+      ? [["Разобрал", `${event.reviewed_by ?? "—"}${event.reviewed_at ? `, ${formatDateTime(event.reviewed_at)}` : ""}`] as [string, ReactNode]]
+      : []),
+    ...(event.review_note ? [["Комментарий", event.review_note] as [string, ReactNode]] : []),
     ["Камера", <a href={cameraLink} onClick={linkHandler(cameraLink)}>{event.camera_name}</a>],
     ["Зона", event.zone_name ?? "вне зон"],
     ["Начало", formatTime(event.started_at)],
@@ -98,6 +106,11 @@ export function EventDetail({ event, onChange, onClose }: { event: SafetyEvent; 
           </a>
         )}
       </div>
+      {event.clip_anon_url && (
+        <a className="btn btn-ghost" href={event.clip_anon_url} target="_blank" rel="noreferrer" download>
+          Клип без лиц
+        </a>
+      )}
 
       <div className="detail-review">
         <span>Разбор</span>
@@ -110,6 +123,8 @@ export function EventDetail({ event, onChange, onClose }: { event: SafetyEvent; 
             </button>
           ))}
         </div>
+        <textarea value={note} maxLength={500} rows={2} placeholder="Комментарий к разбору (необязательно)"
+          aria-label="Комментарий к разбору" onChange={(e) => setNote(e.target.value)} />
       </div>
       {error && <Notice>{error}</Notice>}
 

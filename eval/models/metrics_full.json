@@ -1,0 +1,371 @@
+{
+ "heads": {
+  "data": "merged/heads2",
+  "images": 5696,
+  "iou": "0.5 для P/R/F1 и mAP50, 0.5:0.95 шаг 0.05",
+  "float32": {
+   "helmet": {
+    "thr": 0.334,
+    "precision": 0.904,
+    "recall": 0.904,
+    "f1": 0.904,
+    "map50": 0.93,
+    "map50_95": 0.555,
+    "boxes": 9185,
+    "map50_ci": [
+     0.923,
+     0.938
+    ],
+    "precision_ci": [
+     0.895,
+     0.912
+    ],
+    "recall_ci": [
+     0.895,
+     0.913
+    ]
+   },
+   "no_helmet": {
+    "thr": 0.444,
+    "precision": 0.915,
+    "recall": 0.84,
+    "f1": 0.875,
+    "map50": 0.896,
+    "map50_95": 0.641,
+    "boxes": 4594,
+    "map50_ci": [
+     0.879,
+     0.912
+    ],
+    "precision_ci": [
+     0.9,
+     0.928
+    ],
+    "recall_ci": [
+     0.818,
+     0.858
+    ]
+   }
+  },
+  "int8": {},
+  "float32_map50_ci": [
+   0.905,
+   0.923
+  ],
+  "seconds": 1531,
+  "boot": 1000,
+  "float32_mean": {
+   "map50": 0.913,
+   "map50_95": 0.598
+  }
+ },
+ "ppe": {
+  "data": "merged/ppe",
+  "images": 1734,
+  "iou": "0.5 для P/R/F1 и mAP50, 0.5:0.95 шаг 0.05",
+  "float32": {
+   "person": {
+    "thr": 0.515,
+    "precision": 0.917,
+    "recall": 0.833,
+    "f1": 0.873,
+    "map50": 0.893,
+    "map50_95": 0.712,
+    "boxes": 2900,
+    "map50_ci": [
+     0.874,
+     0.911
+    ],
+    "precision_ci": [
+     0.904,
+     0.928
+    ],
+    "recall_ci": [
+     0.808,
+     0.858
+    ]
+   },
+   "helmet": {
+    "thr": 0.354,
+    "precision": 0.786,
+    "recall": 0.755,
+    "f1": 0.77,
+    "map50": 0.783,
+    "map50_95": 0.54,
+    "boxes": 233,
+    "map50_ci": [
+     0.712,
+     0.847
+    ],
+    "precision_ci": [
+     0.716,
+     0.847
+    ],
+    "recall_ci": [
+     0.68,
+     0.824
+    ]
+   },
+   "no_helmet": {
+    "thr": 0.48,
+    "precision": 0.951,
+    "recall": 0.825,
+    "f1": 0.884,
+    "map50": 0.895,
+    "map50_95": 0.682,
+    "boxes": 2372,
+    "map50_ci": [
+     0.871,
+     0.917
+    ],
+    "precision_ci": [
+     0.941,
+     0.961
+    ],
+    "recall_ci": [
+     0.794,
+     0.859
+    ]
+   },
+   "vest": {
+    "thr": 0.3,
+    "precision": 0.723,
+    "recall": 0.623,
+    "f1": 0.669,
+    "map50": 0.654,
+    "map50_95": 0.407,
+    "boxes": 138,
+    "map50_ci": [
+     0.545,
+     0.768
+    ],
+    "precision_ci": [
+     0.623,
+     0.811
+    ],
+    "recall_ci": [
+     0.504,
+     0.743
+    ]
+   },
+   "mask": {
+    "thr": 0.266,
+    "precision": 0.866,
+    "recall": 0.75,
+    "f1": 0.804,
+    "map50": 0.757,
+    "map50_95": 0.446,
+    "boxes": 172,
+    "map50_ci": [
+     0.644,
+     0.871
+    ],
+    "precision_ci": [
+     0.803,
+     0.92
+    ],
+    "recall_ci": [
+     0.63,
+     0.869
+    ]
+   },
+   "no_mask": {
+    "thr": 0.429,
+    "precision": 0.957,
+    "recall": 0.841,
+    "f1": 0.895,
+    "map50": 0.9,
+    "map50_95": 0.627,
+    "boxes": 1917,
+    "map50_ci": [
+     0.876,
+     0.922
+    ],
+    "precision_ci": [
+     0.946,
+     0.967
+    ],
+    "recall_ci": [
+     0.813,
+     0.868
+    ]
+   },
+   "vehicle": {
+    "thr": 0.428,
+    "precision": 0.907,
+    "recall": 0.701,
+    "f1": 0.791,
+    "map50": 0.789,
+    "map50_95": 0.559,
+    "boxes": 97,
+    "map50_ci": [
+     0.646,
+     0.903
+    ],
+    "precision_ci": [
+     0.818,
+     0.981
+    ],
+    "recall_ci": [
+     0.536,
+     0.852
+    ]
+   }
+  },
+  "int8": {},
+  "float32_map50_ci": [
+   0.771,
+   0.848
+  ],
+  "seconds": 351,
+  "boot": 1000,
+  "float32_mean": {
+   "map50": 0.81,
+   "map50_95": 0.568
+  }
+ },
+ "people": {
+  "data": "merged/ppe",
+  "images": 1734,
+  "iou": "0.5 для P/R/F1 и mAP50, 0.5:0.95 шаг 0.05",
+  "float32": {
+   "person": {
+    "thr": 0.5,
+    "precision": 0.893,
+    "recall": 0.837,
+    "f1": 0.864,
+    "map50": 0.895,
+    "map50_95": 0.731,
+    "boxes": 2900,
+    "map50_ci": [
+     0.876,
+     0.912
+    ],
+    "precision_ci": [
+     0.879,
+     0.907
+    ],
+    "recall_ci": [
+     0.81,
+     0.862
+    ]
+   },
+   "vehicle": {
+    "thr": 0.6,
+    "precision": 0.303,
+    "recall": 0.309,
+    "f1": 0.306,
+    "map50": 0.179,
+    "map50_95": 0.125,
+    "boxes": 97,
+    "map50_ci": [
+     0.107,
+     0.282
+    ],
+    "precision_ci": [
+     0.179,
+     0.429
+    ],
+    "recall_ci": [
+     0.202,
+     0.421
+    ]
+   }
+  },
+  "int8": {},
+  "merge": {
+   "vehicle": "car,motorcycle,bus,truck"
+  },
+  "float32_map50_ci": [
+   0.5,
+   0.591
+  ],
+  "seconds": 363,
+  "boot": 1000,
+  "float32_mean": {
+   "map50": 0.537,
+   "map50_95": 0.428
+  }
+ },
+ "hazard": {
+  "data": "merged/hazard",
+  "images": 1973,
+  "iou": "0.5 для P/R/F1 и mAP50, 0.5:0.95 шаг 0.05",
+  "float32": {
+   "fire": {
+    "thr": 0.338,
+    "precision": 0.715,
+    "recall": 0.66,
+    "f1": 0.686,
+    "map50": 0.713,
+    "map50_95": 0.375,
+    "boxes": 824,
+    "map50_ci": [
+     0.67,
+     0.756
+    ],
+    "precision_ci": [
+     0.681,
+     0.748
+    ],
+    "recall_ci": [
+     0.613,
+     0.707
+    ]
+   },
+   "smoke": {
+    "thr": 0.75,
+    "precision": 0.944,
+    "recall": 0.487,
+    "f1": 0.643,
+    "map50": 0.792,
+    "map50_95": 0.468,
+    "boxes": 661,
+    "map50_ci": [
+     0.758,
+     0.825
+    ],
+    "precision_ci": [
+     0.92,
+     0.967
+    ],
+    "recall_ci": [
+     0.45,
+     0.529
+    ]
+   },
+   "cigarette": {
+    "thr": 0.362,
+    "precision": 0.714,
+    "recall": 0.605,
+    "f1": 0.655,
+    "map50": 0.662,
+    "map50_95": 0.294,
+    "boxes": 865,
+    "map50_ci": [
+     0.626,
+     0.699
+    ],
+    "precision_ci": [
+     0.68,
+     0.744
+    ],
+    "recall_ci": [
+     0.57,
+     0.637
+    ]
+   }
+  },
+  "int8": {},
+  "float32_map50_ci": [
+   0.701,
+   0.745
+  ],
+  "seconds": 925,
+  "boot": 1000,
+  "float32_mean": {
+   "map50": 0.722,
+   "map50_95": 0.379
+  }
+ }
+}

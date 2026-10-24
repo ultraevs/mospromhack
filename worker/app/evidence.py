@@ -58,6 +58,27 @@ def annotate(image: np.ndarray, bbox: Sequence[float] | None, label: str,
     return out
 
 
+# клип для инструктажа: голова каждого человека (верх рамки) пикселизуется
+def anonymize(jpeg: bytes, people: Sequence[Sequence[float]], head_share: float = 0.3) -> bytes:
+    image = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        return jpeg
+    h, w = image.shape[:2]
+    for x, y, bw, bh in people:
+        x1, x2 = max(0, round((x - bw * 0.1) * w)), min(w, round((x + bw * 1.1) * w))
+        y1, y2 = max(0, round((y - bh * 0.05) * h)), min(h, round((y + bh * head_share) * h))
+        if x2 - x1 < 2 or y2 - y1 < 2:
+            continue
+        roi = image[y1:y2, x1:x2]
+        small = cv2.resize(roi, (max(1, (x2 - x1) // 8), max(1, (y2 - y1) // 8)), interpolation=cv2.INTER_AREA)
+        image[y1:y2, x1:x2] = cv2.resize(small, (x2 - x1, y2 - y1), interpolation=cv2.INTER_NEAREST)
+    return encode_jpeg(image, JPEG_QUALITY_BUFFER)
+
+
+def anon_path(path: Path) -> Path:
+    return path.with_name(f"{path.stem}_anon{path.suffix}")
+
+
 def build_clip(frames: Sequence[tuple[int, bytes]], out_path: Path) -> None:
     if len(frames) < 2:
         raise ValueError("для клипа нужно хотя бы два кадра")
@@ -91,6 +112,7 @@ class CameraEvidence:
         self._newest_ms = 0
         self._lock = threading.Lock()
         self._jobs: list[_ClipJob] = []
+        self._people: dict[int, list] = {}
 
     def add_frame(self, image: np.ndarray, ts_ms: int) -> None:
         self._pool.submit(self._encode, image, ts_ms)
@@ -107,6 +129,15 @@ class CameraEvidence:
             keep_from = min([self._newest_ms - self.pre_ms] + [j.start_ms for j in self._jobs])
             if self._frames[0][0] < keep_from:
                 self._frames = deque(f for f in self._frames if f[0] >= keep_from)
+                self._people = {ts: b for ts, b in self._people.items() if ts >= keep_from}
+
+    def set_people(self, ts_ms: int, boxes: list) -> None:
+        with self._lock:
+            self._people[ts_ms] = boxes
+
+    def people_at(self, stamps: Sequence[int]) -> list[list]:
+        with self._lock:
+            return [self._people.get(ts, []) for ts in stamps]
 
     def start_clip(self, key: int, event_ms: int) -> None:
         with self._lock:
@@ -135,10 +166,10 @@ class ClipBuilder:
         self._build = build
         self._tmp = Path(tempfile.mkdtemp(prefix="clips-"))
 
-    def submit(self, key: int, frames: list[tuple[int, bytes]]) -> None:
-        self._pool.submit(self._run, key, frames)
+    def submit(self, key: int, frames: list[tuple[int, bytes]], people: list[list] | None = None) -> None:
+        self._pool.submit(self._run, key, frames, people)
 
-    def _run(self, key: int, frames: list[tuple[int, bytes]]) -> None:
+    def _run(self, key: int, frames: list[tuple[int, bytes]], people: list[list] | None = None) -> None:
         path = self._tmp / f"{key}.mp4"
         try:
             self._build(frames, path)
@@ -146,6 +177,11 @@ class ClipBuilder:
             log.error("клип события %s не собран: %s", key, e)
             self._on_done(key, None)
             return
+        if people and any(people):
+            try:
+                self._build([(ts, anonymize(j, b)) for (ts, j), b in zip(frames, people)], anon_path(path))
+            except Exception as e:  # noqa: BLE001
+                log.error("клип без лиц события %s не собран: %s", key, e)
         self._on_done(key, path)
 
     def cleanup(self) -> None:

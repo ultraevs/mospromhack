@@ -97,7 +97,11 @@ class Event(BaseModel):
     snapshot_url: str | None = None
     snapshot_clean_url: str | None = None
     clip_url: str | None = None
+    clip_anon_url: str | None = None
     review: Review = Review.none
+    reviewed_at: datetime | None = None
+    reviewed_by: str | None = None
+    review_note: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -121,6 +125,7 @@ class EventUpdate(BaseModel):
 
 class EventReview(BaseModel):
     review: Review
+    note: Annotated[str, Field(max_length=500)] | None = None
 
 
 class EventMessage(BaseModel):
@@ -294,6 +299,8 @@ class LyingImmobileRule(BaseModel):
     fraction: Share = 0.7
     lying_ratio: Annotated[float, Field(gt=0, le=10)] = 1.0
     max_speed: Annotated[float, Field(ge=0, le=10)] = 0.1
+    spot_fraction: Share = 0.5
+    spot_radius: Annotated[float, Field(gt=0, le=5)] = 0.5
 
 
 class PhoneRule(BaseModel):
@@ -332,6 +339,7 @@ class LifecycleRule(BaseModel):
     cooldown_s: Annotated[float, Field(ge=0, le=86_400)] = 60
     retrack_iou: Share = 0.3
     retrack_window_s: Annotated[float, Field(ge=0, le=600)] = 10
+    retrack_dist_heights: Annotated[float, Field(ge=0, le=5)] = 0.5
     camera_cooldown_s: Annotated[float, Field(ge=0, le=86_400)] = 60
     track_lost_s: Seconds = 2
 

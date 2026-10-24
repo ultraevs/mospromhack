@@ -54,7 +54,12 @@ $seed = {
     if ($existing.Count -eq 0) {
         foreach ($name in $names) {
             $body = @{ name = [IO.Path]::GetFileNameWithoutExtension($name); source_type = "file"; source = $name; required_ppe = @("helmet") } | ConvertTo-Json
-            Invoke-RestMethod "$api/api/cameras" -Headers $h -Method Post -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($body)) | Out-Null
+            $cam = Invoke-RestMethod "$api/api/cameras" -Headers $h -Method Post -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($body))
+            if ($name -eq "factory_floor.mp4") {
+                # restricted aisle between boxes and table, one person walks through it at ~1-3 s
+                $zone = '{"name":"\u041f\u0440\u043e\u0445\u043e\u0434 \u0437\u0430\u043f\u0440\u0435\u0449\u0451\u043d","type":"restricted","polygon":[[0.565,0.495],[0.648,0.495],[0.655,0.58],[0.56,0.58]]}'
+                Invoke-RestMethod "$api/api/cameras/$($cam.id)/zones" -Headers $h -Method Post -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($zone)) | Out-Null
+            }
             $added++
         }
     }

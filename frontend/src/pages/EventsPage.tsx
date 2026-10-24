@@ -26,8 +26,11 @@ export function EventsPage({ tick }: { tick: number }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [isAdmin, setIsAdmin] = useState(false);
+
   useEffect(() => {
     api.cameras().then(setCameras).catch(() => undefined);
+    api.authMe().then((u) => setIsAdmin(u.role === "admin")).catch(() => undefined);
   }, []);
 
   // те же фильтры идут и в список, и в выгрузку
@@ -116,6 +119,12 @@ export function EventsPage({ tick }: { tick: number }) {
         <a className="btn btn-ghost" href={api.eventsReportUrl(apiFilters)} target="_blank" rel="noopener">
           <Icon name="journal" size={15} />Отчёт за смену
         </a>
+        {isAdmin && (
+          <a className="btn btn-ghost" href={api.eventsDatasetUrl(apiFilters)} download
+            title="Подтверждённые кадры с разметкой YOLO и ложные срабатывания">
+            <Icon name="journal" size={15} />Выгрузить для дообучения
+          </a>
+        )}
       </form>
 
       {error && <Notice>{error}</Notice>}

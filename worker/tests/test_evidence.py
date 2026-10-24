@@ -11,7 +11,8 @@ from shared.config import AppConfig
 from shared.schemas import WorkerCamera, WorkerConfig, Zone
 from worker.app.capture import Frame
 from worker.app.detector.fake import FakeBox, FakeDetector
-from worker.app.evidence import CameraEvidence, ClipBuilder, annotate, build_clip, encode_jpeg, resize_to_width
+from worker.app.evidence import (CameraEvidence, ClipBuilder, annotate, anon_path, anonymize, build_clip, encode_jpeg,
+                                 resize_to_width)
 from worker.app.main import Worker
 from worker.tests.test_hazard import specs  # noqa: F401
 from worker.tests.test_pipeline import FakeClient, FakeReader, FakeSender
@@ -192,3 +193,28 @@ def test_clip_waits_until_event_reaches_backend(specs, monkeypatch):  # noqa: F8
     worker.tick_ppe()
     assert worker.client.clips == [("evt_0000000001", b"fake-mp4")]
     worker.shutdown()
+
+
+def test_anonymize_pixelates_only_heads():
+    img = np.zeros((360, 640, 3), np.uint8)
+    img[:, :, 1] = (np.arange(640) * 7 % 256).astype(np.uint8)  # полосы: пикселизация их смазывает
+    out = cv2.imdecode(np.frombuffer(anonymize(encode_jpeg(img, 95), [(0.25, 0.25, 0.25, 0.5)]), np.uint8), cv2.IMREAD_COLOR)
+    src = cv2.imdecode(np.frombuffer(encode_jpeg(img, 95), np.uint8), cv2.IMREAD_COLOR)
+    head = (slice(90, 130), slice(170, 300))
+    legs = (slice(250, 270), slice(170, 300))
+    assert np.abs(out[head].astype(int) - src[head]).mean() > 10
+    assert np.abs(out[legs].astype(int) - src[legs]).mean() < 4
+
+
+@needs_ffmpeg
+def test_clip_builder_makes_anon_clip_when_people_known(pool, tmp_path):
+    done = []
+    builder = ClipBuilder(pool, lambda key, path: done.append(path))
+    jpeg = encode_jpeg(frame(), 80)
+    builder.submit(1, [(0, jpeg), (500, jpeg)], [[(0.4, 0.2, 0.1, 0.4)], []])
+    assert wait_for(lambda: done, 20)
+    assert done[0].exists() and anon_path(done[0]).exists()
+    builder.submit(2, [(0, jpeg), (500, jpeg)], [[], []])
+    assert wait_for(lambda: len(done) == 2, 20)
+    assert not anon_path(done[1]).exists()
+    builder.cleanup()

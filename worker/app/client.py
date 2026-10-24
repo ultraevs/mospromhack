@@ -39,6 +39,12 @@ class BackendClient:
                                 timeout=30.0)
         r.raise_for_status()
 
+    def upload_clip_anon(self, event_id: str, path) -> None:
+        with open(path, "rb") as f:
+            r = self._http.post(f"/internal/events/{event_id}/clip", params={"anon": "true"},
+                                files={"clip": ("clip_anon.mp4", f, "video/mp4")}, timeout=30.0)
+        r.raise_for_status()
+
     def close_event(self, event_id: str, ended_at: datetime) -> None:
         r = self._http.patch(f"/internal/events/{event_id}",
                              json={"status": "closed", "ended_at": ended_at.isoformat()})
