@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# событийная метрика: события воркера (data/linq/events_*.json от linq_pipeline --once) против интервалов глазами (data/event_gt/*.yaml)
+# событийная метрика: события воркера (data/linq/events_*.json от linq_pipeline --once) против интервалов глазами (eval/event_gt/*.yaml)
 # событие верное, если попало в интервал того же типа [start - pre, end + tol]. на интервал засчитывается count событий (людей), лишние — дубли.
 # в спорном интервале событие не верное и не ложное, просто не считается
 from __future__ import annotations
@@ -66,8 +66,8 @@ def fmt(v):
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--events", nargs="+", default=["data/linq/events_gt.json", "data/linq/events_gt_fall.json"])
-    ap.add_argument("--gt", default="data/event_gt")
+    ap.add_argument("--events", nargs="+", default=["eval/event_gt/runs/events_final.json", "eval/event_gt/runs/events_final_fall.json"])
+    ap.add_argument("--gt", default="eval/event_gt")
     ap.add_argument("--tol", type=float, default=5, help="допуск после конца интервала, с")
     ap.add_argument("--pre", type=float, default=1, help="допуск до начала интервала, с (неточность времени кадра)")
     args = ap.parse_args()

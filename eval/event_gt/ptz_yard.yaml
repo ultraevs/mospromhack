@@ -1,0 +1,7 @@
+video: ptz_yard.mp4
+required_ppe: [helmet, vest]
+intervals:
+  - {type: no_helmet, start_s: 0, end_s: 15.1, who: "сидящий в белой рубашке"}
+  - {type: no_vest, start_s: 0, end_s: 15.1, who: "он же"}
+  - {type: no_helmet, start_s: 0, end_s: 3.5, who: "проходящий слева", disputed: true, why: "в кадре 3.5 с, короче окна правила 4 с"}
+  - {type: no_vest, start_s: 0, end_s: 3.5, who: "проходящий слева", disputed: true, why: "в кадре 3.5 с, короче окна no_vest 6 с"}

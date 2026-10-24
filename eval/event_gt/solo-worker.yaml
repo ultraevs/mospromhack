@@ -1,0 +1,5 @@
+video: solo-worker.mp4
+required_ppe: [helmet, vest]
+intervals:
+  - {type: no_helmet, start_s: 0, end_s: 37.4, who: "рабочий у станка, весь ролик"}
+  - {type: no_vest, start_s: 0, end_s: 37.4, who: "он же, клетчатая рубашка"}

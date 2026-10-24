@@ -29,6 +29,8 @@
 | `PATCH /cameras/{id}` | изменить любые поля |
 | `DELETE /cameras/{id}` | удалить вместе с зонами, ответ 204 |
 | `GET /videos` | видеофайлы в `data/videos`: `[{"name": "factory_floor.mp4", "size": 6927321}]` |
+| `GET /images` | наборы картинок в `data/images`: `[{"name": "set_20261024_114109", "count": 6}]` |
+| `POST /uploads` | только admin, multipart, поле `files` (можно несколько). Одно видео mp4/avi/mkv/mov уходит в `data/videos`, картинки jpg/png/bmp/webp или zip с ними в новую папку `data/images/<имя>` (из zip берутся только картинки, пути выкидываются). До 500 МБ за раз. Ответ: `{"source_type": "file" \| "images", "source": "<имя>"}`, его можно сразу отдать в `POST /cameras`. Чужие расширения и `../` в имени: 422, больше 500 МБ: 413 |
 
 Тело создания:
 
@@ -36,7 +38,7 @@
 {"name": "Цех 2, ворота", "source_type": "file", "source": "factory_floor.mp4", "required_ppe": ["helmet"], "enabled": true}
 ```
 
-`source_type`: `file` (имя файла из `data/videos`) или `rtsp` (адрес `rtsp://...`). `required_ppe`: подмножество `helmet, mask, vest`. Неверный источник: 422.
+`source_type`: `file` (имя файла из `data/videos`), `images` (папка из `data/images`: слайдшоу по кругу, каждая картинка 6 с, вписана в 1280×720 с полями) или `rtsp` (адрес `rtsp://...`). `required_ppe`: подмножество `helmet, mask, vest`. Неверный источник: 422.
 
 Ответ дополнен полями `id`, `status` (`online`, если воркер получает кадры, иначе `offline`) и `open_events`.
 

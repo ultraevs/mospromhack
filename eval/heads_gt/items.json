@@ -1,0 +1,717 @@
+[
+ {
+  "id": 0,
+  "video": "solo-worker.mp4",
+  "frame": 187,
+  "bbox": [
+   587,
+   336,
+   740,
+   682
+  ]
+ },
+ {
+  "id": 1,
+  "video": "solo-worker.mp4",
+  "frame": 561,
+  "bbox": [
+   449,
+   480,
+   673,
+   995
+  ]
+ },
+ {
+  "id": 2,
+  "video": "solo-worker.mp4",
+  "frame": 935,
+  "bbox": [
+   417,
+   516,
+   625,
+   1042
+  ]
+ },
+ {
+  "id": 3,
+  "video": "solo-worker.mp4",
+  "frame": 1308,
+  "bbox": [
+   515,
+   470,
+   684,
+   947
+  ]
+ },
+ {
+  "id": 4,
+  "video": "solo-worker.mp4",
+  "frame": 1682,
+  "bbox": [
+   558,
+   371,
+   777,
+   794
+  ]
+ },
+ {
+  "id": 5,
+  "video": "solo-worker.mp4",
+  "frame": 2056,
+  "bbox": [
+   575,
+   348,
+   748,
+   760
+  ]
+ },
+ {
+  "id": 6,
+  "video": "ptz_yard.mp4",
+  "frame": 31,
+  "bbox": [
+   1025,
+   269,
+   1177,
+   594
+  ]
+ },
+ {
+  "id": 7,
+  "video": "ptz_yard.mp4",
+  "frame": 31,
+  "bbox": [
+   512,
+   64,
+   600,
+   300
+  ]
+ },
+ {
+  "id": 8,
+  "video": "ptz_yard.mp4",
+  "frame": 94,
+  "bbox": [
+   1025,
+   268,
+   1176,
+   595
+  ]
+ },
+ {
+  "id": 9,
+  "video": "ptz_yard.mp4",
+  "frame": 157,
+  "bbox": [
+   1025,
+   269,
+   1176,
+   595
+  ]
+ },
+ {
+  "id": 10,
+  "video": "ptz_yard.mp4",
+  "frame": 219,
+  "bbox": [
+   1025,
+   269,
+   1175,
+   595
+  ]
+ },
+ {
+  "id": 11,
+  "video": "ptz_yard.mp4",
+  "frame": 282,
+  "bbox": [
+   1025,
+   269,
+   1175,
+   595
+  ]
+ },
+ {
+  "id": 12,
+  "video": "ptz_yard.mp4",
+  "frame": 345,
+  "bbox": [
+   1026,
+   268,
+   1175,
+   595
+  ]
+ },
+ {
+  "id": 13,
+  "video": "fire-explosion.mp4",
+  "frame": 74,
+  "bbox": [
+   447,
+   584,
+   591,
+   960
+  ]
+ },
+ {
+  "id": 14,
+  "video": "fire-explosion.mp4",
+  "frame": 74,
+  "bbox": [
+   711,
+   577,
+   827,
+   968
+  ]
+ },
+ {
+  "id": 15,
+  "video": "fire-explosion.mp4",
+  "frame": 74,
+  "bbox": [
+   825,
+   572,
+   950,
+   856
+  ]
+ },
+ {
+  "id": 16,
+  "video": "fire-explosion.mp4",
+  "frame": 221,
+  "bbox": [
+   394,
+   585,
+   548,
+   965
+  ]
+ },
+ {
+  "id": 17,
+  "video": "fire-explosion.mp4",
+  "frame": 221,
+  "bbox": [
+   780,
+   571,
+   906,
+   841
+  ]
+ },
+ {
+  "id": 18,
+  "video": "fire-explosion.mp4",
+  "frame": 221,
+  "bbox": [
+   666,
+   576,
+   786,
+   969
+  ]
+ },
+ {
+  "id": 19,
+  "video": "fire-explosion.mp4",
+  "frame": 368,
+  "bbox": [
+   423,
+   548,
+   570,
+   925
+  ]
+ },
+ {
+  "id": 20,
+  "video": "fire-explosion.mp4",
+  "frame": 368,
+  "bbox": [
+   681,
+   543,
+   801,
+   932
+  ]
+ },
+ {
+  "id": 21,
+  "video": "fire-explosion.mp4",
+  "frame": 368,
+  "bbox": [
+   800,
+   536,
+   924,
+   805
+  ]
+ },
+ {
+  "id": 22,
+  "video": "fire-explosion.mp4",
+  "frame": 515,
+  "bbox": [
+   425,
+   551,
+   572,
+   927
+  ]
+ },
+ {
+  "id": 23,
+  "video": "fire-explosion.mp4",
+  "frame": 515,
+  "bbox": [
+   685,
+   543,
+   802,
+   931
+  ]
+ },
+ {
+  "id": 24,
+  "video": "fire-explosion.mp4",
+  "frame": 515,
+  "bbox": [
+   799,
+   535,
+   925,
+   806
+  ]
+ },
+ {
+  "id": 25,
+  "video": "fire-explosion.mp4",
+  "frame": 662,
+  "bbox": [
+   447,
+   557,
+   594,
+   941
+  ]
+ },
+ {
+  "id": 26,
+  "video": "fire-explosion.mp4",
+  "frame": 662,
+  "bbox": [
+   677,
+   547,
+   798,
+   938
+  ]
+ },
+ {
+  "id": 27,
+  "video": "fire-explosion.mp4",
+  "frame": 662,
+  "bbox": [
+   797,
+   543,
+   915,
+   813
+  ]
+ },
+ {
+  "id": 28,
+  "video": "fire-explosion.mp4",
+  "frame": 809,
+  "bbox": [
+   449,
+   596,
+   591,
+   986
+  ]
+ },
+ {
+  "id": 29,
+  "video": "fire-explosion.mp4",
+  "frame": 809,
+  "bbox": [
+   662,
+   589,
+   780,
+   979
+  ]
+ },
+ {
+  "id": 30,
+  "video": "fire-explosion.mp4",
+  "frame": 809,
+  "bbox": [
+   776,
+   593,
+   903,
+   851
+  ]
+ },
+ {
+  "id": 31,
+  "video": "factory_floor.mp4",
+  "frame": 8,
+  "bbox": [
+   518,
+   357,
+   576,
+   523
+  ]
+ },
+ {
+  "id": 32,
+  "video": "factory_floor.mp4",
+  "frame": 8,
+  "bbox": [
+   657,
+   205,
+   707,
+   333
+  ]
+ },
+ {
+  "id": 33,
+  "video": "factory_floor.mp4",
+  "frame": 8,
+  "bbox": [
+   762,
+   269,
+   813,
+   395
+  ]
+ },
+ {
+  "id": 34,
+  "video": "factory_floor.mp4",
+  "frame": 26,
+  "bbox": [
+   518,
+   355,
+   576,
+   524
+  ]
+ },
+ {
+  "id": 35,
+  "video": "factory_floor.mp4",
+  "frame": 26,
+  "bbox": [
+   481,
+   305,
+   555,
+   463
+  ]
+ },
+ {
+  "id": 36,
+  "video": "factory_floor.mp4",
+  "frame": 42,
+  "bbox": [
+   521,
+   357,
+   575,
+   523
+  ]
+ },
+ {
+  "id": 37,
+  "video": "factory_floor.mp4",
+  "frame": 42,
+  "bbox": [
+   741,
+   167,
+   774,
+   273
+  ]
+ },
+ {
+  "id": 38,
+  "video": "factory_floor.mp4",
+  "frame": 42,
+  "bbox": [
+   671,
+   241,
+   716,
+   358
+  ]
+ },
+ {
+  "id": 39,
+  "video": "factory_floor.mp4",
+  "frame": 60,
+  "bbox": [
+   521,
+   358,
+   575,
+   522
+  ]
+ },
+ {
+  "id": 40,
+  "video": "factory_floor.mp4",
+  "frame": 60,
+  "bbox": [
+   475,
+   307,
+   522,
+   455
+  ]
+ },
+ {
+  "id": 41,
+  "video": "factory_floor.mp4",
+  "frame": 60,
+  "bbox": [
+   774,
+   225,
+   822,
+   298
+  ]
+ },
+ {
+  "id": 42,
+  "video": "factory_floor.mp4",
+  "frame": 76,
+  "bbox": [
+   521,
+   359,
+   575,
+   523
+  ]
+ },
+ {
+  "id": 43,
+  "video": "factory_floor.mp4",
+  "frame": 76,
+  "bbox": [
+   476,
+   307,
+   522,
+   456
+  ]
+ },
+ {
+  "id": 44,
+  "video": "factory_floor.mp4",
+  "frame": 76,
+  "bbox": [
+   766,
+   242,
+   811,
+   298
+  ]
+ },
+ {
+  "id": 45,
+  "video": "factory_floor.mp4",
+  "frame": 94,
+  "bbox": [
+   520,
+   358,
+   576,
+   523
+  ]
+ },
+ {
+  "id": 46,
+  "video": "factory_floor.mp4",
+  "frame": 94,
+  "bbox": [
+   476,
+   308,
+   519,
+   454
+  ]
+ },
+ {
+  "id": 47,
+  "video": "factory_floor.mp4",
+  "frame": 94,
+  "bbox": [
+   794,
+   233,
+   850,
+   304
+  ]
+ },
+ {
+  "id": 48,
+  "video": "warehouse.mp4",
+  "frame": 139,
+  "bbox": [
+   740,
+   281,
+   792,
+   366
+  ]
+ },
+ {
+  "id": 49,
+  "video": "warehouse.mp4",
+  "frame": 231,
+  "bbox": [
+   732,
+   283,
+   798,
+   368
+  ]
+ },
+ {
+  "id": 50,
+  "video": "warehouse.mp4",
+  "frame": 324,
+  "bbox": [
+   740,
+   285,
+   799,
+   368
+  ]
+ },
+ {
+  "id": 51,
+  "video": "fall_test.mp4",
+  "frame": 446,
+  "bbox": [
+   637,
+   198,
+   736,
+   481
+  ]
+ },
+ {
+  "id": 52,
+  "video": "fall_test.mp4",
+  "frame": 1338,
+  "bbox": [
+   245,
+   518,
+   673,
+   714
+  ]
+ },
+ {
+  "id": 53,
+  "video": "fall_test.mp4",
+  "frame": 1635,
+  "bbox": [
+   510,
+   472,
+   728,
+   715
+  ]
+ },
+ {
+  "id": 54,
+  "video": "css_test.mp4",
+  "frame": 208,
+  "bbox": [
+   44,
+   230,
+   139,
+   639
+  ]
+ },
+ {
+  "id": 55,
+  "video": "css_test.mp4",
+  "frame": 208,
+  "bbox": [
+   486,
+   262,
+   575,
+   639
+  ]
+ },
+ {
+  "id": 56,
+  "video": "css_test.mp4",
+  "frame": 208,
+  "bbox": [
+   265,
+   251,
+   341,
+   626
+  ]
+ },
+ {
+  "id": 57,
+  "video": "css_test.mp4",
+  "frame": 208,
+  "bbox": [
+   414,
+   278,
+   480,
+   587
+  ]
+ },
+ {
+  "id": 58,
+  "video": "css_test.mp4",
+  "frame": 208,
+  "bbox": [
+   595,
+   321,
+   639,
+   503
+  ]
+ },
+ {
+  "id": 59,
+  "video": "css_test.mp4",
+  "frame": 208,
+  "bbox": [
+   206,
+   240,
+   286,
+   639
+  ]
+ },
+ {
+  "id": 60,
+  "video": "css_test.mp4",
+  "frame": 208,
+  "bbox": [
+   121,
+   268,
+   196,
+   583
+  ]
+ },
+ {
+  "id": 61,
+  "video": "css_test.mp4",
+  "frame": 208,
+  "bbox": [
+   353,
+   267,
+   423,
+   623
+  ]
+ },
+ {
+  "id": 62,
+  "video": "css_test.mp4",
+  "frame": 1868,
+  "bbox": [
+   149,
+   70,
+   381,
+   638
+  ]
+ },
+ {
+  "id": 63,
+  "video": "css_test.mp4",
+  "frame": 2282,
+  "bbox": [
+   338,
+   562,
+   359,
+   640
+  ]
+ },
+ {
+  "id": 64,
+  "video": "css_test.mp4",
+  "frame": 2282,
+  "bbox": [
+   577,
+   550,
+   590,
+   589
+  ]
+ }
+]

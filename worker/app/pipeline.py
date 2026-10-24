@@ -67,7 +67,7 @@ class CameraPipeline:
 
 
     def process_hazard(self, dets: Detections, spec: ModelSpec, w: int, h: int, ts_ms: int,
-                       rules: RuleSettings) -> list[EventOpen | EventClose]:
+                       rules: RuleSettings, stills: bool = False) -> list[EventOpen | EventClose]:
         t = ts_ms / 1000
         names = [spec.classes[c] for c in dets.cls]
         self._hazard_t = t
@@ -82,7 +82,8 @@ class CameraPipeline:
                 self._hazard_objects.append(ObjectBox(cls=name, bbox=list(norm_box(dets.xyxy[i], w, h)),
                                                       conf=round(float(dets.conf[i]), 3)))
             params = getattr(rules, event_type.value)
-            actions += self.engine.step_camera(t, event_type, check_k_of_m(self.hazard_checks[name], params), bbox, rules)
+            actions += self.engine.step_camera(t, event_type, check_k_of_m(self.hazard_checks[name], params), bbox, rules,
+                                               stills)
         return actions
 
 

@@ -32,7 +32,7 @@ async def worker_config(db: Session = Depends(get_db), state: AppState = Depends
     rows = db.execute(select(CameraRow).where(CameraRow.enabled.is_(True)).order_by(CameraRow.id)).scalars().all()
     cameras = [
         WorkerCamera(id=r.id, name=r.name, rtsp_url=state.sources.rtsp_url(r.id), required_ppe=r.required_ppe or [],
-                     zones=[Zone.model_validate(z) for z in r.zones])
+                     zones=[Zone.model_validate(z) for z in r.zones], stills=r.source_type == "images")
         for r in rows
     ]
     return WorkerConfig(version=get_config_version(db), cameras=cameras, rules=load_rules(db, state.config))

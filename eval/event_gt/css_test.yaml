@@ -1,0 +1,5 @@
+# слайдшоу из фото датасета по ~2 с на кадр, не видео: интервалы короче окон правил, в событийную метрику не берём
+video: css_test.mp4
+required_ppe: [helmet, vest]
+excluded: true
+intervals: []

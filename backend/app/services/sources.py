@@ -17,6 +17,10 @@ from shared.sync import loop_input, loop_offset, probe_duration
 log = logging.getLogger("backend.sources")
 
 RESTART_PAUSES = (1, 2, 5, 10)
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+IMAGE_SECONDS = 6  # дольше окон правил (no_vest 6 с), иначе событие не успеет набраться
+IMAGE_SIZE = (1280, 720)
+IMAGE_FPS = 25
 
 
 def path_name(camera_id: int) -> str:
@@ -27,7 +31,7 @@ def path_name(camera_id: int) -> str:
 # каждая камера = путь cam-N в mediamtx. файл крутим через ffmpeg, rtsp отдаем mediamtx напрямую
 class Desired:
     camera_id: int
-    kind: str  # file | rtsp
+    kind: str  # file | rtsp | images
     source: str
 
 
@@ -50,12 +54,13 @@ def _double(rate: str) -> str:
 class SourceManager:
     def __init__(self, videos_dir: Path, logs_dir: Path, rtsp_port: int, api_port: int, active: bool = True,
                  host: str = "127.0.0.1", width: int = 0, maxrate: str = "", lag_s: float = 0.0,
-                 codec: str = "h264"):
+                 codec: str = "h264", images_dir: Path | None = None):
         self.width = width
         self.lag_s = lag_s
         self.maxrate = maxrate
         self.codec = codec or os.getenv("STREAM_CODEC", "h264")
         self.videos_dir = videos_dir
+        self.images_dir = images_dir or videos_dir.parent / "images"
         self.logs_dir = logs_dir
         self.rtsp_port = rtsp_port
         self.host = host
@@ -103,7 +108,7 @@ class SourceManager:
                 cams[str(cam_id)] = {
                     "kind": d.kind,
                     "publishing": path_name(cam_id) in self._ready,
-                    "ffmpeg_running": bool(proc and proc.popen.poll() is None) if d.kind == "file" else None,
+                    "ffmpeg_running": bool(proc and proc.popen.poll() is None) if d.kind != "rtsp" else None,
                     "error": self._errors.get(cam_id),
                 }
             return {"mediamtx": {"ok": self.mediamtx_error is None, "error": self.mediamtx_error}, "cameras": cams}
@@ -148,7 +153,7 @@ class SourceManager:
 
         now = time.monotonic()
         for cam_id, d in desired.items():
-            if d.kind == "file":
+            if d.kind in ("file", "images"):
                 proc = self._procs.get(cam_id)
                 if proc and proc.popen.poll() is None:
                     if now - proc.started > 15:
@@ -193,14 +198,77 @@ class SourceManager:
             "-f", "rtsp", "-rtsp_transport", "tcp", self.rtsp_url(d.camera_id),
         ]
 
+    def slideshow_command(self, listing: Path, out: Path) -> list[str]:
+        return [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+            "-f", "concat", "-safe", "0", "-i", str(listing),
+            "-an", "-vf", f"fps={IMAGE_FPS},format=yuv420p",
+            "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-g", str(IMAGE_FPS), str(out),
+        ]
+
+    def _slideshow(self, d: Desired, folder: Path) -> Path | None:
+        # concat из картинок с -re отдаёт кадры пачками раз в 6 с, воркеру плохо.
+        # поэтому один раз склеиваем ролик и крутим его как обычный файл
+        files = sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
+        if not files:
+            return None
+        out = self.logs_dir / "slides" / folder.name
+        video = out / "slides.mp4"
+        sig = "\n".join(f"{p.name}:{p.stat().st_size}:{p.stat().st_mtime_ns}" for p in files) + f"\n{IMAGE_SECONDS}:{IMAGE_SIZE}"
+        sig_file = out / "sig.txt"
+        if video.exists() and sig_file.exists() and sig_file.read_text(encoding="utf-8") == sig:
+            return video
+        if out.exists():
+            shutil.rmtree(out, ignore_errors=True)
+        out.mkdir(parents=True, exist_ok=True)
+        # разные размеры и форматы concat не ест - сначала всё в jpg 1280x720 с полями
+        w, h = IMAGE_SIZE
+        vf = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuvj420p"
+        lines = []
+        for i, src in enumerate(files):
+            dst = out / f"{i:05d}.jpg"
+            r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", str(src),
+                                "-vf", vf, "-frames:v", "1", "-q:v", "3", str(dst)],
+                               capture_output=True, timeout=30, stdin=subprocess.DEVNULL)
+            if r.returncode != 0 or not dst.exists():
+                log.warning("камера %s: пропускаю битую картинку %s", d.camera_id, src.name)
+                continue
+            lines.append(f"file '{dst.as_posix()}'\nduration {IMAGE_SECONDS}\n")
+        if not lines:
+            return None
+        listing = out / "list.txt"
+        # последний кадр повторяем, иначе concat игнорит его duration
+        listing.write_text("".join(lines) + lines[-1].splitlines()[0] + "\n", encoding="utf-8")
+        r = subprocess.run(self.slideshow_command(listing, video), capture_output=True,
+                           timeout=60 + 2 * len(lines), stdin=subprocess.DEVNULL)
+        if r.returncode != 0 or not video.exists():
+            log.error("камера %s: не склеился ролик из картинок: %s", d.camera_id, r.stderr[-500:])
+            return None
+        for p in out.glob("*.jpg"):
+            p.unlink(missing_ok=True)
+        sig_file.write_text(sig, encoding="utf-8")
+        self._durations.pop(video, None)  # длина ролика могла поменяться
+        log.info("камера %s: ролик из %s картинок готов", d.camera_id, len(lines))
+        return video
+
     def _start_ffmpeg(self, d: Desired) -> None:
-        path = (self.videos_dir / d.source).resolve()
-        if self.videos_dir.resolve() not in path.parents or not path.is_file():
-            self._fail(d.camera_id, f"нет видеофайла {d.source} в {self.videos_dir}")
-            return
         if not shutil.which("ffmpeg"):
             self._fail(d.camera_id, "ffmpeg не найден в PATH")
             return
+        if d.kind == "images":
+            folder = (self.images_dir / d.source).resolve()
+            if self.images_dir.resolve() not in folder.parents or not folder.is_dir():
+                self._fail(d.camera_id, f"нет папки {d.source} в {self.images_dir}")
+                return
+            path = self._slideshow(d, folder)
+            if path is None:
+                self._fail(d.camera_id, f"в папке {d.source} нет годных картинок")
+                return
+        else:
+            path = (self.videos_dir / d.source).resolve()
+            if self.videos_dir.resolve() not in path.parents or not path.is_file():
+                self._fail(d.camera_id, f"нет видеофайла {d.source} в {self.videos_dir}")
+                return
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         log_file = open(self.logs_dir / f"ffmpeg-{path_name(d.camera_id)}.log", "ab")
         if path not in self._durations:

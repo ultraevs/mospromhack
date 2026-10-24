@@ -23,8 +23,9 @@ def series(pattern, start=0.0, fps=FPS, **kw):
     return [obs(start + i / fps, seen=s, **kw) for i, s in enumerate(pattern)]
 
 
-def camera(required=(PpeItem.helmet,), zones=()):
-    return WorkerCamera(id=1, name="c", rtsp_url="rtsp://x", required_ppe=list(required), zones=list(zones))
+def camera(required=(PpeItem.helmet,), zones=(), stills=False):
+    return WorkerCamera(id=1, name="c", rtsp_url="rtsp://x", required_ppe=list(required), zones=list(zones),
+                        stills=stills)
 
 
 def zone(zone_id, zone_type, required=(), polygon=((0, 0), (1, 0), (1, 1), (0, 1))):
@@ -453,3 +454,32 @@ def test_retrack_far_from_closed_event_opens_new():
     assert len(sim.closes()) == 1
     sim.run(107.0, 2, {8: {**NO_HELMET, "bbox": far}})
     assert len(sim.opens()) == 2 and sim.opens()[1].track_id == 8
+
+
+def test_stills_camera_skips_motion_rules():
+    def cands(seq, stills):
+        tr = TrackState(7)
+        for o in seq:
+            tr.add(o)
+        return {c.type: c for c in evaluate_track(tr, tr.last.t, camera(stills=stills), RULES)}
+
+    lying = [obs(i / FPS, bbox=LIE, seen=("no_helmet",)) for i in range(11 * FPS)]
+    assert cands(lying, False)[EventType.lying_immobile].result.active
+    c = cands(lying, True)
+    assert not {EventType.lying_immobile, EventType.fall, EventType.running} & c.keys()
+    assert c[EventType.no_helmet].result.active  # каска на картинке считается
+    assert EventType.fall not in cands(frames([STAND] * 6 + [(0.35, 0.5, 0.25, 0.25)] + [LIE] * 3), True)
+    assert EventType.running not in cands(moving(0.5, 3), True)
+
+
+def test_stills_camera_no_retrack_suppression():
+    def opens(stills):
+        sim = Sim(cam=camera(stills=stills))
+        sim.run(100.0, 6, {7: NO_HELMET})
+        sim.tracks.pop(7)
+        sim.run(106.0, 1, {})  # трек 7 потерян, событие закрылось
+        sim.run(108.0, 6, {8: NO_HELMET})  # та же рамка, новая картинка
+        return len(sim.opens())
+
+    assert opens(True) == 2
+    assert opens(False) == 1

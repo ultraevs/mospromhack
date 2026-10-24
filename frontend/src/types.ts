@@ -114,7 +114,7 @@ export interface DetectionsMessage {
 export interface Camera {
   id: number;
   name: string;
-  source_type: "rtsp" | "file";
+  source_type: "rtsp" | "file" | "images";
   source: string;
   required_ppe: PpeItem[];
   enabled: boolean;

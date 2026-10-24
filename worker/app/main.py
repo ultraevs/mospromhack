@@ -376,7 +376,8 @@ class Worker:
 
         for (state, frame), dets in zip(current, self._infer_frames("hazard", [f.image for _, f in current])):
             h, w = frame.image.shape[:2]
-            self._queue(state, frame, state.pipeline.process_hazard(dets, spec, w, h, frame.ts_ms, self.remote.rules))
+            self._queue(state, frame, state.pipeline.process_hazard(dets, spec, w, h, frame.ts_ms, self.remote.rules,
+                                                                           state.camera.stills))
 
         cfg = self.config.worker.crop_pass.cigarette
         if cfg.enabled:

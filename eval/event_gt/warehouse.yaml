@@ -1,0 +1,7 @@
+video: warehouse.mp4
+required_ppe: [helmet, vest]
+intervals:
+  - {type: no_helmet, start_s: 0, end_s: 31.5, who: "рабочий в синей футболке у паллет"}
+  - {type: no_vest, start_s: 0, end_s: 31.5, who: "он же"}
+  - {type: no_helmet, start_s: 33.5, end_s: 37, disputed: true, why: "снова входит в кадр у погрузчика, виден частично"}
+  - {type: vehicle_proximity, start_s: 0, end_s: 37, disputed: true, why: "погрузчик стоит, не едет; рядом ли человек — вопрос трактовки"}

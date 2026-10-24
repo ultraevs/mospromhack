@@ -43,6 +43,11 @@ def _validate_source(source_type: SourceType, source: str, state: AppState) -> N
     if source_type == SourceType.rtsp:
         if not source.lower().startswith(("rtsp://", "rtsps://")):
             raise HTTPException(422, "адрес камеры должен начинаться с rtsp:// или rtsps://")
+    elif source_type == SourceType.images:
+        images = (state.settings.data_dir / "images").resolve()
+        path = (images / source).resolve()
+        if images not in path.parents or not path.is_dir():
+            raise HTTPException(422, f"нет папки {source} в data/images")
     else:
         videos = (state.settings.data_dir / "videos").resolve()
         path = (videos / source).resolve()

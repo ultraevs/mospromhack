@@ -68,6 +68,7 @@ class ZoneType(str, Enum):
 class SourceType(str, Enum):
     rtsp = "rtsp"
     file = "file"
+    images = "images"
 
 
 class Event(BaseModel):
@@ -266,9 +267,9 @@ class FallRule(BaseModel):
 
 
 class LyingImmobileRule(BaseModel):
-    window_s: Seconds = 10
-    min_observations: Count = 20
-    fraction: Share = 0.9
+    window_s: Seconds = 6
+    min_observations: Count = 12
+    fraction: Share = 0.7
     lying_ratio: Annotated[float, Field(gt=0, le=10)] = 1.0
     max_speed: Annotated[float, Field(ge=0, le=10)] = 0.1
 
@@ -310,6 +311,7 @@ class WorkerCamera(BaseModel):
     rtsp_url: str
     required_ppe: list[PpeItem] = Field(default_factory=list)
     zones: list[Zone] = Field(default_factory=list)
+    stills: bool = False  # камера на стоп-кадрах: правила движения не считаем
 
 
 # отдаем воркеру через /internal/config

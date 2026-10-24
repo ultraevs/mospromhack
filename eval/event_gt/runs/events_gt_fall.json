@@ -1,0 +1,45 @@
+[
+  {
+    "video": "fall_test.mp4",
+    "duration": 71.36,
+    "fps": 6.0,
+    "required_ppe": [],
+    "tiles": true,
+    "wall_s": 71.9,
+    "proc_fps": 5.27,
+    "events": [
+      {
+        "type": "fall",
+        "camera": 1,
+        "t": 1792825308145.668,
+        "captured_ts": 1792825307974,
+        "track_id": 4,
+        "bbox": [
+          0.2906,
+          0.725,
+          0.3633,
+          0.2687
+        ],
+        "confidence": 1.0,
+        "latency_ms": 171.66796875,
+        "t_video": 25.79
+      },
+      {
+        "type": "fall",
+        "camera": 1,
+        "t": 1792825324257.083,
+        "captured_ts": 1792825323967,
+        "track_id": 5,
+        "bbox": [
+          0.107,
+          0.807,
+          0.4137,
+          0.1859
+        ],
+        "confidence": 1.0,
+        "latency_ms": 290.0830078125,
+        "t_video": 41.66
+      }
+    ]
+  }
+]

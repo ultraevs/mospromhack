@@ -10,7 +10,9 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { credentials: "same-origin", ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
+  // для FormData браузер сам ставит multipart с boundary
+  const type: Record<string, string> = init?.body instanceof FormData ? {} : { "Content-Type": "application/json" };
+  const res = await fetch(path, { credentials: "same-origin", ...init, headers: { ...type, ...init?.headers } });
   if (!res.ok) {
     if (res.status === 401 && path !== "/api/auth/login" && path !== "/api/auth/me") window.dispatchEvent(new Event("auth-expired"));
     let detail = `Сервер ответил ${res.status}`;
@@ -51,6 +53,12 @@ export const api = {
   updateCamera: (id: number, body: Partial<CameraInput>) => request<Camera>(`/api/cameras/${id}`, json("PATCH", body)),
   deleteCamera: (id: number) => request<void>(`/api/cameras/${id}`, { method: "DELETE" }),
   videos: () => request<{ name: string; size: number }[]>("/api/videos"),
+  images: () => request<{ name: string; count: number }[]>("/api/images"),
+  upload: (files: File[]) => {
+    const body = new FormData();
+    for (const f of files) body.append("files", f);
+    return request<{ source_type: "file" | "images"; source: string }>("/api/uploads", { method: "POST", body });
+  },
 
   zones: (cameraId: number) => request<Zone[]>(`/api/cameras/${cameraId}/zones`),
   createZone: (cameraId: number, body: ZoneInput) => request<Zone>(`/api/cameras/${cameraId}/zones`, json("POST", body)),

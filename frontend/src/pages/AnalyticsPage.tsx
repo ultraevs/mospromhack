@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, errorText } from "../api";
 import { Sign } from "../components/Sign";
 import { Empty, Figure, Loading, Notice, PageHeader, Segmented } from "../components/Ui";
-import { formatCount, formatDay, formatPercent, localDayStart, timezoneLabel } from "../lib/format";
+import { formatCount, formatDay, formatPercent, localDayStart } from "../lib/format";
 import { linkHandler } from "../lib/router";
 import { EVENT_LABEL, type AnalyticsSummary, type Camera } from "../types";
 
@@ -43,7 +43,7 @@ export function AnalyticsPage({ tick }: { tick: number }) {
 
   return (
     <div className="page">
-      <PageHeader title="Аналитика" description={`Время по часовому поясу браузера, ${timezoneLabel()}`} actions={<>
+      <PageHeader title="Аналитика" actions={<>
         <label className="field field-inline-label">
           <span>Камера</span>
           <select value={camera} onChange={(e) => setCamera(e.target.value)}>

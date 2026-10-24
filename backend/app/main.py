@@ -8,7 +8,7 @@ import asyncio
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
-from backend.app.api import analytics, auth, cameras, events, internal, notifications, public, zones
+from backend.app.api import analytics, auth, cameras, events, internal, notifications, public, uploads, zones
 from backend.app.db.session import make_engine, make_session_factory
 from backend.app.services.hub import Hub
 from backend.app.services.auth import seed_users
@@ -93,7 +93,7 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
 
     app = FastAPI(title="Контроль нарушений по видео", lifespan=lifespan)
     app.state.app = state
-    for module in (auth, cameras, zones, events, analytics, notifications, internal, public):
+    for module in (auth, cameras, uploads, zones, events, analytics, notifications, internal, public):
         app.include_router(module.router)
     @app.get("/media/{file_path:path}", include_in_schema=False)
     async def media_file(file_path: str, _user=Depends(get_current_user), state: AppState = Depends(get_state)):

@@ -22,6 +22,7 @@ from worker.app.model_spec import load_all_specs  # noqa: E402
 from worker.app.postprocess import Detections, decode, merge_heads, merge_people, preprocess  # noqa: E402
 
 OUT = ROOT / "data" / "heads_gt"
+GT = ROOT / "eval" / "heads_gt"  # эталон лежит в репо, make пишет в data
 VIDEOS = ["solo-worker.mp4", "ptz_yard.mp4", "fire-explosion.mp4", "factory_floor.mp4", "warehouse.mp4",
           "fall_test.mp4", "css_test.mp4"]
 
@@ -117,9 +118,9 @@ def verdict(dets: Detections, spec, box) -> str | None:
 
 
 def evaluate(args) -> None:
-    items = {it["id"]: it for it in json.loads((OUT / "items.json").read_text(encoding="utf-8"))}
+    items = {it["id"]: it for it in json.loads((GT / "items.json").read_text(encoding="utf-8"))}
     gt = {}
-    for line in (OUT / "labels.txt").read_text(encoding="utf-8").splitlines():
+    for line in (GT / "labels.txt").read_text(encoding="utf-8").splitlines():
         parts = line.split("#")[0].split()
         if len(parts) >= 2 and parts[1] in ("h", "n"):
             gt[int(parts[0])] = parts[1]

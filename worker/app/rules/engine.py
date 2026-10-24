@@ -70,12 +70,14 @@ def evaluate_track(track: TrackState, t: float, camera: WorkerCamera, rules: Rul
         zone_id = next(iter(sorted(track.last.zones & flammable)), None)
         out.append(Candidate(EventType.smoking, check_k_of_m(track.checks, rules.smoking), severity, bbox, zone_id))
 
+    out.append(Candidate(EventType.vehicle_proximity, check_vehicle_proximity(obs, t, rules.vehicle_proximity),
+                         SEVERITY[EventType.vehicle_proximity], bbox))
+    if camera.stills:  # на картинке все неподвижны, движение не считаем
+        return out
     restricted = {z.id for z in camera.zones if z.type == ZoneType.restricted}
     severity = Severity.high if track.last.zones & restricted else SEVERITY[EventType.running]
     zone_id = next(iter(sorted(track.last.zones & restricted)), None)
     out.append(Candidate(EventType.running, check_running(obs, t, rules.running), severity, bbox, zone_id))
-    out.append(Candidate(EventType.vehicle_proximity, check_vehicle_proximity(obs, t, rules.vehicle_proximity),
-                         SEVERITY[EventType.vehicle_proximity], bbox))
     out.append(Candidate(EventType.fall, check_fall(obs, t, rules.fall), SEVERITY[EventType.fall], bbox))
     out.append(Candidate(EventType.lying_immobile, check_lying_immobile(obs, t, rules.lying_immobile),
                          SEVERITY[EventType.lying_immobile], bbox))
@@ -104,7 +106,8 @@ class RuleEngine:
             evaluated[track_id] = evaluate_track(track, t, camera, rules)
             for cand in evaluated[track_id]:
                 if cand.result.active:
-                    self._activate((track_id, cand.type), cand, t, life.cooldown_s, life, actions, retrack=True)
+                    self._activate((track_id, cand.type), cand, t, life.cooldown_s, life, actions,
+                                   retrack=not camera.stills)  # на слайдшоу каждая картинка новая сцена
 
         for key, op in list(self._open.items()):
             track_id = key[0]
@@ -117,16 +120,17 @@ class RuleEngine:
         return actions, evaluated
 
     def step_camera(self, t: float, event_type: EventType, result: RuleResult, bbox: BBox | None,
-                    rules: RuleSettings) -> list[EventOpen | EventClose]:
+                    rules: RuleSettings, stills: bool = False) -> list[EventOpen | EventClose]:
         life = rules.lifecycle
+        cooldown = 0.0 if stills else life.camera_cooldown_s  # картинки сменяются, кулдаун не нужен
         key = (None, event_type)
         actions: list[EventOpen | EventClose] = []
         if result.active:
             cand = Candidate(event_type, result, SEVERITY[event_type], bbox)
-            self._activate(key, cand, t, life.camera_cooldown_s, life, actions, retrack=False)
+            self._activate(key, cand, t, cooldown, life, actions, retrack=False)
         op = self._open.get(key)
         if op and t - op.last_true >= life.close_after_s:
-            self._close(key, t, life.camera_cooldown_s, actions)
+            self._close(key, t, cooldown, actions)
         return actions
 
     def _activate(self, key, cand: Candidate, t: float, cooldown_s: float, life, actions, retrack: bool) -> None:

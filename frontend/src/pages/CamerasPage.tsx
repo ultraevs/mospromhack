@@ -224,7 +224,7 @@ function Focus({ camera, cameras, health, tick, isAdmin, onEdit }: {
             {isAdmin && <button type="button" className="btn btn-ghost" onClick={onEdit}><Icon name="settings" size={15} />Настроить камеру</button>}
           </div>
           <p className="stage-meta">
-            {camera.source_type === "rtsp" ? "RTSP" : "Файл"}: {camera.source}
+            {camera.source_type === "rtsp" ? "RTSP" : camera.source_type === "images" ? "Картинки" : "Файл"}: {camera.source}
             {camera.required_ppe.length > 0 && <> · Обязательно: {camera.required_ppe.map((p) => PPE_LABEL[p].toLowerCase()).join(", ")}</>}
           </p>
         </section>

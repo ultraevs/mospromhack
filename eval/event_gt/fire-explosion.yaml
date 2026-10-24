@@ -1,0 +1,9 @@
+# разметка глазами по листам frames/, 24.10. disputed: true — в счёт не идёт, события в нём не считаются ложными
+video: fire-explosion.mp4
+required_ppe: [helmet, vest]
+intervals:
+  - {type: no_helmet, start_s: 0, end_s: 14.7, who: "левый рабочий в тёмном, без каски"}
+  - {type: no_helmet, start_s: 0, end_s: 14.7, who: "правый рабочий", disputed: true, why: "в красном свете не разобрать, каска или волосы (heads_gt: ?)"}
+  - {type: no_vest, start_s: 0, end_s: 14.7, who: "три рабочих у печи, жилетов нет ни на ком", count: 3}
+  - {type: fire, start_s: 12.8, end_s: 14.7, who: "выброс металла/пламя из печи"}
+  - {type: smoke, start_s: 0, end_s: 14.7, disputed: true, why: "дымка в цехе весь ролик, это фон, а не происшествие"}

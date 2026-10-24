@@ -1,0 +1,5 @@
+video: factory_floor.mp4
+required_ppe: [helmet, vest]
+intervals:
+  - {type: no_helmet, start_s: 0, end_s: 17, who: "люди у столов, касок нет ни на ком; уверенно видно ~5", count: 5}
+  - {type: no_vest, start_s: 0, end_s: 17, disputed: true, why: "почти все в оранжевых жилетах, у пары тёмных фигур сверху не разобрать"}

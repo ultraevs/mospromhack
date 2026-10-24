@@ -1,0 +1,12 @@
+# офис, сиз не требуем (воркеру --ppe пусто). склейки на 16.5, 22, 39, 56 с; присед на 20-21 с — не падение, событие там ложное
+video: fall_test.mp4
+required_ppe: []
+intervals:
+  - {type: fall, start_s: 2.5, end_s: 4.5, who: "сцена 1, падение у двери"}
+  - {type: lying_immobile, start_s: 4, end_s: 16.5, who: "сцена 1, лежит"}
+  - {type: fall, start_s: 24.5, end_s: 27, who: "сцена 3, падение в прыжке"}
+  - {type: lying_immobile, start_s: 27, end_s: 38.5, who: "сцена 3, лежит"}
+  - {type: fall, start_s: 40.5, end_s: 42.5, who: "сцена 4, падение со стула"}
+  - {type: lying_immobile, start_s: 42, end_s: 55.5, who: "сцена 4, лежит на спине"}
+  - {type: fall, start_s: 56, end_s: 57.5, who: "сцена 5, сползает со стула на пол"}
+  - {type: lying_immobile, start_s: 57.5, end_s: 71.4, disputed: true, why: "сидит на полу, прислонившись, не лежит"}

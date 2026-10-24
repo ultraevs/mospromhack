@@ -6,10 +6,6 @@ import { formatDateTime } from "../lib/format";
 import type { AuthUser, UserRole } from "../types";
 
 const ROLE_LABEL: Record<UserRole, string> = { admin: "Администратор", viewer: "Оператор" };
-const ROLE_HINT: Record<UserRole, string> = {
-  admin: "всё: камеры, зоны, правила, уведомления, пользователи",
-  viewer: "камеры и журнал, разбор нарушений",
-};
 
 export function UsersPage({ me }: { me: AuthUser }) {
   const [users, setUsers] = useState<AuthUser[] | null>(null);
@@ -38,7 +34,6 @@ export function UsersPage({ me }: { me: AuthUser }) {
   return (
     <div className="page">
       <PageHeader title="Пользователи"
-        description={<>Администратор: {ROLE_HINT.admin}. Оператор: {ROLE_HINT.viewer}.</>}
         actions={<button type="button" className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" size={16} />Добавить пользователя</button>} />
       {error && <Notice onClose={() => setError(null)}>{error}</Notice>}
       {message && <Notice tone="ok" onClose={() => setMessage(null)}>{message}</Notice>}
@@ -126,8 +121,8 @@ function UserForm({ onClose, onCreated }: { onClose: () => void; onCreated: (u: 
         <label className="field">
           <span>Роль</span>
           <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}>
-            <option value="viewer">{ROLE_LABEL.viewer}: {ROLE_HINT.viewer}</option>
-            <option value="admin">{ROLE_LABEL.admin}: {ROLE_HINT.admin}</option>
+            <option value="viewer">{ROLE_LABEL.viewer}</option>
+            <option value="admin">{ROLE_LABEL.admin}</option>
           </select>
         </label>
         <label className="field">

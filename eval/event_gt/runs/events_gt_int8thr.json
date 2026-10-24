@@ -1,0 +1,424 @@
+[
+ {
+  "video": "fire-explosion.mp4",
+  "duration": 14.716,
+  "fps": 6.0,
+  "required_ppe": [
+   "helmet",
+   "vest"
+  ],
+  "tiles": true,
+  "wall_s": 24.9,
+  "proc_fps": 1.6,
+  "events": [
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827672767.5728,
+    "captured_ts": 1792827671699,
+    "track_id": 1,
+    "bbox": [
+     0.2066,
+     0.5507,
+     0.0781,
+     0.3528
+    ],
+    "confidence": 0.183,
+    "latency_ms": 1068.57275390625,
+    "t_video": 1.98
+   },
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827672767.7332,
+    "captured_ts": 1792827671699,
+    "track_id": 2,
+    "bbox": [
+     0.3484,
+     0.541,
+     0.0586,
+     0.3625
+    ],
+    "confidence": 0.06,
+    "latency_ms": 1068.733154296875,
+    "t_video": 1.98
+   },
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827673785.0957,
+    "captured_ts": 1792827673006,
+    "track_id": 3,
+    "bbox": [
+     0.4125,
+     0.5062,
+     0.0641,
+     0.2486
+    ],
+    "confidence": 0.082,
+    "latency_ms": 779.095703125,
+    "t_video": 2.75
+   },
+   {
+    "type": "no_vest",
+    "camera": 1,
+    "t": 1792827675983.9128,
+    "captured_ts": 1792827674780,
+    "track_id": 1,
+    "bbox": [
+     0.2232,
+     0.5066,
+     0.0754,
+     0.3479
+    ],
+    "confidence": 1.0,
+    "latency_ms": 1203.912841796875,
+    "t_video": 3.8
+   },
+   {
+    "type": "no_vest",
+    "camera": 1,
+    "t": 1792827675984.1614,
+    "captured_ts": 1792827674780,
+    "track_id": 2,
+    "bbox": [
+     0.3567,
+     0.5062,
+     0.0615,
+     0.3528
+    ],
+    "confidence": 1.0,
+    "latency_ms": 1204.161376953125,
+    "t_video": 3.8
+   },
+   {
+    "type": "no_vest",
+    "camera": 1,
+    "t": 1792827675984.2864,
+    "captured_ts": 1792827674780,
+    "track_id": 3,
+    "bbox": [
+     0.4209,
+     0.4965,
+     0.0613,
+     0.2486
+    ],
+    "confidence": 1.0,
+    "latency_ms": 1204.286376953125,
+    "t_video": 3.8
+   }
+  ]
+ },
+ {
+  "video": "solo-worker.mp4",
+  "duration": 37.383,
+  "fps": 6.0,
+  "required_ppe": [
+   "helmet",
+   "vest"
+  ],
+  "tiles": true,
+  "wall_s": 38.6,
+  "proc_fps": 2.99,
+  "events": [
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827696166.9167,
+    "captured_ts": 1792827695947,
+    "track_id": 1,
+    "bbox": [
+     0.2928,
+     0.3191,
+     0.0922,
+     0.3424
+    ],
+    "confidence": 0.102,
+    "latency_ms": 219.916748046875,
+    "t_video": 1.12
+   },
+   {
+    "type": "no_vest",
+    "camera": 1,
+    "t": 1792827697939.8516,
+    "captured_ts": 1792827697617,
+    "track_id": 1,
+    "bbox": [
+     0.2956,
+     0.3295,
+     0.0893,
+     0.3076
+    ],
+    "confidence": 1.0,
+    "latency_ms": 322.8515625,
+    "t_video": 2.74
+   },
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827714283.763,
+    "captured_ts": 1792827713679,
+    "track_id": 4,
+    "bbox": [
+     0.2734,
+     0.4316,
+     0.084,
+     0.4424
+    ],
+    "confidence": 0.097,
+    "latency_ms": 604.762939453125,
+    "t_video": 18.32
+   },
+   {
+    "type": "no_vest",
+    "camera": 1,
+    "t": 1792827716386.9414,
+    "captured_ts": 1792827715603,
+    "track_id": 4,
+    "bbox": [
+     0.268,
+     0.4368,
+     0.0895,
+     0.4375
+    ],
+    "confidence": 1.0,
+    "latency_ms": 783.94140625,
+    "t_video": 20.18
+   }
+  ]
+ },
+ {
+  "video": "factory_floor.mp4",
+  "duration": 17.0,
+  "fps": 6.0,
+  "required_ppe": [
+   "helmet",
+   "vest"
+  ],
+  "tiles": true,
+  "wall_s": 16.6,
+  "proc_fps": 2.84,
+  "events": [
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827745078.3208,
+    "captured_ts": 1792827744788,
+    "track_id": 1,
+    "bbox": [
+     0.517,
+     0.2859,
+     0.0348,
+     0.174
+    ],
+    "confidence": 0.081,
+    "latency_ms": 290.32080078125,
+    "t_video": 1.15
+   },
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827745845.5847,
+    "captured_ts": 1792827745623,
+    "track_id": 3,
+    "bbox": [
+     0.5563,
+     0.3726,
+     0.05,
+     0.1688
+    ],
+    "confidence": 0.078,
+    "latency_ms": 222.584716796875,
+    "t_video": 1.99
+   },
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827753095.2603,
+    "captured_ts": 1792827752378,
+    "track_id": 2,
+    "bbox": [
+     0.4092,
+     0.4969,
+     0.0395,
+     0.2285
+    ],
+    "confidence": 0.078,
+    "latency_ms": 717.26025390625,
+    "t_video": 8.74
+   },
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827754177.108,
+    "captured_ts": 1792827753488,
+    "track_id": 5,
+    "bbox": [
+     0.6014,
+     0.3142,
+     0.0363,
+     0.0993
+    ],
+    "confidence": 0.075,
+    "latency_ms": 689.10791015625,
+    "t_video": 9.85
+   },
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827754177.377,
+    "captured_ts": 1792827753488,
+    "track_id": 10,
+    "bbox": [
+     0.3707,
+     0.4274,
+     0.0336,
+     0.2035
+    ],
+    "confidence": 0.127,
+    "latency_ms": 689.376953125,
+    "t_video": 9.85
+   },
+   {
+    "type": "no_vest",
+    "camera": 1,
+    "t": 1792827755590.6472,
+    "captured_ts": 1792827755290,
+    "track_id": 10,
+    "bbox": [
+     0.3734,
+     0.4278,
+     0.0336,
+     0.1986
+    ],
+    "confidence": 1.0,
+    "latency_ms": 300.647216796875,
+    "t_video": 11.65
+   }
+  ]
+ },
+ {
+  "video": "warehouse.mp4",
+  "duration": 37.0,
+  "fps": 6.0,
+  "required_ppe": [
+   "helmet",
+   "vest"
+  ],
+  "tiles": true,
+  "wall_s": 37.3,
+  "proc_fps": 4.68,
+  "events": [
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827772542.7563,
+    "captured_ts": 1792827772299,
+    "track_id": 1,
+    "bbox": [
+     0.6377,
+     0.5604,
+     0.0668,
+     0.3375
+    ],
+    "confidence": 0.098,
+    "latency_ms": 243.75634765625,
+    "t_video": 1.97
+   },
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827776497.8086,
+    "captured_ts": 1792827776305,
+    "track_id": 3,
+    "bbox": [
+     0.5762,
+     0.3937,
+     0.0422,
+     0.1139
+    ],
+    "confidence": 0.095,
+    "latency_ms": 192.80859375,
+    "t_video": 5.95
+   }
+  ]
+ },
+ {
+  "video": "ptz_yard.mp4",
+  "duration": 15.117,
+  "fps": 6.0,
+  "required_ppe": [
+   "helmet",
+   "vest"
+  ],
+  "tiles": true,
+  "wall_s": 16.1,
+  "proc_fps": 2.67,
+  "events": [
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827818862.446,
+    "captured_ts": 1792827818586,
+    "track_id": 2,
+    "bbox": [
+     0.4455,
+     0.0964,
+     0.0809,
+     0.392
+    ],
+    "confidence": 0.116,
+    "latency_ms": 276.446044921875,
+    "t_video": 1.38
+   },
+   {
+    "type": "no_vest",
+    "camera": 1,
+    "t": 1792827819627.3489,
+    "captured_ts": 1792827819423,
+    "track_id": 1,
+    "bbox": [
+     0.8016,
+     0.383,
+     0.1141,
+     0.4424
+    ],
+    "confidence": 1.0,
+    "latency_ms": 204.348876953125,
+    "t_video": 2.17
+   },
+   {
+    "type": "no_vest",
+    "camera": 1,
+    "t": 1792827819959.4343,
+    "captured_ts": 1792827819743,
+    "track_id": 2,
+    "bbox": [
+     0.5959,
+     0.0861,
+     0.0754,
+     0.4174
+    ],
+    "confidence": 1.0,
+    "latency_ms": 216.434326171875,
+    "t_video": 2.47
+   },
+   {
+    "type": "no_helmet",
+    "camera": 1,
+    "t": 1792827822436.1404,
+    "captured_ts": 1792827822222,
+    "track_id": 1,
+    "bbox": [
+     0.7984,
+     0.383,
+     0.1172,
+     0.4424
+    ],
+    "confidence": 0.09,
+    "latency_ms": 214.140380859375,
+    "t_video": 4.8
+   }
+  ]
+ }
+]
