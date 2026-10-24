@@ -112,6 +112,8 @@ flowchart TB
 | [backend/](backend/) | API, журнал, камеры, MAX, вебхуки, выгрузки |
 | [frontend/](frontend/) | интерфейс |
 | [training/](training/) | датасеты и обучение моделей |
+| [models/](models/) | веса onnx и программы LinQ TPU: СИЗ, опасности, люди и техника, головы, поза |
+| [data/videos/](data/videos/) | демо-ролики для камер |
 | [scripts/](scripts/) | запуск, компиляция и замеры на LinQ, оценка качества |
 | [eval/](eval/) | разметка событий и эталон касок |
 | [docs/](docs/) | [API](docs/API.md) · [LinQ TPU](docs/LINQ.md) · [метрики](docs/METRICS.md) |
