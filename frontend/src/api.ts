@@ -68,6 +68,8 @@ export const api = {
   events: (params: Query = {}) => request<EventPage>(`/api/events${query(params)}`),
   // не fetch, а ссылка: браузер сам скачает файл с cookie
   eventsExportUrl: (params: Query = {}, format: "xlsx" | "csv" = "xlsx") => `/api/events/export${query({ ...params, format })}`,
+  // печатный отчёт за смену, тоже ссылкой в новой вкладке
+  eventsReportUrl: (params: Query = {}) => `/api/events/report${query(params)}`,
   event: (id: string) => request<SafetyEvent>(`/api/events/${id}`),
   reviewEvent: (id: string, review: Review) => request<SafetyEvent>(`/api/events/${id}`, json("PATCH", { review })),
 

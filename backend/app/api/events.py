@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import csv
+import html
 import io
-from datetime import date, datetime, timezone
+from collections import Counter
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -130,6 +132,71 @@ async def export_events(conds: list = Depends(_filters), format: str = Query(def
         wb.save(buf)
         body, media = buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return Response(body, media_type=media, headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+REPORT_CSS = """
+body{font:13px/1.4 Arial,sans-serif;color:#111;margin:24px}h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:18px 0 6px}
+.meta{color:#555}.tiles{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.tile{border:1px solid #bbb;border-radius:6px;padding:8px 12px;min-width:120px}
+.tile b{display:block;font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}
+th{background:#eee}td img{max-width:110px;max-height:70px}.sign{margin-top:32px}.print{margin-bottom:12px;padding:6px 14px;font-size:14px}
+tr{page-break-inside:avoid}@media print{.print{display:none}body{margin:0}}
+"""
+
+
+def _e(v) -> str:
+    return html.escape(str(v if v is not None else ""))
+
+
+@router.get("/events/report", response_class=HTMLResponse)
+async def report_events(conds: list = Depends(_filters), camera_id: int | None = None,
+                        from_: datetime | None = Query(default=None, alias="from"), to: datetime | None = None,
+                        db: Session = Depends(get_db)):
+    e = _e
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if from_ is None and to is None:
+        # смена по умолчанию - последние 12 часов
+        from_ = now - timedelta(hours=12)
+        conds = [*conds, EventRow.started_at >= from_]
+    rows = db.execute(select(EventRow).where(*conds).order_by(EventRow.started_at.asc(), EventRow.id.asc())
+                      .limit(EXPORT_LIMIT)).scalars().all()
+    real = [r for r in rows if r.review != "false_positive"]
+    lat = [r.latency_ms for r in real if r.latency_ms is not None]
+    by_type = Counter(r.type for r in real).most_common()
+    places = Counter((r.camera_name or f"Камера {r.camera_id}", r.zone_name or "") for r in real).most_common(5)
+    cam = next((r.camera_name for r in rows if r.camera_name), f"#{camera_id}") if camera_id is not None else ""
+    period = f"{_local(_naive(from_)) or 'начала журнала'} — {_local(_naive(to)) or _local(now)}"
+
+    tiles = [("Нарушений", len(real)), ("Критичных", sum(r.severity == "high" for r in real)),
+             ("Не разобрано", sum(r.review == "none" for r in real)), ("Ложных исключено", len(rows) - len(real))]
+    if lat:
+        tiles.insert(3, ("Среднее до тревоги", f"{sum(lat) / len(lat) / 1000:.1f} с"))
+    out = ["<!doctype html><html lang='ru'><head><meta charset='utf-8'><title>Отчёт по нарушениям за смену</title>"
+           f"<style>{REPORT_CSS}</style></head><body>",
+           "<button class='print' onclick='window.print()'>Печать / сохранить в PDF</button>",
+           "<h1>Отчёт по нарушениям за смену</h1>",
+           f"<div class='meta'>Период: {e(period)}" + (f"<br>Камера: {e(cam)}" if cam else "")
+           + f"<br>Сформирован: {e(_local(now))}</div>",
+           "<div class='tiles'>" + "".join(f"<div class='tile'><b>{e(v)}</b>{e(k)}</div>" for k, v in tiles) + "</div>"]
+    if by_type:
+        out.append("<h2>По типам</h2><table><tr><th>Нарушение</th><th>Кол-во</th></tr>"
+                   + "".join(f"<tr><td>{e(TYPE_LABEL.get(t, t))}</td><td>{n}</td></tr>" for t, n in by_type) + "</table>")
+    if places:
+        out.append("<h2>Проблемные места</h2><table><tr><th>Камера</th><th>Зона</th><th>Кол-во</th></tr>"
+                   + "".join(f"<tr><td>{e(c)}</td><td>{e(z or '—')}</td><td>{n}</td></tr>" for (c, z), n in places)
+                   + "</table>")
+    out.append("<h2>Журнал</h2><table><tr><th>№</th><th>Время</th><th>Нарушение</th><th>Камера / зона</th>"
+               "<th>Разбор</th><th>Комментарий</th><th>Кадр</th></tr>")
+    for i, r in enumerate(rows, 1):
+        place = r.camera_name + (f" / {r.zone_name}" if r.zone_name else "")
+        note = r.details.get("comment", "") if isinstance(r.details, dict) else ""  # отдельного поля пока нет
+        img = f"<img src='{e(r.snapshot_url)}' alt=''>" if r.snapshot_url else ""
+        out.append(f"<tr><td>{i}</td><td>{e(_local(r.started_at))}</td><td>{e(TYPE_LABEL.get(r.type, r.type))}</td>"
+                   f"<td>{e(place)}</td><td>{e(REVIEW_LABEL.get(r.review, r.review))}</td><td>{e(note)}</td>"
+                   f"<td>{img}</td></tr>")
+    if not rows:
+        out.append("<tr><td colspan='7'>Нарушений за период нет</td></tr>")
+    out.append("</table><p class='sign'>Подпись ответственного: ______________________ / ______________ /</p></body></html>")
+    return HTMLResponse("".join(out))
 
 
 @router.get("/events/{event_id}", response_model=Event)

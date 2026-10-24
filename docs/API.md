@@ -85,6 +85,7 @@
 |---|---|
 | `GET /events` | журнал, новые сверху |
 | `GET /events/export?format=xlsx\|csv` | журнал файлом для отчёта, см. ниже |
+| `GET /events/report` | печатный HTML-отчёт за смену (те же фильтры, без периода - последние 12 ч), Ctrl+P → PDF |
 | `GET /events/{id}` | одно событие |
 | `PATCH /events/{id}` | разбор: `{"review": "confirmed"}`, `false_positive`, `forwarded` (передано мастеру) или `none` |
 

@@ -113,6 +113,9 @@ export function EventsPage({ tick }: { tick: number }) {
         <a className="btn btn-ghost" href={api.eventsExportUrl(apiFilters)} download>
           <Icon name="journal" size={15} />Выгрузить в Excel
         </a>
+        <a className="btn btn-ghost" href={api.eventsReportUrl(apiFilters)} target="_blank" rel="noopener">
+          <Icon name="journal" size={15} />Отчёт за смену
+        </a>
       </form>
 
       {error && <Notice>{error}</Notice>}

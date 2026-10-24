@@ -227,3 +227,17 @@ def test_export_csv_and_xlsx(client, camera):
     assert len(rows) == 2 and rows[1][6] == "Огонь" and rows[1][7] == "Высокая"
 
     assert client.get("/api/events/export?format=pdf").status_code == 422
+
+
+def test_shift_report_html(client, camera):
+    post_event(client, camera["id"])
+    b = post_event(client, camera["id"], type="fire", severity="high")
+    client.patch(f"/api/events/{b['id']}", json={"review": "false_positive"})
+    r = client.get(f"/api/events/report?from=2026-10-04T00:00:00Z&camera_id={camera['id']}")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    t = r.text
+    assert "Отчёт по нарушениям за смену" in t and "Ложных исключено" in t and "Подпись ответственного" in t
+    assert "Без каски" in t and "Ложное" in t
+    assert "<b>1</b>Нарушений" in t
+    # без периода - последние 12 часов, старые события не попадают
+    assert "Нарушений за период нет" in client.get("/api/events/report").text

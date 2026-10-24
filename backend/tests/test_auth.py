@@ -98,3 +98,5 @@ def test_ws_events_needs_session(app, viewer):
 def test_viewer_can_export(admin, viewer):
     assert viewer.get("/api/events/export?format=csv").status_code == 200
     assert TestClient(admin.app).get("/api/events/export").status_code == 401
+    assert viewer.get("/api/events/report").status_code == 200
+    assert TestClient(admin.app).get("/api/events/report").status_code == 401
