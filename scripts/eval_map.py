@@ -38,7 +38,8 @@ def average_precision(tp: np.ndarray, conf: np.ndarray, n_gt: int) -> float:
     return float(trapezoid(np.interp(x, mrec, mpre), x))
 
 
-def evaluate(session: ort.InferenceSession, spec, images: list[Path], labels_dir: Path) -> tuple[dict[str, float], float]:
+# по классам: (совпало ли с разметкой, уверенность) на каждую детекцию, число рамок разметки
+def match(session, spec, images: list[Path], labels_dir: Path) -> tuple[list, np.ndarray, float]:
     low = dataclasses.replace(spec, thresholds=np.full(spec.nc, 0.001, np.float32))
     name = session.get_inputs()[0].name
     stats = [([], []) for _ in range(spec.nc)]
@@ -82,6 +83,11 @@ def evaluate(session: ort.InferenceSession, spec, images: list[Path], labels_dir
                             matched[k] = True
                 stats[c][0].extend(matched.tolist())
                 stats[c][1].extend(dets.conf[idx].tolist())
+    return stats, n_gt, spent
+
+
+def evaluate(session: ort.InferenceSession, spec, images: list[Path], labels_dir: Path) -> tuple[dict[str, float], float]:
+    stats, n_gt, spent = match(session, spec, images, labels_dir)
     ap = {spec.classes[c]: average_precision(np.array(stats[c][0], bool), np.array(stats[c][1]), int(n_gt[c]))
           for c in range(spec.nc) if n_gt[c] > 0}
     return ap, spent / len(images) * 1000

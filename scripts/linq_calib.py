@@ -12,6 +12,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from worker.app.crops import tile_spans  # noqa: E402
 from worker.app.model_spec import load_model_spec  # noqa: E402
 from worker.app.postprocess import letterbox  # noqa: E402
 
@@ -58,6 +59,7 @@ def main() -> None:
     ap.add_argument("--videos", type=Path, help="папка с роликами для кадров из реальных сцен")
     ap.add_argument("--n-images", type=int, default=128)
     ap.add_argument("--n-video", type=int, default=64)
+    ap.add_argument("--tiles", action="store_true", help="кадры роликов резать на плитки, как их видит модель голов")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", type=Path, default=ROOT / "data" / "linq")
     args = ap.parse_args()
@@ -67,7 +69,10 @@ def main() -> None:
     paths = dataset_images(args.images, args.n_images, rng)
     frames = [cv2.imread(str(p)) for p in paths]
     if args.videos:
-        frames += video_frames(args.videos, args.n_video)
+        video = video_frames(args.videos, args.n_video)
+        if args.tiles:
+            video = [f[:, x1:x2] for f in video for x1, x2 in tile_spans(f.shape[1], f.shape[0])]
+        frames += video
 
     batch = np.stack([letterbox(f, spec.input_size)[0] for f in frames if f is not None])
     args.out.mkdir(parents=True, exist_ok=True)

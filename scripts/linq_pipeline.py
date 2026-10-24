@@ -40,7 +40,8 @@ class Backend:
 
     def post_event(self, body, snapshot=None, clean=None):
         now = time.time() * 1000
-        self.events.append({"type": body.type.value, "camera": body.camera_id, "t": now,
+        self.events.append({"type": body.type.value, "camera": body.camera_id, "t": now, "captured_ts": body.captured_ts,
+                            "track_id": body.track_id, "bbox": body.bbox, "confidence": body.confidence,
                             "latency_ms": now - body.captured_ts if body.captured_ts else None})
         return SimpleNamespace(id=str(len(self.events)))
 
@@ -125,6 +126,53 @@ def run_once(config, specs, detector, videos: list[str], cams: int, fps: float, 
     return summary(backend.stats, backend.events, cams, fps, seconds, config.worker.inflight)
 
 
+def run_video_once(config, specs, detector, video: str, fps: float, ppe: list[str]) -> dict:
+    # один проход ролика без петли: время события считаем от первого кадра ffmpeg (-re, так что это время ролика)
+    import worker.app.main as wmain
+    from shared.sync import probe_duration
+    path = capture.sync_path(capture.SYNC_SCHEME + video)
+    dur = probe_duration(path) or 60
+    opened: dict = {}
+
+    def open_once(url, *a, **kw):
+        if opened:
+            opened.setdefault("t_end", time.time())
+            return None  # ролик кончился, второй раз не открываем
+        cap = capture.open_capture(url, *a, **kw)
+        if cap is not None:
+            opened["t0"] = time.time()
+        return cap
+
+    capture.sync_input = lambda url, now=None: ["-re", "-i", str(capture.sync_path(url))]
+    orig, wmain.open_capture = wmain.open_capture, open_once
+    config.worker.ppe_fps = fps
+    cam = WorkerCamera(id=1, name="cam1", rtsp_url=f"{capture.SYNC_SCHEME}{video}", required_ppe=ppe)
+    backend = Backend(WorkerConfig(version=1, cameras=[cam], rules=config.rules))
+    worker = Worker(config, specs, detector, backend, Sender())
+    thread = threading.Thread(target=worker.run, daemon=True)
+    thread.start()
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < dur + 25 and not ("t0" in opened and time.time() - opened["t0"] > dur + 8):
+        time.sleep(1)
+    worker.stop()
+    thread.join(timeout=10)
+    for state in worker.cameras.values():
+        state.reader.stop()
+    for pool in (worker._pool, worker._cpu, worker._side, worker._detect_pool):
+        pool.shutdown(wait=False, cancel_futures=True)
+    worker._clips.cleanup()
+    wmain.open_capture = orig
+    fps_seen = [c["proc_fps"] for s in backend.stats for c in s["cameras"].values()]
+    # 1080p декод на стенде может не успевать за -re, поэтому растягиваем стенные часы на длину ролика
+    t_first = opened.get("t0", 0) * 1000
+    wall = (opened.get("t_end", time.time()) - opened.get("t0", 0)) * 1000
+    k = dur * 1000 / wall if wall > dur * 1000 else 1.0
+    events = [{**e, "t_video": round((e["captured_ts"] - t_first) * k / 1000, 2) if e["captured_ts"] else None}
+              for e in backend.events]
+    return {"video": video, "duration": dur, "fps": fps, "required_ppe": ppe, "tiles": config.worker.tiles, "wall_s": round(wall / 1000, 1),
+            "proc_fps": round(float(np.mean(fps_seen[1:] or fps_seen)), 2) if fps_seen else 0.0, "events": events}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cams", type=int, nargs="+", default=[1, 2, 4])
@@ -137,6 +185,8 @@ def main() -> None:
     ap.add_argument("--inflight", type=int, default=1, help="пачек кадров в полёте (worker.inflight)")
     ap.add_argument("--tiles", action="store_true", help="каски с двух плиток кадра (worker.tiles)")
     ap.add_argument("--models", nargs="+", help="только эти модели из models/ (по умолчанию все)")
+    ap.add_argument("--once", action="store_true", help="каждый ролик один проход, события со временем от начала ролика")
+    ap.add_argument("--ppe", nargs="*", default=["helmet", "vest"], help="требуемые сиз (для --once)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     for name in ("httpx", "pika", "worker.capture"):
@@ -160,6 +210,23 @@ def main() -> None:
     linq["program_dir"] = linq["program_dir"].replace("{login}", settings.linq_login or os.environ.get("LINQ_LOGIN", ""))
     detector = create_detector(args.detector, specs, None, config.worker.precision, linq)
     log.info("детектор %s, модели %s", detector.device.replace(settings.linq_login or "-", "<login>"), sorted(specs))
+
+    if args.once:
+        try:
+            out = ROOT / "data" / "linq" / f"events_{args.tag}.json"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            runs = []
+            for v in args.videos:
+                runs.append(run_video_once(config, specs, detector, v, args.fps, args.ppe))
+                log.info("%s: к/с %s, событий %s %s", v, runs[-1]["proc_fps"], len(runs[-1]["events"]),
+                         [(e["type"], e["t_video"]) for e in runs[-1]["events"]])
+                out.write_text(json.dumps(runs, ensure_ascii=False, indent=2), encoding="utf-8")
+        finally:
+            close = getattr(detector, "close", None)
+            if close:
+                close()
+        print(f"отчет: {out.relative_to(ROOT)}")
+        return
 
     rows = []
     try:

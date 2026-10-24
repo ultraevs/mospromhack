@@ -201,3 +201,29 @@ def test_stats_merge_worker_report(client):
     assert s["worker_alive"] is True and s["device"] == "cuda" and s["streams"] == 4
     assert s["inference"]["ppe"]["batch"] == 4 and s["cameras"]["1"]["proc_fps"] == 6.0
     assert s["subscribers"] == {"detections": 0, "events": 0}
+
+
+def test_export_csv_and_xlsx(client, camera):
+    import io
+
+    from openpyxl import load_workbook
+
+    a = post_event(client, camera["id"])
+    post_event(client, camera["id"], type="fire", severity="high")
+    client.patch(f"/internal/events/{a['id']}", headers=INTERNAL, json={"status": "closed", "ended_at": "2026-10-04T12:32:10Z"})
+
+    r = client.get("/api/events/export?format=csv")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    assert re.search(r'filename="events_\d{4}-\d{2}-\d{2}\.csv"', r.headers["content-disposition"])
+    assert r.content.startswith(b"\xef\xbb\xbf")
+    lines = r.content.decode("utf-8-sig").strip().splitlines()
+    assert len(lines) == 3 and lines[0].startswith("ID;Начало")
+    row = next(l for l in lines if a["id"] in l).split(";")
+    assert row[3] == "0:01:04" and row[6] == "Без каски" and row[8] == "Закрыто"
+
+    r = client.get("/api/events/export?format=xlsx&type=fire")
+    assert r.status_code == 200 and ".xlsx" in r.headers["content-disposition"]
+    rows = list(load_workbook(io.BytesIO(r.content)).active.values)
+    assert len(rows) == 2 and rows[1][6] == "Огонь" and rows[1][7] == "Высокая"
+
+    assert client.get("/api/events/export?format=pdf").status_code == 422

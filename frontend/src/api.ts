@@ -58,6 +58,8 @@ export const api = {
   deleteZone: (id: number) => request<void>(`/api/zones/${id}`, { method: "DELETE" }),
 
   events: (params: Query = {}) => request<EventPage>(`/api/events${query(params)}`),
+  // не fetch, а ссылка: браузер сам скачает файл с cookie
+  eventsExportUrl: (params: Query = {}, format: "xlsx" | "csv" = "xlsx") => `/api/events/export${query({ ...params, format })}`,
   event: (id: string) => request<SafetyEvent>(`/api/events/${id}`),
   reviewEvent: (id: string, review: Review) => request<SafetyEvent>(`/api/events/${id}`, json("PATCH", { review })),
 

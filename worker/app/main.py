@@ -10,7 +10,7 @@ import time
 import uuid
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -62,7 +62,8 @@ class Worker:
     def __init__(self, config: AppConfig, specs: dict[str, ModelSpec], detector: Detector, client: BackendClient,
                  sender: DetectionsSender, reader_factory: Callable[[int, str], CameraReader] | None = None):
         self.config = config
-        self.specs = specs
+        own = getattr(detector, "thresholds", {})  # у linq свои пороги под int8
+        self.specs = {n: replace(s, thresholds=own[n]) if n in own else s for n, s in specs.items()}
         self.detector = detector
         self.client = client
         self.sender = sender

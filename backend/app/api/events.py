@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import csv
+import io
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -28,20 +31,9 @@ def _naive(dt: datetime | None) -> datetime | None:
     return dt.astimezone(timezone.utc).replace(tzinfo=None) if dt.tzinfo else dt
 
 
-@router.get("/events", response_model=EventPage)
-async def list_events(
-    camera_id: int | None = None,
-    zone_id: int | None = None,
-    type: EventType | None = None,
-    severity: Severity | None = None,
-    status: EventStatus | None = None,
-    review: Review | None = None,
-    from_: datetime | None = Query(default=None, alias="from"),
-    to: datetime | None = None,
-    limit: int = Query(default=50, ge=1, le=500),
-    offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
-):
+def _filters(camera_id: int | None = None, zone_id: int | None = None, type: EventType | None = None,
+             severity: Severity | None = None, status: EventStatus | None = None, review: Review | None = None,
+             from_: datetime | None = Query(default=None, alias="from"), to: datetime | None = None) -> list:
     conds = []
     if camera_id is not None:
         conds.append(EventRow.camera_id == camera_id)
@@ -59,11 +51,85 @@ async def list_events(
         conds.append(EventRow.started_at >= _naive(from_))
     if to is not None:
         conds.append(EventRow.started_at <= _naive(to))
+    return conds
 
+
+@router.get("/events", response_model=EventPage)
+async def list_events(
+    conds: list = Depends(_filters),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
     total = db.execute(select(func.count()).select_from(EventRow).where(*conds)).scalar_one()
     rows = db.execute(select(EventRow).where(*conds).order_by(EventRow.started_at.desc(), EventRow.id.desc())
                       .limit(limit).offset(offset)).scalars().all()
     return EventPage(items=[svc.to_schema(r) for r in rows], total=total, limit=limit, offset=offset)
+
+
+# подписи как во фронте (types.ts), охране труда коды не нужны
+TYPE_LABEL = {
+    "no_helmet": "Без каски", "no_mask": "Без маски", "no_vest": "Без жилета", "zone_intrusion": "В запретной зоне",
+    "smoking": "Курение", "fire": "Огонь", "smoke": "Дым", "running": "Бег", "vehicle_proximity": "Рядом с техникой",
+    "fall": "Падение", "lying_immobile": "Лежит неподвижно",
+}
+SEVERITY_LABEL = {"high": "Высокая", "medium": "Средняя", "low": "Низкая"}
+STATUS_LABEL = {"open": "Идёт", "closed": "Закрыто"}
+REVIEW_LABEL = {"none": "Не разобрано", "confirmed": "Подтверждено", "false_positive": "Ложное",
+                "forwarded": "Передано мастеру"}
+EXPORT_LIMIT = 50_000
+EXPORT_HEAD = ["ID", "Начало", "Окончание", "Длительность", "Камера", "Зона", "Нарушение", "Важность", "Состояние",
+               "Разбор", "Уверенность", "Стоп-кадр"]
+
+
+def _local(dt: datetime | None) -> str:
+    # в базе наивный utc, в отчёт - время сервера
+    return dt.replace(tzinfo=timezone.utc).astimezone().strftime("%d.%m.%Y %H:%M:%S") if dt else ""
+
+
+def _duration(r: EventRow) -> str:
+    if r.ended_at is None:
+        return ""
+    sec = max(0, int((r.ended_at - r.started_at).total_seconds()))
+    return f"{sec // 3600}:{sec // 60 % 60:02d}:{sec % 60:02d}"
+
+
+def _export_row(r: EventRow) -> list:
+    return [r.id, _local(r.started_at), _local(r.ended_at), _duration(r), r.camera_name, r.zone_name or "",
+            TYPE_LABEL.get(r.type, r.type), SEVERITY_LABEL.get(r.severity, r.severity),
+            STATUS_LABEL.get(r.status, r.status), REVIEW_LABEL.get(r.review, r.review), round(r.confidence, 2),
+            r.snapshot_url or ""]
+
+
+@router.get("/events/export")
+async def export_events(conds: list = Depends(_filters), format: str = Query(default="xlsx", pattern="^(xlsx|csv)$"),
+                        db: Session = Depends(get_db)):
+    rows = db.execute(select(EventRow).where(*conds).order_by(EventRow.started_at.desc(), EventRow.id.desc())
+                      .limit(EXPORT_LIMIT)).scalars().all()
+    data = [_export_row(r) for r in rows]
+    name = f"events_{date.today().isoformat()}.{format}"
+    if format == "csv":
+        buf = io.StringIO()
+        w = csv.writer(buf, delimiter=";")
+        w.writerow(EXPORT_HEAD)
+        w.writerows(data)
+        body, media = buf.getvalue().encode("utf-8-sig"), "text/csv; charset=utf-8"  # bom чтоб excel понял кириллицу
+    else:
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Нарушения"
+        ws.append(EXPORT_HEAD)
+        for row in data:
+            ws.append(row)
+        ws.freeze_panes = "A2"
+        for col, width in zip("ABCDEFGHIJKL", (16, 20, 20, 12, 24, 20, 20, 11, 11, 18, 12, 40)):
+            ws.column_dimensions[col].width = width
+        buf = io.BytesIO()
+        wb.save(buf)
+        body, media = buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return Response(body, media_type=media, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @router.get("/events/{event_id}", response_model=Event)

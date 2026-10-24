@@ -204,11 +204,16 @@ class LinqDetector:
         self._raw: dict[str, tuple[int, dict, dict]] = {}
         self._packers: dict[str, ImagePacker] = {}
         self._pack_cache = _PackCache()
+        # пороги под int8 (scripts/linq_thresholds.py): оценки у квантованной модели ниже, чем у float
+        self.thresholds: dict[str, np.ndarray] = {}
 
         local = {}
         for name, spec in specs.items():
             linq_dir, meta = load_linq_meta(spec)
             self.meta[name] = meta
+            if meta.get("thresholds"):
+                self.thresholds[name] = np.array([meta["thresholds"].get(c, float(spec.thresholds[i]))
+                                                  for i, c in enumerate(spec.classes)], dtype=np.float32)
             self._tails[name] = make_tail(linq_dir, meta)
             self.timings[name] = {"frames": 0, "tpu_ms": 0.0, "roundtrip_ms": 0.0, "tail_ms": 0.0, "pack_ms": 0.0}
             local[name] = linq_dir / meta["program"]

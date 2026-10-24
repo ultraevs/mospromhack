@@ -273,3 +273,11 @@ def test_pixel_thresholds_use_source_frame_pixels(spec):
             opened += actions
         assert len(opened) == expected, scale
         assert pipe.tracks[next(iter(pipe.tracks))].last.height_px == pytest.approx(90 * scale)
+
+
+def test_linq_thresholds_replace_float_ones(spec):
+    det = FakeDetector({"ppe": spec}, {})
+    det.thresholds = {"ppe": np.full(spec.nc, 0.05, np.float32)}
+    w = Worker(AppConfig(), {"ppe": spec}, det, FakeClient(WorkerConfig(version=1, cameras=[])), FakeSender(),
+               reader_factory=FakeReader)
+    assert np.allclose(w.specs["ppe"].thresholds, 0.05) and not np.allclose(spec.thresholds, 0.05)

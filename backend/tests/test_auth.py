@@ -93,3 +93,8 @@ def test_ws_events_needs_session(app, viewer):
     assert e.value.code == 4401
     with viewer.websocket_connect("/ws/events"):
         pass
+
+
+def test_viewer_can_export(admin, viewer):
+    assert viewer.get("/api/events/export?format=csv").status_code == 200
+    assert TestClient(admin.app).get("/api/events/export").status_code == 401

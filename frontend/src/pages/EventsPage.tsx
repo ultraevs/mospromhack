@@ -30,20 +30,20 @@ export function EventsPage({ tick }: { tick: number }) {
     api.cameras().then(setCameras).catch(() => undefined);
   }, []);
 
+  // те же фильтры идут и в список, и в выгрузку
+  const apiFilters = {
+    camera_id: filters.camera || undefined,
+    type: filters.type || undefined,
+    severity: filters.severity || undefined,
+    status: filters.status || undefined,
+    review: filters.review || undefined,
+    from: filters.from ? localDayStart(filters.from) : undefined,
+    to: filters.to ? localDayEnd(filters.to) : undefined,
+  };
   const filterKey = FILTER_KEYS.map((k) => filters[k]).join("|");
   useEffect(() => {
     let cancelled = false;
-    api.events({
-      limit: PAGE,
-      offset: (page - 1) * PAGE,
-      camera_id: filters.camera || undefined,
-      type: filters.type || undefined,
-      severity: filters.severity || undefined,
-      status: filters.status || undefined,
-      review: filters.review || undefined,
-      from: filters.from ? localDayStart(filters.from) : undefined,
-      to: filters.to ? localDayEnd(filters.to) : undefined,
-    }).then((res) => {
+    api.events({ limit: PAGE, offset: (page - 1) * PAGE, ...apiFilters }).then((res) => {
       if (cancelled) return;
       setItems(res.items);
       setTotal(res.total);
@@ -110,6 +110,9 @@ export function EventsPage({ tick }: { tick: number }) {
             <Icon name="refresh" size={15} />Сбросить
           </button>
         )}
+        <a className="btn btn-ghost" href={api.eventsExportUrl(apiFilters)} download>
+          <Icon name="journal" size={15} />Выгрузить в Excel
+        </a>
       </form>
 
       {error && <Notice>{error}</Notice>}
