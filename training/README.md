@@ -11,7 +11,8 @@
 | hazard | fire, smoke, cigarette | D-Fire (Kaggle, не больше 8000 картинок), smoker-yolo (Roboflow) |
 | heads | helmet, no_helmet | Hard Hats, Construction Site Safety |
 | heads2 | helmet, no_helmet | как heads + головы рабочих из SH17 как no_helmet (баланс ~33k / 23k) |
-| people | person, car, truck, bus, motorcycle | не обучается: COCO yolov8s, голова урезана с 80 до 5 классов, `scripts/make_people_model.py` |
+| people | person, car, motorcycle, bus, truck, cell phone | не обучается: COCO yolov8s, голова урезана с 80 до 6 классов, `scripts/make_people_model.py` |
+| pose | 17 ключевых точек человека (COCO) | не обучается: yolov8n-pose, `scripts/make_pose_model.py`; падение, «лежит», переноска груза, телефон у уха |
 
 - В SH17 нет классов «без каски» / «без маски»: `no_helmet` выводится из головы без пересечения с каской, `no_mask` — из лица без маски/щитка (правило `derive` в конфиге).
 - heads2 появилась, потому что v1 без голов из SH17 принимала кепки и волосы за каску.

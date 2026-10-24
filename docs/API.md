@@ -52,10 +52,23 @@
 | `DELETE /zones/{id}` | удалить, ответ 204 |
 
 ```json
-{"name": "Зона резки", "type": "ppe_required", "polygon": [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]], "required_ppe": ["helmet", "mask"]}
+{"name": "Стеллажи, погрузчик", "type": "restricted", "polygon": [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]],
+ "required_ppe": [], "schedule": {"start": "07:55", "end": "12:00", "days": [1, 2, 3, 4, 5]}}
 ```
 
-`type`: `restricted` (вход запрещён), `ppe_required` (обязательны СИЗ из `required_ppe`), `flammable` (горючие материалы). `polygon`: не меньше трёх точек `[x, y]` в долях кадра 0..1, иначе 422. Изменение зоны действует без перезапуска: воркер подхватывает его опросом за 2 секунды.
+| `type` | что делает |
+|---|---|
+| `restricted` | вход запрещён: событие `zone_intrusion` |
+| `ppe_required` | обязательны СИЗ из `required_ppe` |
+| `flammable` | горючие материалы: курение здесь — высокая важность |
+| `smoking_allowed` | курилка: курение здесь не нарушение |
+| `barrier` | узкая полоса ограждения: пересёк — `barrier_crossing` |
+| `suspended_load` | под краном или конвейером: `under_load` |
+| `height` | работа на высоте: `no_harness`, если привязь не видна |
+
+`schedule`: когда зона действует, время местное, `days` — 1 (пн) … 7 (вс). Окно может переходить через полночь (`22:00`–`06:00`). `null` — всегда. Вне окна зона для воркера не существует.
+
+`polygon`: не меньше трёх точек `[x, y]` в долях кадра 0..1, иначе 422. Изменение зоны действует без перезапуска: воркер подхватывает его опросом за 2 секунды.
 
 ### Параметры правил
 
@@ -70,16 +83,27 @@
   "no_mask": {"window_s": 4, "min_observations": 8, "fraction": 0.35},
   "no_vest": {"window_s": 6, "min_observations": 15, "max_fraction": 0.1, "min_person_height_px": 120},
   "zone_intrusion": {"window_s": 1.5, "fraction": 0.7, "min_observations": 4},
-  "smoking": {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": false},
+  "smoking": {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": true},
   "fire": {"k": 3, "m": 5}, "smoke": {"k": 3, "m": 5},
+  "running": {"window_s": 2, "min_observations": 6, "fraction": 0.6, "speed_heights_s": 1.5},
+  "vehicle_proximity": {"window_s": 1.5, "min_observations": 4, "fraction": 0.7, "distance_heights": 1.0, "min_vehicle_speed": 0.1},
+  "fall": {"window_s": 1.5, "min_observations": 2, "upright_ratio": 1.3, "lying_ratio": 1.0, "drop_heights": 0.2},
+  "lying_immobile": {"window_s": 6, "min_observations": 12, "fraction": 0.7, "lying_ratio": 1.0, "max_speed": 0.1},
+  "phone_usage": {"window_s": 3, "min_observations": 6, "fraction": 0.5, "upper_fraction": 0.6},
+  "barrier_crossing": {"window_s": 3, "min_observations": 3},
+  "under_load": {"window_s": 1.5, "fraction": 0.7, "min_observations": 4},
+  "no_harness": {"window_s": 4, "min_observations": 8, "max_fraction": 0.2},
+  "unsafe_carry": {"window_s": 2, "min_observations": 6, "fraction": 0.6, "min_speed_heights_s": 0.3},
   "lifecycle": {"close_after_s": 5, "cooldown_s": 60, "retrack_iou": 0.3, "retrack_window_s": 10,
                 "camera_cooldown_s": 60, "track_lost_s": 2}
 }
 ```
 
-При первом запуске значения берутся из `config.yaml`, дальше хранятся в БД. Значения вне допустимых границ: 422.
+При первом запуске значения берутся из `config.yaml`, дальше хранятся в БД. Значения вне допустимых границ: 422. `smoking.everywhere`: `true` — курение нарушение везде, кроме зон `smoking_allowed`; `false` — только в зонах `flammable`. `min_vehicle_speed` — скорость техники в её высотах в секунду, ниже которой сближение не считается (стоящая техника).
 
 ### События
+
+Типы (`type`): `no_helmet`, `no_vest`, `no_mask`, `zone_intrusion`, `smoking`, `fire`, `smoke`, `running`, `vehicle_proximity`, `fall`, `lying_immobile`, `phone_usage`, `barrier_crossing`, `under_load`, `no_harness`, `unsafe_carry`. Важность `high` у `fire`, `smoke`, `zone_intrusion`, `vehicle_proximity`, `fall`, `lying_immobile`, `barrier_crossing`, `under_load`, `no_harness`; у курения и бега она повышается в зонах `flammable` и `restricted`.
 
 | метод и путь | назначение |
 |---|---|

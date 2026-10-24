@@ -58,7 +58,8 @@
 
 | скрипт | что делает |
 |---|---|
-| `make_people_model.py` | модель people: COCO yolov8s, голова урезана с 80 до 5 классов (person, car, truck, bus, motorcycle) |
+| `make_people_model.py` | модель people: COCO yolov8s, голова урезана с 80 до 6 классов (person, car, motorcycle, bus, truck, cell phone) |
+| `make_pose_model.py` | модель pose: yolov8n-pose (17 точек) в `models/pose/` |
 | `export_dynamic.py` | экспорт `best.dynamic.onnx` с динамическим размером входа |
 | `make_fp16.py` | `best.dynamic.onnx` → `best.fp16.onnx` |
 
