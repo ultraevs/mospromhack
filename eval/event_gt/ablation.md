@@ -1,4 +1,4 @@
-# Абляция на событиях (локально, onnx на GPU)
+# Абляция на событиях (float32, ONNX Runtime)
 
 `linq_pipeline.py --once --detector onnx`, 5 роликов с каской+жилетом + fall_test без сиз, `event_eval.py` (−1…+5 с). 23 нарушения.
 

@@ -39,13 +39,13 @@
 | `linq_compile.py` | onnx → программа TPU: режет хвост модели на CPU, квантует, компилирует |
 | `linq_thresholds.py` | пороги под int8 по max F1 (симуляция = TPU), пишет в `models/<m>/linq/meta.yaml` |
 | `linq_eval.py` | AP50 float32 против int8 на val |
-| `linq_remote.py` | калибровка/компиляция/eval на стенде: `setup`, `sync`, `sh` и т.д., у себя ничего не считаем |
+| `linq_remote.py` | калибровка/компиляция/eval на стенде: `setup`, `sync`, `sh` и т.д. |
 | `linq_stand.py` | клиент Jupyter на стенде: выполнить код/shell, загрузить файл |
 | `linq_stand.ps1` | то же через Docker с VPN |
 | `linq_vpn.ps1` | контейнер с VPN до стенда: `up`/`down`/`exec`/`status` |
 | `linq_sdk.ps1` | Docker-образ с SDK LinQ и запуск команд в нём |
 | `linq_pack.py` | архив кода воркера и моделей для стенда |
-| `linq_deploy.py` | воркер с TPU + мост на стенде, backend/UI у себя (см. docs/LINQ.md) |
+| `linq_deploy.py` | воркер с TPU + мост на стенде, backend и интерфейс отдельно (см. docs/LINQ.md) |
 | `linq_bridge.py` | мост воркер ↔ backend через RabbitMQ |
 | `linq_pipeline.py` | весь воркер на стенде без backend: ролики → TPU → правила → события; `--once` для метрик |
 | `linq_relay.py` | посредник на стенде: jpeg по VPN → облачный TPU → рамки json |
