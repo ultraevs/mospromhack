@@ -69,7 +69,7 @@ def video(tmp_path):
 
 @pytest.fixture
 def backend(tmp_path, video):
-    settings = Settings(_env_file=None, internal_token=TOKEN, telegram_bot_token="", data_dir=tmp_path,
+    settings = Settings(_env_file=None, internal_token=TOKEN, max_bot_token="", data_dir=tmp_path,
                         config_path=ROOT / "config.yaml")
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))

@@ -22,8 +22,9 @@ services:
     restart: unless-stopped
     depends_on: [mediamtx]
     environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-true}
+      MAX_BOT_TOKEN: ${MAX_BOT_TOKEN:-}
+      MAX_ENABLED: ${MAX_ENABLED:-true}
+      MAX_API_URL: ${MAX_API_URL:-https://platform-api2.max.ru}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me}
       AUTH_ADMIN_LOGIN: ${AUTH_ADMIN_LOGIN:-admin}
       AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD:-admin1234}

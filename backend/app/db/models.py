@@ -107,8 +107,8 @@ class DeliveryRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
-class TelegramChatRow(Base):
-    __tablename__ = "telegram_chats"
+class MaxChatRow(Base):
+    __tablename__ = "max_chats"
 
     chat_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
     subscribed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

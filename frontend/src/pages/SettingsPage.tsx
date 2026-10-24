@@ -1,16 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader, Toggle } from "../components/Ui";
 import { loadPrefs, savePrefs, unlockAudio, type AlertPrefs } from "../lib/alerts";
 import { setQuery, useLocation } from "../lib/router";
 import { RulesPanel } from "./settings/RulesPanel";
 import { ShiftsPanel } from "./settings/ShiftsPanel";
-import { TelegramPanel } from "./settings/TelegramPanel";
+import { MaxPanel } from "./settings/MaxPanel";
 import { WebhooksPanel } from "./settings/WebhooksPanel";
 
 const TABS = [
   { key: "rules", label: "Правила" },
   { key: "shifts", label: "Смены" },
-  { key: "telegram", label: "Telegram" },
+  { key: "max", label: "MAX" },
   { key: "webhooks", label: "Вебхуки" },
 ] as const;
 
@@ -34,7 +34,7 @@ export function SettingsPage() {
       <section className="panel settings-body">
         {tab === "rules" && <RulesPanel />}
         {tab === "shifts" && <ShiftsPanel />}
-        {tab === "telegram" && <TelegramPanel />}
+        {tab === "max" && <MaxPanel />}
         {tab === "webhooks" && <WebhooksPanel />}
       </section>
       <BrowserAlerts />
@@ -44,6 +44,11 @@ export function SettingsPage() {
 
 function BrowserAlerts() {
   const [prefs, setPrefs] = useState(loadPrefs);
+  useEffect(() => {
+    const sync = () => setPrefs(loadPrefs());
+    window.addEventListener("alert-prefs", sync);
+    return () => window.removeEventListener("alert-prefs", sync);
+  }, []);
   const [perm, setPerm] = useState(() => (typeof Notification === "undefined" ? "unsupported" : Notification.permission));
   const set = (p: Partial<AlertPrefs>) => {
     const next = { ...prefs, ...p };
@@ -58,7 +63,7 @@ function BrowserAlerts() {
   return (
     <section className="panel settings-body alert-prefs">
       <h2 className="panel-title">Оповещения в браузере</h2>
-      <label className="alert-row"><span>Звук для критичных</span><Toggle checked={prefs.sound} onChange={(v) => set({ sound: v })} label="Звук для критичных" /></label>
+      <label className="alert-row"><span>Звук при нарушениях (кнопка есть и в шапке)</span><Toggle checked={prefs.sound} onChange={(v) => { unlockAudio(); set({ sound: v }); }} label="Звук при нарушениях" /></label>
       <label className="alert-row"><span>Плашка критичных</span><Toggle checked={prefs.banner} onChange={(v) => set({ banner: v })} label="Плашка критичных" /></label>
       <div className="alert-row">
         <span>Уведомления: <b>{permText}</b></span>

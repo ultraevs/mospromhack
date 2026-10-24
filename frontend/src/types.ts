@@ -50,14 +50,14 @@ export interface RuleSettings {
   };
 }
 
-export interface TelegramSettings {
+export interface MaxSettings {
   instant_min_severity: Severity;
   min_interval_s: number;
   summary_interval_s: number;
   repeat_interval_s: number;
 }
 
-export interface TelegramStatus {
+export interface MaxStatus {
   enabled: boolean;
   reason: "switched_off" | "no_token" | "invalid_token" | null;
   running: boolean;
@@ -170,7 +170,7 @@ export interface Stats {
   inference?: Record<string, { avg_ms: number; p95_ms: number; batch: number }>;
   cameras?: Record<string, { online: boolean; error: string | null; read_fps: number; proc_fps: number }>;
   clips?: { built: number; failed: number; pending: number };
-  latency?: { capture_to_event: LatencySummary | null; capture_to_telegram?: LatencySummary | null };
+  latency?: { capture_to_event: LatencySummary | null; capture_to_max?: LatencySummary | null };
 }
 
 export interface SourceHealth {

@@ -8,7 +8,7 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from shared.schemas import RuleSettings, TelegramSettings
+from shared.schemas import MaxSettings, RuleSettings
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -80,15 +80,16 @@ class AppConfig(BaseModel):
     worker: WorkerSection = Field(default_factory=WorkerSection)
     evidence: EvidenceSection = Field(default_factory=EvidenceSection)
     rules: RuleSettings = Field(default_factory=RuleSettings)
-    telegram: TelegramSettings = Field(default_factory=TelegramSettings)
+    max: MaxSettings = Field(default_factory=MaxSettings)
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", env_file_encoding="utf-8", extra="ignore")
 
-    telegram_bot_token: str = ""
+    max_bot_token: str = ""
+    max_api_url: str = "https://platform-api2.max.ru"
     ppe_fps: float | None = None
-    telegram_enabled: bool = True
+    max_enabled: bool = True
     internal_token: str = "change-me"
     auth_admin_login: str = "admin"
     auth_admin_password: str = "admin1234"

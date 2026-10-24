@@ -8,11 +8,11 @@ from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.app.db.models import DeliveryRow, TelegramChatRow, WebhookRow
-from backend.app.services.telegram import AiogramSender, TelegramNotifier, load_settings, save_enabled, save_settings, run_bot
+from backend.app.db.models import DeliveryRow, MaxChatRow, WebhookRow
+from backend.app.services.max_bot import MaxNotifier, MaxSender, load_settings, run_bot, save_enabled, save_settings
 from backend.app.services.webhooks import sample_event
 from backend.app.state import AppState, get_db, get_state, require_admin
-from shared.schemas import EventType, Severity, TelegramSettings
+from shared.schemas import EventType, MaxSettings, Severity
 
 router = APIRouter(prefix="/api", tags=["notifications"], dependencies=[Depends(require_admin)])
 
@@ -35,7 +35,7 @@ class WebhookPatch(BaseModel):
     enabled: bool | None = None
 
 
-class TelegramToggle(BaseModel):
+class MaxToggle(BaseModel):
     enabled: bool
 
 
@@ -128,66 +128,66 @@ async def list_deliveries(webhook_id: int, limit: int = Query(default=50, ge=1, 
     return [_delivery(r) for r in rows]
 
 
-@router.get("/telegram")
-async def telegram_status(db: Session = Depends(get_db), state: AppState = Depends(get_state)) -> dict:
-    subscribers = db.execute(select(func.count()).select_from(TelegramChatRow)).scalar_one()
-    tg = state.telegram_state
-    return {"enabled": tg["enabled"], "reason": tg["reason"], "running": tg["running"], "username": tg["username"],
-            "error": tg["error"],
+@router.get("/max")
+async def max_status(db: Session = Depends(get_db), state: AppState = Depends(get_state)) -> dict:
+    subscribers = db.execute(select(func.count()).select_from(MaxChatRow)).scalar_one()
+    mx = state.max_state
+    return {"enabled": mx["enabled"], "reason": mx["reason"], "running": mx["running"], "username": mx["username"],
+            "error": mx["error"],
             "subscribers": subscribers, "sent": state.notifier.sent if state.notifier else 0,
             "errors": state.notifier.errors if state.notifier else 0,
             "pending": state.notifier.pending if state.notifier else 0}
 
 
-@router.put("/telegram")
-async def set_telegram_enabled(body: TelegramToggle, db: Session = Depends(get_db), state: AppState = Depends(get_state)) -> dict:
+@router.put("/max")
+async def set_max_enabled(body: MaxToggle, db: Session = Depends(get_db), state: AppState = Depends(get_state)) -> dict:
     if body.enabled:
-        token = state.settings.telegram_bot_token
+        token = state.settings.max_bot_token
         if not token:
-            raise HTTPException(status_code=409, detail="не задан TELEGRAM_BOT_TOKEN в окружении backend")
+            raise HTTPException(status_code=409, detail="не задан MAX_BOT_TOKEN в окружении backend")
         try:
-            sender = AiogramSender(token)
+            sender = MaxSender(token, state.settings.max_api_url)
         except Exception as exc:  # noqa: BLE001
-            raise HTTPException(status_code=422, detail=f"токен Telegram не принят: {exc}") from exc
+            raise HTTPException(status_code=422, detail=f"токен MAX не принят: {exc}") from exc
         if state.notifier is None:
-            state.notifier = TelegramNotifier(state.session_factory, sender, state.settings.data_dir / "media", state.config.telegram)
-            state.bus.subscribe("telegram", state.notifier.handle)
+            state.notifier = MaxNotifier(state.session_factory, sender, state.settings.data_dir / "media", state.config.max)
+            state.bus.subscribe("max", state.notifier.handle)
         else:
             state.notifier.set_sender(sender)
             state.notifier.set_enabled(True)
-        state.telegram_sender = sender
+        state.max_sender = sender
         save_enabled(db, True)
-        state.telegram_state.update(enabled=True, reason=None, error=None, running=False)
-        if state.telegram_bot_task is None or state.telegram_bot_task.done():
-            state.telegram_bot_task = asyncio.create_task(run_bot(sender, state.notifier, state.telegram_state), name="telegram-bot")
+        state.max_state.update(enabled=True, reason=None, error=None, running=False)
+        if state.max_bot_task is None or state.max_bot_task.done():
+            state.max_bot_task = asyncio.create_task(run_bot(sender, state.notifier, state.max_state), name="max-bot")
     else:
         if state.notifier:
             state.notifier.set_enabled(False)
-        task = state.telegram_bot_task
+        task = state.max_bot_task
         if task is not None and not task.done():
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
-        state.telegram_bot_task = None
-        state.telegram_sender = None
+        state.max_bot_task = None
+        state.max_sender = None
         save_enabled(db, False)
-        state.telegram_state.update(enabled=False, running=False, username=None, reason="switched_off", error=None)
+        state.max_state.update(enabled=False, running=False, username=None, reason="switched_off", error=None)
     db.commit()
-    subscribers = db.execute(select(func.count()).select_from(TelegramChatRow)).scalar_one()
-    return {"enabled": state.telegram_state["enabled"], "reason": state.telegram_state["reason"],
-            "running": state.telegram_state["running"], "username": state.telegram_state["username"],
-            "error": state.telegram_state["error"], "subscribers": subscribers,
+    subscribers = db.execute(select(func.count()).select_from(MaxChatRow)).scalar_one()
+    return {"enabled": state.max_state["enabled"], "reason": state.max_state["reason"],
+            "running": state.max_state["running"], "username": state.max_state["username"],
+            "error": state.max_state["error"], "subscribers": subscribers,
             "sent": state.notifier.sent if state.notifier else 0,
             "errors": state.notifier.errors if state.notifier else 0,
             "pending": state.notifier.pending if state.notifier else 0}
 
 
-@router.get("/settings/telegram", response_model=TelegramSettings)
-async def get_telegram_settings(db: Session = Depends(get_db), state: AppState = Depends(get_state)):
-    return load_settings(db, state.config.telegram)
+@router.get("/settings/max", response_model=MaxSettings)
+async def get_max_settings(db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+    return load_settings(db, state.config.max)
 
 
-@router.put("/settings/telegram", response_model=TelegramSettings)
-async def put_telegram_settings(body: TelegramSettings, db: Session = Depends(get_db)):
+@router.put("/settings/max", response_model=MaxSettings)
+async def put_max_settings(body: MaxSettings, db: Session = Depends(get_db)):
     save_settings(db, body)
     db.commit()
     return body

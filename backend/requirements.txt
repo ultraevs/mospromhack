@@ -4,7 +4,6 @@ SQLAlchemy
 pydantic
 pydantic-settings
 httpx
-aiogram
 PyYAML
 python-multipart
 openpyxl

@@ -183,7 +183,7 @@ def test_backend_restart_does_not_close_events_of_running_worker(settings):
 def test_stats_report_capture_to_event_latency(client, camera):
     import time
 
-    assert client.get("/api/stats").json()["latency"] == {"capture_to_event": None, "capture_to_telegram": None}
+    assert client.get("/api/stats").json()["latency"] == {"capture_to_event": None, "capture_to_max": None}
     now = int(time.time() * 1000)
     for age in (100, 200, 300):
         post_event(client, camera["id"], captured_ts=now - age)

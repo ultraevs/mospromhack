@@ -14,7 +14,7 @@ INTERNAL = {"X-Internal-Token": TOKEN}
 def settings(tmp_path) -> Settings:
     (tmp_path / "videos").mkdir()
     (tmp_path / "videos" / "demo.mp4").write_bytes(b"not a real video")
-    return Settings(_env_file=None, internal_token=TOKEN, telegram_bot_token="", auth_enabled=False, data_dir=tmp_path,
+    return Settings(_env_file=None, internal_token=TOKEN, max_bot_token="", auth_enabled=False, data_dir=tmp_path,
                     config_path=ROOT / "config.yaml")
 
 

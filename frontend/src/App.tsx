@@ -3,7 +3,7 @@ import { api } from "./api";
 import { CriticalAlerts } from "./components/CriticalAlerts";
 import { Icon, type IconName } from "./components/Icons";
 import { useLiveEvents, type LiveState } from "./hooks/useLiveEvents";
-import { emitLive } from "./lib/alerts";
+import { audioLocked, emitLive, loadPrefs, savePrefs, unlockAudio } from "./lib/alerts";
 import { linkHandler, navigate, useLocation } from "./lib/router";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { CamerasPage } from "./pages/CamerasPage";
@@ -97,10 +97,12 @@ function Workspace({ user, onLogout }: { user: AuthUser; onLogout: () => void })
           <Icon name="menu" />
         </button>
         <span>{route?.label}</span>
+        <SoundToggle />
       </header>
       <aside className={`sidebar ${menuOpen ? "is-open" : ""}`}>
         <div className="brand">
           <strong>Контроль безопасности</strong>
+          <SoundToggle />
         </div>
         <nav aria-label="Разделы">
           {routes.map((r) => (
@@ -145,6 +147,35 @@ function Page({ path, tick, user }: { path: string; tick: number; user: AuthUser
     case "/users": return <UsersPage me={user} />;
     default: return null;
   }
+}
+
+function SoundToggle() {
+  const [on, setOn] = useState(() => loadPrefs().sound);
+  const [locked, setLocked] = useState(audioLocked);
+  useEffect(() => {
+    const sync = () => setOn(loadPrefs().sound);
+    const audio = () => setLocked(audioLocked());
+    window.addEventListener("alert-prefs", sync);
+    window.addEventListener("audio-state", audio);
+    return () => {
+      window.removeEventListener("alert-prefs", sync);
+      window.removeEventListener("audio-state", audio);
+    };
+  }, []);
+  const toggle = () => {
+    unlockAudio();
+    // звук включен, но браузер его держит - первый клик просто разблокирует
+    if (on && locked) return;
+    savePrefs({ ...loadPrefs(), sound: !on });
+  };
+  const waiting = on && locked;
+  const label = !on ? "Звук нарушений выключен" : waiting ? "Нажмите, чтобы браузер разрешил звук" : "Звук нарушений включён";
+  return (
+    <button type="button" className={`icon-btn sound-btn ${on ? "is-on" : ""} ${waiting ? "is-waiting" : ""}`}
+      aria-label={label} aria-pressed={on} title={label} onClick={toggle}>
+      <Icon name={on ? "sound" : "mute"} />
+    </button>
+  );
 }
 
 function Connection({ live }: { live: LiveState }) {

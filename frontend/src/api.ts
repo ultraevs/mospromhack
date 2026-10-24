@@ -1,6 +1,6 @@
 import type {
   AnalyticsSummary, AuthUser, Camera, Capacity, CameraInput, ClientConfig, Delivery, EventPage, Health, Review, RuleSettings, SafetyEvent,
-  Shift, Stats, TelegramSettings, TelegramStatus, UserRole, Webhook, WebhookInput, Zone, ZoneInput,
+  Shift, Stats, MaxSettings, MaxStatus, UserRole, Webhook, WebhookInput, Zone, ZoneInput,
 } from "./types";
 
 export class ApiError extends Error {
@@ -82,10 +82,10 @@ export const api = {
 
   rules: () => request<RuleSettings>("/api/settings/rules"),
   saveRules: (body: RuleSettings) => request<RuleSettings>("/api/settings/rules", json("PUT", body)),
-  telegram: () => request<TelegramStatus>("/api/telegram"),
-  setTelegramEnabled: (enabled: boolean) => request<TelegramStatus>("/api/telegram", json("PUT", { enabled })),
-  telegramSettings: () => request<TelegramSettings>("/api/settings/telegram"),
-  saveTelegramSettings: (body: TelegramSettings) => request<TelegramSettings>("/api/settings/telegram", json("PUT", body)),
+  max: () => request<MaxStatus>("/api/max"),
+  setMaxEnabled: (enabled: boolean) => request<MaxStatus>("/api/max", json("PUT", { enabled })),
+  maxSettings: () => request<MaxSettings>("/api/settings/max"),
+  saveMaxSettings: (body: MaxSettings) => request<MaxSettings>("/api/settings/max", json("PUT", body)),
   shifts: () => request<{ shifts: Shift[] }>("/api/settings/shifts").then((r) => r.shifts),
   saveShifts: (shifts: Shift[]) => request<{ shifts: Shift[] }>("/api/settings/shifts", json("PUT", { shifts })).then((r) => r.shifts),
   capacity: (params: Query) => request<Capacity>(`/api/capacity${query(params)}`, { cache: "no-store" }),

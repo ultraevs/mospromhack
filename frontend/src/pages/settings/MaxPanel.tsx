@@ -1,19 +1,19 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, errorText } from "../../api";
 import { Figure, Loading, Notice, Toggle } from "../../components/Ui";
-import { SEVERITY_LABEL, type Severity, type TelegramSettings, type TelegramStatus } from "../../types";
+import { SEVERITY_LABEL, type Severity, type MaxSettings, type MaxStatus } from "../../types";
 
-export function TelegramPanel() {
-  const [status, setStatus] = useState<TelegramStatus | null>(null);
-  const [settings, setSettings] = useState<TelegramSettings | null>(null);
+export function MaxPanel() {
+  const [status, setStatus] = useState<MaxStatus | null>(null);
+  const [settings, setSettings] = useState<MaxSettings | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = () => api.telegram().then(setStatus).catch((e) => setError(errorText(e, "Не удалось получить состояние бота")));
+  const load = () => api.max().then(setStatus).catch((e) => setError(errorText(e, "Не удалось получить состояние бота")));
   useEffect(() => {
     void load();
-    api.telegramSettings().then(setSettings).catch((e) => setError(errorText(e, "Не удалось загрузить настройки")));
+    api.maxSettings().then(setSettings).catch((e) => setError(errorText(e, "Не удалось загрузить настройки")));
     const timer = window.setInterval(load, 5000);
     return () => window.clearInterval(timer);
   }, []);
@@ -21,7 +21,7 @@ export function TelegramPanel() {
   const toggle = async (enabled: boolean) => {
     setBusy(true);
     try {
-      setStatus(await api.setTelegramEnabled(enabled));
+      setStatus(await api.setMaxEnabled(enabled));
       setError(null);
     } catch (e) {
       setError(errorText(e, "Не удалось переключить бота"));
@@ -35,7 +35,7 @@ export function TelegramPanel() {
     if (!settings) return;
     setBusy(true);
     try {
-      setSettings(await api.saveTelegramSettings(settings));
+      setSettings(await api.saveMaxSettings(settings));
       setSaved(true);
       setError(null);
     } catch (err) {
@@ -45,7 +45,7 @@ export function TelegramPanel() {
     }
   };
 
-  const set = <K extends keyof TelegramSettings>(key: K, value: TelegramSettings[K]) => {
+  const set = <K extends keyof MaxSettings>(key: K, value: MaxSettings[K]) => {
     setSaved(false);
     setSettings((s) => (s ? { ...s, [key]: value } : s));
   };
@@ -53,15 +53,15 @@ export function TelegramPanel() {
   if (!status) return error ? <Notice>{error}</Notice> : <Loading />;
 
   const stateText = status.reason === "no_token" ? "Токен бота не задан"
-    : status.reason === "invalid_token" ? "Токен бота не принят Telegram"
+    : status.reason === "invalid_token" ? "Токен бота не принят MAX"
     : !status.enabled ? "Бот выключен"
     : status.error ? "Ошибка бота" : status.running ? "Бот работает" : "Бот запускается";
 
   return (
-    <div className="telegram">
+    <div className="max-panel">
       <div className="settings-head">
         <div>
-          <h2>Telegram</h2>
+          <h2>MAX</h2>
         </div>
         <div className="field-inline">
           <Toggle checked={status.enabled} disabled={busy || status.reason === "no_token"} onChange={(v) => void toggle(v)} label="Бот включён" />
@@ -71,15 +71,15 @@ export function TelegramPanel() {
       {error && <Notice>{error}</Notice>}
       {status.error && <Notice>{status.error}</Notice>}
       {status.reason === "no_token" && (
-        <Notice tone="warn">Впишите токен бота в .env (<code>TELEGRAM_BOT_TOKEN=</code>) и перезапустите backend.</Notice>
+        <Notice tone="warn">Впишите токен бота в .env (<code>MAX_BOT_TOKEN=</code>) и перезапустите backend. Токен: business.max.ru → Чат-боты → бот → Настройки.</Notice>
       )}
 
       {status.enabled && status.username && (
         <section className="subscribe">
           <h3>Как подписать чат</h3>
           <ol>
-            <li>Откройте бота <a href={`https://t.me/${status.username}`} target="_blank" rel="noreferrer">@{status.username}</a> или добавьте его в рабочий чат смены.</li>
-            <li>Отправьте ему <code>/start</code>. Отписаться: <code>/stop</code>.</li>
+            <li>Откройте бота <a href={`https://max.ru/${status.username}`} target="_blank" rel="noreferrer">@{status.username}</a> или добавьте его в рабочий чат смены.</li>
+            <li>Нажмите «Начать» или отправьте <code>/start</code>. Отписаться: <code>/stop</code>.</li>
           </ol>
         </section>
       )}

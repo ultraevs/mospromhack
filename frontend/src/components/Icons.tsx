@@ -23,6 +23,8 @@ const paths = {
   wall: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   polygon: "M5 18 4 8l8-5 8 6-2 9z",
   external: "M14 5h5v5m0-5-7 7M19 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4",
+  sound: "M4 9.5h3.5L12 5.5v13l-4.5-4H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11",
+  mute: "M4 9.5h3.5L12 5.5v13l-4.5-4H4zM16 9.5l5 5m0-5-5 5",
 } as const;
 
 export type IconName = keyof typeof paths;

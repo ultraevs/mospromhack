@@ -12,7 +12,7 @@ RTSP = "rtsp://cam:secret@10.0.0.5:554/stream1"
 @pytest.fixture
 def app(tmp_path):
     (tmp_path / "videos").mkdir()
-    settings = Settings(_env_file=None, internal_token=TOKEN, telegram_bot_token="", auth_enabled=True, data_dir=tmp_path,
+    settings = Settings(_env_file=None, internal_token=TOKEN, max_bot_token="", auth_enabled=True, data_dir=tmp_path,
                         config_path=ROOT / "config.yaml", auth_admin_login="admin", auth_admin_password="admin-pass",
                         auth_viewer_login="viewer", auth_viewer_password="viewer-pass")
     return create_app(settings, run_sources=False)

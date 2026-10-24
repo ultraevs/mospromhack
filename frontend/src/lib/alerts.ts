@@ -1,4 +1,4 @@
-import type { EventMessage, SafetyEvent } from "../types";
+import type { EventMessage, SafetyEvent, Severity } from "../types";
 
 export interface AlertPrefs { sound: boolean; banner: boolean }
 
@@ -47,31 +47,49 @@ export function onLive(l: Listener) {
 }
 
 let ctx: AudioContext | null = null;
+let lastPlay = 0;
+const GAP_MS = 1200; // пачка событий не превращается в пулемёт
+
+// браузер не дает играть звук до первого клика - шапка показывает это
+export const audioLocked = () => !ctx || ctx.state !== "running";
 
 export function unlockAudio() {
   try {
-    ctx ??= new AudioContext();
+    if (!ctx) {
+      ctx = new AudioContext();
+      ctx.onstatechange = () => window.dispatchEvent(new Event("audio-state"));
+    }
     if (ctx.state === "suspended") void ctx.resume();
   } catch {
     ctx = null;
   }
 }
 
-export function beep() {
+// [частота, старт, длительность]: high - три резких выстрела, medium - два, low - один мягкий
+const PATTERN: Record<Severity, { wave: OscillatorType; gain: number; shots: [number, number, number][] }> = {
+  high: { wave: "square", gain: 0.22, shots: [[1180, 0, 0.11], [880, 0.15, 0.11], [1180, 0.3, 0.16]] },
+  medium: { wave: "square", gain: 0.16, shots: [[880, 0, 0.16], [880, 0.26, 0.16]] },
+  low: { wave: "sine", gain: 0.2, shots: [[660, 0, 0.22]] },
+};
+
+export function alarm(severity: Severity) {
   try {
     if (!ctx || ctx.state !== "running") return;
+    if (Date.now() - lastPlay < GAP_MS) return;
+    lastPlay = Date.now();
+    const { wave, gain: peak, shots } = PATTERN[severity];
     const t0 = ctx.currentTime;
-    for (const off of [0, 0.28]) {
+    for (const [freq, off, len] of shots) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "square";
-      osc.frequency.value = 880;
+      osc.type = wave;
+      osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.0001, t0 + off);
-      gain.gain.exponentialRampToValueAtTime(0.18, t0 + off + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + off + 0.2);
+      gain.gain.exponentialRampToValueAtTime(peak, t0 + off + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + off + len);
       osc.connect(gain).connect(ctx.destination);
       osc.start(t0 + off);
-      osc.stop(t0 + off + 0.22);
+      osc.stop(t0 + off + len + 0.02);
     }
   } catch {
     // звук не критичен

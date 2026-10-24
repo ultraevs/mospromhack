@@ -24,7 +24,7 @@ export function PerformancePage() {
 
   const names = new Map(cameras.map((c) => [String(c.id), c.name]));
   const lat = stats.latency?.capture_to_event ?? null;
-  const tg = stats.latency?.capture_to_telegram ?? null;
+  const mx = stats.latency?.capture_to_max ?? null;
   const models = Object.keys(stats.inference ?? {});
   const targetPpe = stats.target_fps?.ppe;
   const cameraIds = Array.from(new Set([...Object.keys(stats.cameras ?? {}), ...Object.keys(health?.sources ?? {})]));
@@ -40,7 +40,7 @@ export function PerformancePage() {
         <Figure label="Потоков в анализе" value={String(stats.streams ?? 0)} />
         <Figure label="Детектор" value={stats.worker_alive ? `${stats.detector}` : "—"} note={stats.device === "cpu" ? "на процессоре" : stats.device} />
         <Figure label="От кадра до события" value={lat ? `${lat.avg_ms} мс` : "—"} note={latencyNote(lat, "событиям")} />
-        <Figure label="От кадра до Telegram" value={tg ? `${tg.avg_ms} мс` : "—"} note={tg ? latencyNote(tg, "сообщениям") : "сообщений ещё не было"} />
+        <Figure label="От кадра до MAX" value={mx ? `${mx.avg_ms} мс` : "—"} note={mx ? latencyNote(mx, "сообщениям") : "сообщений ещё не было"} />
         <Figure label="Клипы" value={`${stats.clips?.built ?? 0}`} note={`в работе ${stats.clips?.pending ?? 0}, с ошибкой ${stats.clips?.failed ?? 0}`} />
         <Figure label="Вырезок в секунду" value={String(stats.crops_per_s ?? 0)}
           note={`сигарета ${stats.crop_pass?.cigarette ? "вкл" : "выкл"}, головы ${stats.crop_pass?.head ? "вкл" : "выкл"}`} />

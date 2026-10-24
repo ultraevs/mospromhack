@@ -364,7 +364,7 @@ class RuleSettings(BaseModel):
     lifecycle: LifecycleRule = Field(default_factory=LifecycleRule)
 
 
-class TelegramSettings(BaseModel):
+class MaxSettings(BaseModel):
     instant_min_severity: Severity = Severity.high
     min_interval_s: Annotated[float, Field(ge=0.05, le=60)] = 1
     summary_interval_s: Annotated[float, Field(ge=1, le=86_400)] = 60

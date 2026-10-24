@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { applyMessage, beep, loadPrefs, onLive, unlockAudio } from "../lib/alerts";
+import { alarm, applyMessage, loadPrefs, onLive, unlockAudio } from "../lib/alerts";
 import { formatTime } from "../lib/format";
 import { navigate } from "../lib/router";
 import { EVENT_LABEL, type SafetyEvent } from "../types";
@@ -42,9 +42,9 @@ export function CriticalAlerts() {
   }, []);
 
   useEffect(() => onLive((m) => {
-    if (m.type === "event_created" && m.event.severity === "high" && m.event.review === "none") {
-      if (loadPrefs().sound) beep();
-      notify(m.event);
+    if (m.type === "event_created" && m.event.review === "none") {
+      if (loadPrefs().sound) alarm(m.event.severity);
+      if (m.event.severity === "high") notify(m.event);
     }
     setList((cur) => applyMessage(cur, m, hidden.current));
   }), []);

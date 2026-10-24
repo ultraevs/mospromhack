@@ -44,7 +44,7 @@ rules:
     camera_cooldown_s: 60
     track_lost_s: 2
 
-telegram:
+max:
   instant_min_severity: high
   min_interval_s: 1
   summary_interval_s: 60

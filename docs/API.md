@@ -179,19 +179,21 @@ valid = hmac.compare_digest(expected, request.headers["X-Signature"])
  "status_code": 200, "ok": true, "error": null, "duration_ms": 8, "created_at": "2026-10-03T22:38:22.105000Z"}
 ```
 
-### Телеграм
+### MAX
 
-`GET /telegram` — статус бота:
+`GET /max` — статус бота:
 
 ```json
 {"enabled": true, "running": true, "username": "my_bot", "error": null, "subscribers": 2, "sent": 14, "errors": 0, "pending": 3}
 ```
 
-`pending` — сколько событий ждёт сводки. Команды бота: `/start` подписывает чат, `/stop` отписывает, `/status` показывает число камер и открытых нарушений. Без `TELEGRAM_BOT_TOKEN` в `.env` бот выключен (`enabled: false`), остальное работает.
+Бот ходит в `platform-api2.max.ru` (long polling `GET /updates`, фото и клипы грузит через `POST /uploads`); адрес меняется в `MAX_API_URL`. Сертификат platform-api2 выдан «Russian Trusted Root CA» Минцифры, backend доверяет ему через бандл в `backend/app/services/certs/`. Токен: business.max.ru → Чат-боты → бот → Настройки (или бот «MAX для бизнеса»).
 
-`PUT /telegram` с телом `{"enabled": true|false}` запускает или останавливает polling без перезапуска backend и сохраняет выбор в базе. Для включения требуется `TELEGRAM_BOT_TOKEN` в окружении.
+`pending` — сколько событий ждёт сводки. Команды бота: `/start` (или кнопка «Начать») подписывает чат, `/stop` отписывает, `/status` показывает число камер и открытых нарушений. Без `MAX_BOT_TOKEN` в `.env` бот выключен (`enabled: false`), остальное работает.
 
-`GET /settings/telegram`, `PUT /settings/telegram` — что и как часто уходит в чат. Действует со следующего события.
+`PUT /max` с телом `{"enabled": true|false}` запускает или останавливает polling без перезапуска backend и сохраняет выбор в базе. Для включения требуется `MAX_BOT_TOKEN` в окружении.
+
+`GET /settings/max`, `PUT /settings/max` — что и как часто уходит в чат. Действует со следующего события.
 
 ```json
 {"instant_min_severity": "high", "min_interval_s": 1, "summary_interval_s": 60, "repeat_interval_s": 300}
@@ -269,7 +271,7 @@ valid = hmac.compare_digest(expected, request.headers["X-Signature"])
 
 - **Журнал событий по REST.** `GET /api/events` с фильтрами по камере, типу, важности, статусу, разбору и периоду, с постраничным выводом. Подходит, чтобы забирать события пакетами.
 - **Вебхуки.** Событие уходит `POST`-ом с JSON и подписью `X-Signature` (HMAC-SHA256), с повторами и журналом доставок. Можно фильтровать по типу и важности, получать открытие, клип и закрытие (`X-Event-Action`).
-- **Telegram.** Уведомления с фото и клипом для смены, настройки порога и частоты в `/api/settings/telegram`.
+- **MAX.** Уведомления с фото и клипом для смены, настройки порога и частоты в `/api/settings/max`.
 - **Служебный токен.** Скрипты и внешние сервисы могут ходить в публичный REST с заголовком `X-Internal-Token` (значение `INTERNAL_TOKEN` из `.env`), без cookie-сессии; права как у admin. Токен держать только на стороне сервера, наружу не отдавать.
 
 **Разбор события** (`PATCH /api/events/{id}`, поле `review`): `confirmed`, `false_positive` (ложное срабатывание), `forwarded` (передано мастеру), `none`. Это отметка оператора, она видна в журнале, в аналитике (доля ложных по типам, `false_share`) и приходит в `/ws/events` как `event_updated`. Размеченные события вместе с кадрами (`clean.jpg`) задел под дообучение: ложные срабатывания можно выгрузить через `GET /api/events?review=false_positive` и использовать как отрицательные примеры. Автоматического дообучения по этим меткам сейчас нет, это план.

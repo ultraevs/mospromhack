@@ -85,7 +85,11 @@ small { font-size: var(--fs-small); }
   position: sticky; top: 0; display: flex; flex-direction: column; height: 100vh;
   border-right: 1px solid var(--line-soft); background: #191d22;
 }
-.brand { display: grid; gap: 2px; padding: 20px 18px 18px; border-bottom: 1px solid var(--line-soft); }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 20px 12px 18px 18px; border-bottom: 1px solid var(--line-soft); }
+.sound-btn.is-on { color: var(--text); }
+.sound-btn.is-waiting { color: var(--yellow); animation: sound-wait 1.6s ease-in-out infinite; }
+@keyframes sound-wait { 50% { opacity: 0.45; } }
+.mobile-bar .sound-btn { margin-left: auto; }
 .brand strong { font-size: 15px; font-weight: 600; }
 .brand span { color: var(--faint); font-size: var(--fs-small); }
 .sidebar nav { display: grid; gap: 2px; padding: 12px 10px; }
@@ -405,7 +409,7 @@ small { font-size: var(--fs-small); }
 .subscribe { margin-bottom: 16px; padding: 12px 14px; border: 1px solid var(--line-soft); border-radius: var(--r-panel); }
 .subscribe ol { display: grid; gap: 4px; margin-top: 6px; padding-left: 20px; color: var(--muted); }
 .subscribe a { color: var(--text); }
-.telegram .figures { margin-top: 4px; }
+.max-panel .figures { margin-top: 4px; }
 .hook-list { display: grid; gap: 10px; }
 .hook-list > li { padding: 12px 14px; border: 1px solid var(--line-soft); border-radius: var(--r-panel); }
 .hook-list > li.is-off strong { color: var(--muted); }
@@ -483,6 +487,7 @@ small { font-size: var(--fs-small); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+  .sound-btn.is-waiting { animation: none; }
 }
 
 .skip-link { position: absolute; left: 8px; top: -60px; z-index: 100; padding: 8px 12px; border-radius: var(--r-control); background: var(--text); color: var(--ink); }

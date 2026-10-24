@@ -3,6 +3,7 @@ import json
 import time
 from datetime import datetime, timezone
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,20 +11,20 @@ from backend.app.db.session import make_engine, make_session_factory
 from backend.app.main import create_app
 from backend.app.services import media
 from backend.app.services.bus import BusMessage
-from backend.app.services.telegram import TelegramNotifier, caption, summary
+from backend.app.services.max_bot import MaxApiError, MaxNotifier, MaxSender, caption, command_of, run_bot, summary
 from backend.tests.conftest import INTERNAL, event_body
-from shared.schemas import Event, TelegramSettings
+from shared.schemas import Event, MaxSettings
 
 INTERVAL = 0.08
 SUMMARY = 0.3
 REPEAT = 1.0
 
 
-def cfg(**over) -> TelegramSettings:
+def cfg(**over) -> MaxSettings:
     values = {"instant_min_severity": "high", "min_interval_s": INTERVAL, "summary_interval_s": SUMMARY,
               "repeat_interval_s": REPEAT, **over}
-    return TelegramSettings.model_construct(**{**values, "instant_min_severity":
-                                               TelegramSettings(instant_min_severity=values["instant_min_severity"]).instant_min_severity})
+    return MaxSettings.model_construct(**{**values, "instant_min_severity":
+                                               MaxSettings(instant_min_severity=values["instant_min_severity"]).instant_min_severity})
 
 
 class FakeSender:
@@ -34,9 +35,9 @@ class FakeSender:
     async def _record(self, kind, chat_id, **kw) -> int:
         if self.fail_next:
             self.fail_next -= 1
-            raise RuntimeError("telegram is down")
+            raise RuntimeError("max is down")
         self.calls.append({"kind": kind, "chat": chat_id, "t": time.monotonic(), **kw})
-        return 1000 + len(self.calls)
+        return f"mid.{1000 + len(self.calls)}"
 
     async def send_message(self, chat_id, text):
         return await self._record("message", chat_id, text=text)
@@ -65,7 +66,7 @@ def make_event(n, media_root=None, type="no_helmet", camera=(1, "Цех 2, во�
 def make_notifier(tmp_path, **over):
     sessions = make_session_factory(make_engine(tmp_path / "db.sqlite"))
     sender = FakeSender()
-    n = TelegramNotifier(sessions, sender, tmp_path / "media", cfg(**over))
+    n = MaxNotifier(sessions, sender, tmp_path / "media", cfg(**over))
     n.sender = sender
     n.media = tmp_path / "media"
     return n
@@ -109,7 +110,7 @@ def test_caption_and_summary_text():
 
 
 def test_default_settings_match_the_decision():
-    d = TelegramSettings()
+    d = MaxSettings()
     assert (d.instant_min_severity.value, d.min_interval_s, d.summary_interval_s, d.repeat_interval_s) == ("high", 1, 60, 300)
 
 
@@ -127,7 +128,7 @@ async def test_high_event_is_sent_at_once_as_photo_and_clip_as_reply(notifier):
     await notifier.handle(BusMessage("clip_added", ev))
     await notifier.wait()
     video = notifier.sender.calls[1]
-    assert video["kind"] == "video" and video["reply_to"] == 1001 and video["video"].read_bytes() == b"mp4"
+    assert video["kind"] == "video" and video["reply_to"] == "mid.1001" and video["video"].read_bytes() == b"mp4"
     assert notifier.sent == 2 and notifier.pending == 0
 
 
@@ -275,12 +276,12 @@ async def test_instant_threshold_is_a_setting(tmp_path):
 
 
 async def test_settings_from_db_override_defaults(tmp_path):
-    from backend.app.services.telegram import save_settings
+    from backend.app.services.max_bot import save_settings
 
     notifier = make_notifier(tmp_path)
     notifier.command(42, "start")
     with notifier._sessions() as db:
-        save_settings(db, TelegramSettings(instant_min_severity="low", repeat_interval_s=0, min_interval_s=0.05))
+        save_settings(db, MaxSettings(instant_min_severity="low", repeat_interval_s=0, min_interval_s=0.05))
         db.commit()
     for n in (1, 2):
         await notifier.handle(BusMessage("opened", make_event(n, notifier.media, type="no_vest")))
@@ -290,18 +291,18 @@ async def test_settings_from_db_override_defaults(tmp_path):
 
 
 def test_backend_without_token_has_bot_disabled(client):
-    tg = client.get("/api/telegram").json()
-    assert tg == {"enabled": False, "reason": "no_token", "running": False, "username": None, "error": None,
+    mx = client.get("/api/max").json()
+    assert mx == {"enabled": False, "reason": "no_token", "running": False, "username": None, "error": None,
                   "subscribers": 0, "sent": 0, "errors": 0, "pending": 0}
-    assert client.get("/api/stats").json()["latency"]["capture_to_telegram"] is None
+    assert client.get("/api/stats").json()["latency"]["capture_to_max"] is None
 
 
 def test_backend_sends_event_to_subscribed_chat(settings):
     sender = FakeSender()
-    with TestClient(create_app(settings, run_sources=False, telegram_sender=sender)) as c:
+    with TestClient(create_app(settings, run_sources=False, max_sender=sender)) as c:
         app_state = c.app.state.app
         app_state.notifier.command(42, "start")
-        assert c.get("/api/telegram").json()["subscribers"] == 1 and c.get("/api/telegram").json()["enabled"] is True
+        assert c.get("/api/max").json()["subscribers"] == 1 and c.get("/api/max").json()["enabled"] is True
         cam = c.post("/api/cameras", json={"name": "Цех", "source_type": "file", "source": "demo.mp4"}).json()
         body = event_body(cam["id"], type="fire", severity="high", track_id=None, captured_ts=int(time.time() * 1000) - 120)
         r = c.post("/internal/events", headers=INTERNAL, data={"event": json.dumps(body)},
@@ -312,56 +313,178 @@ def test_backend_sends_event_to_subscribed_chat(settings):
             time.sleep(0.02)
         assert sender.calls and sender.calls[0]["kind"] == "photo" and sender.calls[0]["chat"] == 42
         assert sender.calls[0]["photo"].read_bytes() == b"jpeg-bytes" and "Камера: Цех" in sender.calls[0]["caption"]
-        lat = c.get("/api/stats").json()["latency"]["capture_to_telegram"]
+        lat = c.get("/api/stats").json()["latency"]["capture_to_max"]
         assert lat["events"] == 1 and 120 <= lat["avg_ms"] < 3000
-        assert c.get("/api/telegram").json()["sent"] == 1
+        assert c.get("/api/max").json()["sent"] == 1
         r = c.post("/internal/events", headers=INTERNAL, json=event_body(cam["id"]))
         assert r.status_code == 201
         end = time.monotonic() + 3
-        while c.get("/api/telegram").json()["pending"] == 0 and time.monotonic() < end:
+        while c.get("/api/max").json()["pending"] == 0 and time.monotonic() < end:
             time.sleep(0.02)
-        assert c.get("/api/telegram").json()["pending"] == 1 and len(sender.calls) == 1
+        assert c.get("/api/max").json()["pending"] == 1 and len(sender.calls) == 1
 
 
 def test_switch_turns_bot_off_even_with_token_and_sender(settings, monkeypatch):
     sender = FakeSender()
-    off = settings.model_copy(update={"telegram_enabled": False, "telegram_bot_token": "123456:AAH-fake-token"})
-    with TestClient(create_app(off, run_sources=False, telegram_sender=sender)) as c:
+    off = settings.model_copy(update={"max_enabled": False, "max_bot_token": "fake-max-token"})
+    with TestClient(create_app(off, run_sources=False, max_sender=sender)) as c:
         assert c.app.state.app.notifier is None
-        tg = c.get("/api/telegram").json()
-        assert (tg["enabled"], tg["reason"], tg["error"]) == (False, "switched_off", None)
+        mx = c.get("/api/max").json()
+        assert (mx["enabled"], mx["reason"], mx["error"]) == (False, "switched_off", None)
         cam = c.post("/api/cameras", json={"name": "Цех", "source_type": "file", "source": "demo.mp4"}).json()
         body = event_body(cam["id"], type="fire", severity="high", track_id=None)
         assert c.post("/internal/events", headers=INTERNAL, json=body).status_code == 201
         time.sleep(0.3)
         assert sender.calls == [] and c.get("/api/events").json()["total"] == 1
-        assert not any("телеграм" in p for p in c.get("/api/health").json()["problems"])
+        assert not any("MAX" in p for p in c.get("/api/health").json()["problems"])
     from shared.config import Settings
     for raw, expected in (("false", False), ("0", False), ("off", False), ("true", True), ("1", True)):
-        monkeypatch.setenv("TELEGRAM_ENABLED", raw)
-        assert Settings(_env_file=None).telegram_enabled is expected
+        monkeypatch.setenv("MAX_ENABLED", raw)
+        assert Settings(_env_file=None).max_enabled is expected
 
 
 def test_enabled_bot_reports_no_reason(settings):
-    with TestClient(create_app(settings, run_sources=False, telegram_sender=FakeSender())) as c:
-        tg = c.get("/api/telegram").json()
-        assert (tg["enabled"], tg["reason"]) == (True, None)
+    with TestClient(create_app(settings, run_sources=False, max_sender=FakeSender())) as c:
+        mx = c.get("/api/max").json()
+        assert (mx["enabled"], mx["reason"]) == (True, None)
 
 
-def test_telegram_settings_api(client):
+def test_max_settings_api(client):
     default = {"instant_min_severity": "high", "min_interval_s": 1, "summary_interval_s": 60, "repeat_interval_s": 300}
-    assert client.get("/api/settings/telegram").json() == default
+    assert client.get("/api/settings/max").json() == default
     new = {"instant_min_severity": "medium", "min_interval_s": 2, "summary_interval_s": 120, "repeat_interval_s": 600}
-    r = client.put("/api/settings/telegram", json=new)
-    assert r.status_code == 200 and r.json() == new and client.get("/api/settings/telegram").json() == new
+    r = client.put("/api/settings/max", json=new)
+    assert r.status_code == 200 and r.json() == new and client.get("/api/settings/max").json() == new
     for field, value in (("instant_min_severity", "urgent"), ("min_interval_s", 0), ("summary_interval_s", 0),
                          ("repeat_interval_s", -1)):
-        assert client.put("/api/settings/telegram", json={**new, field: value}).status_code == 422, field
-    assert client.get("/api/settings/telegram").json() == new
+        assert client.put("/api/settings/max", json={**new, field: value}).status_code == 422, field
+    assert client.get("/api/settings/max").json() == new
 
 
-def test_aiogram_sender_accepts_token_format():
-    from backend.app.services.telegram import AiogramSender
+# вместо platform-api: пишет запросы, отвечает как MAX
+class FakeMax:
 
-    sender = AiogramSender("123456:AAH-fake-token-for-construction-only")
-    assert sender.bot.id == 123456
+    def __init__(self, not_ready=0, updates=None, me_status=200):
+        self.requests: list[tuple[str, str, dict, bytes]] = []
+        self.not_ready = not_ready
+        self.updates = list(updates or [])
+        self.me_status = me_status
+
+    async def __call__(self, request: httpx.Request) -> httpx.Response:
+        params = dict(request.url.params)
+        self.requests.append((request.method, request.url.path, params, request.content))
+        host, path = request.url.host, request.url.path
+        if host == "upload.test":
+            return httpx.Response(200, json={"photos": {"p1": {"token": "img-token"}}} if path == "/img" else None,
+                                  text=None if path == "/img" else "<retval>1</retval>")
+        if path == "/me":
+            if self.me_status != 200:
+                return httpx.Response(self.me_status, json={"code": "verify.token", "message": "Invalid access_token"})
+            return httpx.Response(200, json={"user_id": 1, "name": "Контроль ТБ", "username": "safety_bot", "is_bot": True})
+        if path == "/me/commands":
+            return httpx.Response(200, json={})
+        if path == "/uploads":
+            if params["type"] == "image":
+                return httpx.Response(200, json={"url": "https://upload.test/img"})
+            return httpx.Response(200, json={"url": "https://upload.test/vid", "token": "vid-token"})
+        if path == "/messages":
+            if self.not_ready:
+                self.not_ready -= 1
+                return httpx.Response(400, json={"code": "attachment.not.ready", "message": "Key: errors.process.attachment.file.not.processed"})
+            return httpx.Response(200, json={"message": {"body": {"mid": f"mid.{len(self.requests)}", "seq": 1}}})
+        if path == "/updates":
+            if not self.updates:
+                await asyncio.sleep(0.05)  # как long polling, иначе цикл бота не отпускает loop
+            batch = self.updates.pop(0) if self.updates else []
+            return httpx.Response(200, json={"updates": batch, "marker": len(self.requests)})
+        return httpx.Response(404, json={"code": "not.found", "message": path})
+
+    def sent(self) -> list[dict]:
+        return [{"chat": int(q["chat_id"]), **json.loads(body)} for m, path, q, body in self.requests if path == "/messages"]
+
+
+def make_sender(fake: FakeMax) -> MaxSender:
+    return MaxSender("max-token", "https://api.test", ready_pauses=(0.01, 0.01), transport=httpx.MockTransport(fake))
+
+
+def test_sender_needs_token_and_trusts_mincifry_root():
+    with pytest.raises(ValueError):
+        MaxSender("  ")
+    sender = MaxSender("max-token")
+    assert sender.client.headers["Authorization"] == "max-token" and str(sender.client.base_url).startswith("https://platform-api2.max.ru")
+
+
+async def test_photo_is_uploaded_then_sent_with_token(tmp_path):
+    fake = FakeMax()
+    sender = make_sender(fake)
+    photo = tmp_path / "s.jpg"
+    photo.write_bytes(b"jpeg")
+    mid = await sender.send_photo(42, photo, "Огонь")
+    assert [(m, p) for m, p, _, _ in fake.requests] == [("POST", "/uploads"), ("POST", "/img"), ("POST", "/messages")]
+    assert b"jpeg" in fake.requests[1][3] and b'name="data"' in fake.requests[1][3]
+    assert fake.sent() == [{"chat": 42, "text": "Огонь",
+                            "attachments": [{"type": "image", "payload": {"photos": {"p1": {"token": "img-token"}}}}]}]
+    assert mid == "mid.3"
+    await sender.close()
+
+
+async def test_clip_waits_until_max_processed_it_and_goes_as_reply(tmp_path):
+    fake = FakeMax(not_ready=2)
+    sender = make_sender(fake)
+    clip = tmp_path / "c.mp4"
+    clip.write_bytes(b"mp4")
+    await sender.send_video(-77, clip, "Клип", "mid.photo")
+    sent = fake.sent()
+    assert len(sent) == 3 and sent[-1] == {"chat": -77, "text": "Клип", "link": {"type": "reply", "mid": "mid.photo"},
+                                           "attachments": [{"type": "video", "payload": {"token": "vid-token"}}]}
+    fake.not_ready = 5
+    with pytest.raises(MaxApiError) as e:
+        await sender.send_video(-77, clip, "Клип", None)
+    assert e.value.code == "attachment.not.ready"
+    await sender.close()
+
+
+def test_commands_come_from_start_button_and_slash_messages():
+    def msg(text, chat_id=5, is_bot=False):
+        return {"update_type": "message_created", "timestamp": 1,
+                "message": {"sender": {"user_id": 9, "is_bot": is_bot}, "recipient": {"chat_id": chat_id, "chat_type": "dialog"},
+                            "body": {"mid": "m", "seq": 1, "text": text}}}
+
+    assert command_of({"update_type": "bot_started", "timestamp": 1, "chat_id": 5, "user": {"user_id": 9}}) == (5, "start")
+    assert command_of(msg("/status")) == (5, "status")
+    assert command_of(msg(" /Stop@safety_bot please", chat_id=-100)) == (-100, "stop")
+    assert command_of(msg("/")) == (5, "")
+    assert command_of(msg("привет")) is None
+    assert command_of(msg("/start", is_bot=True)) is None
+    assert command_of(msg("/start", chat_id=None)) is None
+    assert command_of({"update_type": "message_callback", "timestamp": 1}) is None
+
+
+async def test_bot_answers_commands_and_keeps_marker(tmp_path):
+    fake = FakeMax(updates=[[{"update_type": "bot_started", "timestamp": 1, "chat_id": 5, "user": {"user_id": 9}}],
+                            [{"update_type": "message_created", "timestamp": 2,
+                              "message": {"sender": {"user_id": 9}, "recipient": {"chat_id": 5, "chat_type": "dialog"},
+                                          "body": {"mid": "m", "seq": 2, "text": "/status"}}}]])
+    notifier = make_notifier(tmp_path)
+    state = {"enabled": True, "running": False, "username": None, "error": None, "reason": None}
+    task = asyncio.create_task(run_bot(make_sender(fake), notifier, state))
+    end = time.monotonic() + 3
+    while len(fake.sent()) < 2 and time.monotonic() < end:
+        await asyncio.sleep(0.01)
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    assert state["username"] == "safety_bot" and state["running"] is False
+    sent = fake.sent()
+    assert "Подписка включена" in sent[0]["text"] and "Камер в работе" in sent[1]["text"] and notifier.chats() == [5]
+    polls = [q for m, p, q, _ in fake.requests if p == "/updates"]
+    assert "marker" not in polls[0] and int(polls[1]["marker"]) > 0
+    assert polls[0]["types"] == "message_created,bot_started"
+    await notifier.close()
+
+
+async def test_bad_token_stops_bot_with_reason(tmp_path):
+    notifier = make_notifier(tmp_path)
+    state = {"enabled": True, "running": False, "username": None, "error": None, "reason": None}
+    await run_bot(make_sender(FakeMax(me_status=401)), notifier, state)
+    assert state["reason"] == "invalid_token" and "verify.token" in state["error"] and state["running"] is False
+    await notifier.close()
