@@ -9,6 +9,7 @@ worker:
     head: {enabled: true, max_per_frame: 4, top_fraction: 0.5, margin: 0.15, max_person_height_px: 200}
   decode: {backend: ffmpeg, width: 1280, hwaccel: auto}
   overlay_delay_ms: 0
+  tiles: true  # головы на широком кадре мелкие, модель голов гоняем по двум квадратам кадра
   fake_scenario: null
 
 evidence:
