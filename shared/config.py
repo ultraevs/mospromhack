@@ -51,7 +51,7 @@ class LinqSection(BaseModel):
 
 
 class WorkerSection(BaseModel):
-    detector: Literal["onnx", "linq", "fake"] = "onnx"
+    detector: Literal["onnx", "linq", "relay", "fake"] = "onnx"
     linq: LinqSection = Field(default_factory=LinqSection)
     precision: Literal["auto", "fp32", "fp16"] = "auto"
     ppe_fps: float = 6

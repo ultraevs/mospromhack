@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from worker.app.detector.base import Detector
@@ -10,6 +11,7 @@ __all__ = ["Detector", "create_detector"]
 
 def create_detector(kind: str, specs: dict[str, ModelSpec], fake_scenario: str | Path | None = None,
                     precision: str = "fp32", linq: dict | None = None) -> Detector:
+    kind = os.environ.get("DETECTOR") or kind  # DETECTOR=relay в окружении процесса перебивает config.yaml
     # импорты внутри чтобы fake работал без onnxruntime
     if kind == "onnx":
         from worker.app.detector.onnx_detector import OnnxDetector
@@ -20,4 +22,11 @@ def create_detector(kind: str, specs: dict[str, ModelSpec], fake_scenario: str |
     if kind == "linq":
         from worker.app.detector.linq import LinqDetector
         return LinqDetector(specs, **(linq or {}))
-    raise ValueError(f"неизвестный детектор {kind!r}; допустимо: onnx, linq, fake")
+    if kind == "relay":
+        # кадр jpeg-ом на посредника на стенде (scripts/linq_relay.py), назад готовые рамки
+        from worker.app.detector.relay import RelayDetector, env, login_from_env
+        cfg = linq or {}
+        return RelayDetector(specs, broker=cfg.get("broker", "10.0.114.30"), port=cfg.get("port", 5672),
+                             timeout_s=float(env("RELAY_TIMEOUT_S", "5")), batch=cfg.get("batch", 8),
+                             login=login_from_env(), queue=env("RELAY_QUEUE"))
+    raise ValueError(f"неизвестный детектор {kind!r}; допустимо: onnx, linq, relay, fake")
