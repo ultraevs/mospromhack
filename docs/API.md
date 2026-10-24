@@ -139,6 +139,8 @@ valid = hmac.compare_digest(expected, request.headers["X-Signature"])
 
 `pending` — сколько событий ждёт сводки. Команды бота: `/start` подписывает чат, `/stop` отписывает, `/status` показывает число камер и открытых нарушений. Без `TELEGRAM_BOT_TOKEN` в `.env` бот выключен (`enabled: false`), остальное работает.
 
+`PUT /telegram` с телом `{"enabled": true|false}` запускает или останавливает polling без перезапуска backend и сохраняет выбор в базе. Для включения требуется `TELEGRAM_BOT_TOKEN` в окружении.
+
 `GET /settings/telegram`, `PUT /settings/telegram` — что и как часто уходит в чат. Действует со следующего события.
 
 ```json
@@ -154,7 +156,7 @@ valid = hmac.compare_digest(expected, request.headers["X-Signature"])
 
 ### Аналитика
 
-`GET /analytics/summary?from&to&camera_id&tz_offset_min` — счётчики за период. Все параметры необязательны; без `from` и `to` — за всё время. `tz_offset_min` — смещение местного времени от UTC в минутах (для Москвы 180), нужно для разбивки по часам и дням.
+`GET /analytics/summary?from&to&days&camera_id&tz_offset_min` — счётчики за период. Все параметры необязательны; без `from`, `to` и `days` — за всё время. `days=7` или `days=30` считает период по часам backend, поэтому фильтр не зависит от рассинхрона часов браузера. `tz_offset_min` — смещение местного времени от UTC в минутах (для Москвы 180), нужно для разбивки по часам и дням.
 
 ```json
 {
@@ -233,4 +235,3 @@ valid = hmac.compare_digest(expected, request.headers["X-Signature"])
 | `PATCH /internal/events/{id}` | закрыть: `{"status": "closed", "ended_at": "..."}` |
 | `POST /internal/stats` | статистика и пульс воркера, раз в секунду |
 | `WS /internal/detections` | поток сообщений `detections`, backend пересылает их подписчикам `/ws/detections` |
-

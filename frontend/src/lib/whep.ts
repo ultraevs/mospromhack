@@ -1,4 +1,3 @@
-// минимальный whep клиент, тянет видео из mediamtx по webrtc
 export interface WhepSession {
   pc: RTCPeerConnection;
   close: () => void;
@@ -7,36 +6,37 @@ export interface WhepSession {
 function waitIceGathering(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
   if (pc.iceGatheringState === "complete") return Promise.resolve();
   return new Promise((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const done = () => {
+      if (timer) clearTimeout(timer);
       pc.removeEventListener("icegatheringstatechange", check);
       resolve();
     };
-    const check = () => pc.iceGatheringState === "complete" && done();
+    const check = () => { if (pc.iceGatheringState === "complete") done(); };
+    timer = setTimeout(done, timeoutMs);
     pc.addEventListener("icegatheringstatechange", check);
-    setTimeout(done, timeoutMs);
   });
 }
 
 export async function connectWhep(url: string, onStream: (stream: MediaStream) => void): Promise<WhepSession> {
   const pc = new RTCPeerConnection();
   pc.addTransceiver("video", { direction: "recvonly" });
-  pc.ontrack = (e) => onStream(e.streams[0] ?? new MediaStream([e.track]));
-
+  pc.ontrack = (event) => onStream(event.streams[0] ?? new MediaStream([event.track]));
   const close = () => pc.close();
 
   try {
     await pc.setLocalDescription(await pc.createOffer());
-    await waitIceGathering(pc, 1000);
-    const res = await fetch(url, {
+    await waitIceGathering(pc, 1200);
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/sdp" },
-      body: pc.localDescription!.sdp,
+      body: pc.localDescription?.sdp ?? "",
     });
-    if (!res.ok) throw new Error(res.status === 404 ? "поток не публикуется" : `MediaMTX ответил ${res.status}`);
-    await pc.setRemoteDescription({ type: "answer", sdp: await res.text() });
-  } catch (e) {
+    if (!response.ok) throw new Error(response.status === 404 ? "поток не публикуется" : `MediaMTX ответил ${response.status}`);
+    await pc.setRemoteDescription({ type: "answer", sdp: await response.text() });
+  } catch (error) {
     close();
-    throw e;
+    throw error;
   }
   return { pc, close };
 }

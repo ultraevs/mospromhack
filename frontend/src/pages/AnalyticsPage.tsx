@@ -1,176 +1,65 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import { periodStart } from "../lib/journal";
-import { EVENT_LABEL, SEVERITY_COLOR, SEVERITY_ICON, SEVERITY_LABEL } from "../types";
+import { EmptyState, PageHeader } from "../App";
+import { Icon } from "../components/Icons";
+import { eventLabel, formatCount, formatPercent } from "../lib/format";
 import type { AnalyticsSummary, Camera } from "../types";
+import type { PageProps } from "./types";
 
-const PERIODS: [string, string][] = [["day", "Сутки"], ["week", "7 дней"], ["month", "30 дней"], ["all", "Всё время"]];
-const AXIS = { fill: "#8b96a5", fontSize: 12 };
-const TOOLTIP = {
-  contentStyle: { background: "#161b22", border: "1px solid #2a323d", color: "#d7dde5" },
-  cursor: { fill: "#1c232d" },
-};
-
-function Card({ title, value, hint }: { title: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded border border-line bg-panel p-3">
-      <div className="text-xs text-muted">{title}</div>
-      <div className="text-xl font-semibold">{value}</div>
-      {hint && <div className="text-xs text-muted">{hint}</div>}
-    </div>
-  );
-}
-
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded border border-line bg-panel p-3">
-      <h2 className="mb-2 font-medium">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Bars({ rows, empty }: { rows: { key: string | number; label: string; hint?: string; total: number }[]; empty: string }) {
-  const max = Math.max(1, ...rows.map((r) => r.total));
-  if (rows.length === 0) return <div className="text-muted">{empty}</div>;
-  return (
-    <div className="flex flex-col gap-1.5">
-      {rows.map((r) => (
-        <div key={r.key} className="grid grid-cols-[minmax(120px,1fr)_2fr_40px] items-center gap-2">
-          <span className="truncate" title={r.hint}>{r.label}{r.hint && <span className="text-muted"> · {r.hint}</span>}</span>
-          <span className="h-3 rounded bg-panel-2"><span className="block h-3 rounded bg-accent" style={{ width: `${(r.total / max) * 100}%` }} /></span>
-          <span className="text-right tabular-nums">{r.total}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const percent = (share: number | null) => (share === null ? "—" : `${Math.round(share * 100)}%`);
-
-export function AnalyticsPage() {
-  const [period, setPeriod] = useState("day");
-  const [cameraId, setCameraId] = useState("");
+export function AnalyticsPage({ refreshKey }: PageProps) {
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [cameras, setCameras] = useState<Camera[]>([]);
-  const [data, setData] = useState<AnalyticsSummary | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => { api.cameras().then(setCameras).catch(() => undefined); }, []);
+  const [camera, setCamera] = useState("");
+  const [range, setRange] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
-    const load = () => api.analytics({
-      from: periodStart(period), camera_id: cameraId || undefined, tz_offset_min: -new Date().getTimezoneOffset(),
-    }).then((d) => { setData(d); setError(""); }).catch((e: Error) => setError(e.message));
-    load();
-    const timer = setInterval(load, 10_000);
-    return () => clearInterval(timer);
-  }, [period, cameraId]);
+    let cancelled = false;
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    const period = range === "all" ? {} : { days: Number(range) };
+    Promise.all([api.analytics({ ...period, camera_id: camera || undefined, tz_offset_min: -new Date().getTimezoneOffset() }), api.cameras()]).then(([next, cameraList]) => { if (!cancelled && requestId === requestIdRef.current) { setSummary(next); setCameras(cameraList); setError(null); } }).catch((reason: unknown) => { if (!cancelled && requestId === requestIdRef.current) setError(reason instanceof Error ? reason.message : "Не удалось загрузить аналитику"); }).finally(() => { if (!cancelled && requestId === requestIdRef.current) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [camera, range, refreshKey]);
 
-  if (!data) return <div className="p-6 text-muted">{error ? `▲ ${error}` : "Загрузка…"}</div>;
+  const peakHour = useMemo(() => summary?.by_hour.reduce((peak, item) => item.total > peak.total ? item : peak, { hour: 0, total: 0 }), [summary]);
+  const maxHour = Math.max(...(summary?.by_hour.map((item) => item.total) ?? [0]), 1);
+  const topTypes = summary?.by_type.filter((item) => item.total).sort((a, b) => b.total - a.total).slice(0, 5) ?? [];
+  const rangeLabel = range === "all" ? "всё время" : `${range} дней`;
+  const cameraLabel = cameras.find((item) => String(item.id) === camera)?.name ?? "все камеры";
 
-  const types = data.by_type.map((t) => ({
-    name: EVENT_LABEL[t.type], "подтверждено": t.confirmed, "ложное": t.false_positive, "не размечено": t.unreviewed,
-  }));
-  const hours = data.by_hour.map((h) => ({ name: String(h.hour).padStart(2, "0"), "нарушений": h.total }));
-  const marked = data.confirmed + data.false_positive;
-  const journal = (query: string) => `/journal?${query}${cameraId ? `&camera_id=${cameraId}` : ""}`;
+  return <div className={`page-stack analytics-page ${loading ? "is-loading" : ""}`}><PageHeader kicker="Сигналы / закономерности" title="Аналитика" description="Не просто количество событий — точки напряжения, которые помогают менять процесс." action={<div className="range-control"><button type="button" aria-pressed={range === "all"} className={range === "all" ? "range-active" : ""} onClick={() => setRange("all")}>Всё время</button><button type="button" aria-pressed={range === "30"} className={range === "30" ? "range-active" : ""} onClick={() => setRange("30")}>30 дней</button><button type="button" aria-pressed={range === "7"} className={range === "7" ? "range-active" : ""} onClick={() => setRange("7")}>7 дней</button></div>} />{error && <div className="error-notice" role="alert"><Icon name="alert" size={17} /><span>{error}</span></div>}<section className="analytics-filters"><AnalyticsCameraSelect value={camera} cameras={cameras} onChange={setCamera} /><span className="analytics-note"><Icon name="clock" size={15} />Москва (UTC+3)</span><span className="analytics-filter-summary" aria-live="polite">Срез: {rangeLabel} · {cameraLabel}{loading && " · обновляем"}</span></section>{summary && summary.total ? <><section className="analytics-kpis"><AnalyticsKpi label="Всего событий" value={formatCount(summary.total)} note="за выбранный период" /><AnalyticsKpi label="Подтверждено" value={formatCount(summary.confirmed)} note={`${formatPercent(summary.total ? summary.confirmed / summary.total : 0)} от всех`} tone="green" /><AnalyticsKpi label="Ложные срабатывания" value={formatCount(summary.false_positive)} note={`${formatPercent(summary.false_share)} среди размеченных`} tone="danger" /><AnalyticsKpi label="Пик активности" value={peakHour ? `${String(peakHour.hour).padStart(2, "0")}:00` : "—"} note={peakHour ? `${peakHour.total} событий в час` : "нет данных"} tone="amber" /></section><div className="analytics-grid"><section className="panel chart-panel"><div className="panel-heading"><div><span className="panel-kicker">Ритм смены</span><h2>События по часам</h2></div><span className="chart-unit">событий / час</span></div><div className="bar-chart" aria-label="График событий по часам">{summary.by_hour.map((item) => <div className="bar-column" key={item.hour}><div className="bar-track"><span className="bar-fill" style={{ height: `${Math.max(item.total ? (item.total / maxHour) * 100 : 3, 3)}%` }} title={`${item.hour}:00 · ${item.total}`} /></div><span>{item.hour % 4 === 0 ? String(item.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="panel ranking-panel"><div className="panel-heading"><div><span className="panel-kicker">Распределение</span><h2>Типы сигналов</h2></div><Icon name="activity" size={18} /></div>{topTypes.length ? <div className="ranking-list">{topTypes.map((item, index) => <div className="ranking-row" key={item.type}><span className="ranking-index">{String(index + 1).padStart(2, "0")}</span><div className="ranking-name"><strong>{eventLabel(item.type)}</strong><span className="ranking-track"><i style={{ width: `${(item.total / topTypes[0].total) * 100}%` }} /></span></div><strong className="ranking-value">{item.total}</strong></div>)}</div> : <EmptyState title="Данных пока мало" description="Распределение появится после первых событий." />}</section></div><section className="panel camera-ranking"><div className="panel-heading"><div><span className="panel-kicker">Нагрузка</span><h2>Камеры и зоны</h2></div><button className="text-button" type="button" onClick={() => setCamera("")}>Сбросить источник <Icon name="refresh" size={14} /></button></div><div className="camera-ranking-grid"><div><span className="ranking-subtitle">Камеры</span>{summary.by_camera.length ? summary.by_camera.slice(0, 5).map((item) => <RankingLine key={item.camera_id} label={item.camera_name} value={item.total} max={summary.by_camera[0].total} />) : <span className="muted-copy">Нет данных</span>}</div><div><span className="ranking-subtitle">Зоны</span>{summary.by_zone.length ? summary.by_zone.slice(0, 5).map((item) => <RankingLine key={item.zone_id} label={item.zone_name ?? "Без названия"} detail={item.camera_name} value={item.total} max={summary.by_zone[0].total} />) : <span className="muted-copy">События вне зон: {summary.without_zone}</span>}</div></div></section></> : <section className="panel"><EmptyState icon="activity" title="За выбранный срез событий нет" description="Измените период или источник, чтобы посмотреть другой срез." /></section>}</div>;
+}
 
-  return (
-    <div className="max-w-7xl p-4">
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <h1 className="text-base font-semibold">Аналитика</h1>
-        <div className="flex gap-1">
-          {PERIODS.map(([key, title]) => (
-            <button key={key} onClick={() => setPeriod(key)}
-                    className={`rounded border px-3 py-1 ${period === key ? "border-accent text-text" : "border-line text-muted hover:text-text"}`}>
-              {title}
-            </button>
-          ))}
-        </div>
-        <select value={cameraId} onChange={(e) => setCameraId(e.target.value)} className="rounded border border-line bg-bg px-2 py-1 text-text">
-          <option value="">все камеры</option>
-          {cameras.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        {error && <span className="text-high">▲ {error}</span>}
-      </div>
+function AnalyticsKpi({ label, value, note, tone = "neutral" }: { label: string; value: string; note: string; tone?: "neutral" | "green" | "danger" | "amber" }) { return <div className={`analytics-kpi kpi-${tone}`}><span className="metric-label">{label}</span><strong>{value}</strong><span>{note}</span></div>; }
+function RankingLine({ label, detail, value, max }: { label: string; detail?: string; value: number; max: number }) { return <div className="ranking-line"><div><strong>{label}</strong>{detail && <small>{detail}</small>}</div><span className="ranking-line-track"><i style={{ width: `${(value / Math.max(max, 1)) * 100}%` }} /></span><b>{value}</b></div>; }
 
-      <div className="mb-3 grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
-        <Card title="Нарушений за период" value={String(data.total)} />
-        {data.by_severity.map((s) => (
-          <Card key={s.severity} title={`${SEVERITY_ICON[s.severity]} Важность ${SEVERITY_LABEL[s.severity]}`} value={String(s.total)} />
-        ))}
-        <Card title="Доля ложных" value={percent(data.false_share)}
-              hint={marked ? `${data.false_positive} ложных из ${marked} размеченных` : "нет размеченных событий"} />
-        <Card title="Не размечено" value={String(data.unreviewed)} hint="отметки ставятся в журнале" />
-      </div>
+function AnalyticsCameraSelect({ value, cameras, onChange }: { value: string; cameras: Camera[]; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = cameras.find((item) => String(item.id) === value)?.name ?? "Все камеры";
+  const options = [{ value: "", label: "Все камеры" }, ...cameras.map((item) => ({ value: String(item.id), label: item.name }))];
 
-      {data.total === 0 ? (
-        <div className="rounded border border-line bg-panel p-6 text-muted">За этот период нарушений нет.</div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          <Panel title="По типам">
-            <div className="h-64">
-              <ResponsiveContainer>
-                <BarChart data={types} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-                  <CartesianGrid stroke="#2a323d" vertical={false} />
-                  <XAxis dataKey="name" tick={AXIS} interval={0} angle={-20} textAnchor="end" height={56} />
-                  <YAxis allowDecimals={false} tick={AXIS} />
-                  <Tooltip {...TOOLTIP} />
-                  <Legend />
-                  <Bar dataKey="подтверждено" stackId="a" fill="#3fb97f" isAnimationActive={false} />
-                  <Bar dataKey="ложное" stackId="a" fill={SEVERITY_COLOR.medium} isAnimationActive={false} />
-                  <Bar dataKey="не размечено" stackId="a" fill="#4c9aff" isAnimationActive={false} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <table className="mt-2 w-full text-left text-sm">
-              <thead className="text-xs text-muted">
-                <tr>{["Тип", "Всего", "Подтверждено", "Ложных", "Доля ложных", ""].map((h) => <th key={h} className="py-1 font-normal">{h}</th>)}</tr>
-              </thead>
-              <tbody>
-                {data.by_type.filter((t) => t.total > 0).map((t) => (
-                  <tr key={t.type} className="border-t border-line">
-                    <td className="py-1">{EVENT_LABEL[t.type]}</td>
-                    <td className="tabular-nums">{t.total}</td>
-                    <td className="tabular-nums">{t.confirmed}</td>
-                    <td className="tabular-nums">{t.false_positive}</td>
-                    <td className="tabular-nums">{percent(t.false_share)}</td>
-                    <td className="text-right"><Link className="text-accent hover:underline" to={journal(`type=${t.type}`)}>в журнал</Link></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Panel>
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
-          <Panel title="По часам суток">
-            <div className="h-64">
-              <ResponsiveContainer>
-                <BarChart data={hours} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-                  <CartesianGrid stroke="#2a323d" vertical={false} />
-                  <XAxis dataKey="name" tick={AXIS} interval={1} />
-                  <YAxis allowDecimals={false} tick={AXIS} />
-                  <Tooltip {...TOOLTIP} labelFormatter={(h) => `${h}:00–${h}:59`} />
-                  <Bar dataKey="нарушений" fill="#4c9aff" isAnimationActive={false} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="mt-2 text-xs text-muted">Час начала события по местному времени этого компьютера.</p>
-          </Panel>
-
-          <Panel title="По зонам">
-            <Bars empty="Событий, привязанных к зонам, нет"
-                  rows={data.by_zone.map((z) => ({ key: z.zone_id, label: z.zone_name ?? `зона ${z.zone_id}`, hint: z.camera_name, total: z.total }))} />
-            {data.without_zone > 0 && <p className="mt-2 text-xs text-muted">Без зоны (требование камеры или событие всего кадра): {data.without_zone}</p>}
-          </Panel>
-
-          <Panel title="По камерам">
-            <Bars empty="Событий нет"
-                  rows={data.by_camera.map((c) => ({ key: c.camera_id, label: c.camera_name, total: c.total }))} />
-          </Panel>
-        </div>
-      )}
-    </div>
-  );
+  return <div className="analytics-select" ref={rootRef}>
+    <span className="analytics-select-label">Источник</span>
+    <button className="analytics-select-trigger" type="button" aria-label="Источник камеры" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}><span>{selected}</span><Icon name="chevron" size={14} /></button>
+    {open && <div className="analytics-select-menu" role="listbox" aria-label="Источник камеры">{options.map((option) => <button className="analytics-select-option" key={option.value || "all"} type="button" role="option" aria-selected={option.value === value} onClick={() => { onChange(option.value); setOpen(false); }}>{option.label}</button>)}</div>}
+  </div>;
 }

@@ -8,7 +8,8 @@ from fastapi import Depends, Header, HTTPException, Request, WebSocket
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.app.db.models import SettingRow
+from backend.app.db.models import SettingRow, UserRow
+from backend.app.services import auth
 from backend.app.services.bus import EventBus
 from backend.app.services.hub import Hub
 from backend.app.services.sources import SourceManager
@@ -27,6 +28,8 @@ class AppState:
     bus: EventBus = field(default_factory=EventBus)
     webhooks: Any = None
     notifier: Any = None
+    telegram_sender: Any = None
+    telegram_bot_task: Any = None
     telegram_state: dict = field(default_factory=lambda: {"enabled": False, "running": False, "username": None,
                                                           "error": None, "reason": "no_token"})
     worker_stats: dict[str, Any] = field(default_factory=dict)
@@ -54,6 +57,16 @@ def get_state_ws(ws: WebSocket) -> AppState:
 def get_db(state: AppState = Depends(get_state)):
     with state.session_factory() as db:
         yield db
+
+
+def get_current_user(request: Request, state: AppState = Depends(get_state)) -> UserRow:
+    return auth.current_user(request, state.session_factory, state.settings.auth_enabled)
+
+
+def require_admin(user: UserRow = Depends(get_current_user)) -> UserRow:
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="требуются права администратора")
+    return user
 
 
 def require_internal(x_internal_token: str | None = Header(default=None), state: AppState = Depends(get_state)):

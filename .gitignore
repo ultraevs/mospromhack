@@ -205,6 +205,10 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Playwright artifacts (local visual QA output is stored in /tmp)
+frontend/test-results/
+frontend/playwright-report/
+
 # Ruff stuff:
 .ruff_cache/
 

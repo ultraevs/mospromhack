@@ -23,9 +23,16 @@ webrtcAddress: :8889
 webrtcAllowOrigins: ["*"]
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: :8189
+webrtcAdditionalHosts: [127.0.0.1, 172.17.0.1]
 
 rtmp: no
-hls: no
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigins: ["*"]
+hlsVariant: mpegts
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsAlwaysRemux: no
 srt: no
 
 paths:

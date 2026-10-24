@@ -20,6 +20,7 @@ from shared.schemas import Event, EventStatus, EventType, Severity, TelegramSett
 log = logging.getLogger("backend.telegram")
 
 TELEGRAM_KEY = "telegram"
+TELEGRAM_ENABLED_KEY = "telegram_enabled"
 
 EVENT_TEXT = {
     EventType.no_helmet: "Без каски", EventType.no_mask: "Без маски", EventType.no_vest: "Без жилета",
@@ -38,6 +39,15 @@ def load_settings(db: Session, default: TelegramSettings) -> TelegramSettings:
 
 def save_settings(db: Session, value: TelegramSettings) -> None:
     set_setting(db, TELEGRAM_KEY, value.model_dump(mode="json"))
+
+
+def load_enabled(db: Session, default: bool) -> bool:
+    value = get_setting(db, TELEGRAM_ENABLED_KEY)
+    return default if value is None else bool(value)
+
+
+def save_enabled(db: Session, value: bool) -> None:
+    set_setting(db, TELEGRAM_ENABLED_KEY, value)
 
 
 def caption(event: Event, skipped: int = 0) -> str:
@@ -75,11 +85,12 @@ class _Out:
 class TelegramNotifier:
 
     def __init__(self, session_factory: sessionmaker[Session], sender: Sender, media_root: Path,
-                 defaults: TelegramSettings | None = None):
+                 defaults: TelegramSettings | None = None, enabled: bool = True):
         self._sessions = session_factory
         self._sender = sender
         self._media = media_root
         self._defaults = defaults or TelegramSettings()
+        self._enabled = enabled
         self._queues: dict[int, asyncio.Queue[_Out]] = {}
         self._tasks: dict[int, asyncio.Task] = {}
         self._photo_message: dict[tuple[int, str], int] = {}
@@ -90,6 +101,23 @@ class TelegramNotifier:
         self.latency_ms: deque[int] = deque(maxlen=100)
         self.sent = 0
         self.errors = 0
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
+    def set_enabled(self, enabled: bool) -> None:
+        self._enabled = enabled
+        if not enabled:
+            for task in self._tasks.values():
+                task.cancel()
+            self._pending.clear()
+            if self._flush_task is not None:
+                self._flush_task.cancel()
+                self._flush_task = None
+
+    def set_sender(self, sender: Sender) -> None:
+        self._sender = sender
 
     def settings(self) -> TelegramSettings:
         with self._sessions() as db:
@@ -128,6 +156,8 @@ class TelegramNotifier:
 
 
     async def handle(self, message: BusMessage) -> None:
+        if not self._enabled:
+            return
         if message.action == "closed":
             return
         chats = self.chats()

@@ -27,11 +27,16 @@ class EventBus:
         self._queue_size = queue_size
         self._subs: list[tuple[str, asyncio.Queue[BusMessage], Handler]] = []
         self._tasks: list[asyncio.Task] = []
+        self._started = False
 
     def subscribe(self, name: str, handler: Handler) -> None:
-        self._subs.append((name, asyncio.Queue(maxsize=self._queue_size), handler))
+        queue: asyncio.Queue[BusMessage] = asyncio.Queue(maxsize=self._queue_size)
+        self._subs.append((name, queue, handler))
+        if self._started:
+            self._tasks.append(asyncio.create_task(self._run(name, queue, handler), name=f"bus-{name}"))
 
     def start(self) -> None:
+        self._started = True
         for name, queue, handler in self._subs:
             self._tasks.append(asyncio.create_task(self._run(name, queue, handler), name=f"bus-{name}"))
 
@@ -40,6 +45,7 @@ class EventBus:
             task.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks.clear()
+        self._started = False
 
     def publish(self, message: BusMessage) -> None:
         for name, queue, _ in self._subs:

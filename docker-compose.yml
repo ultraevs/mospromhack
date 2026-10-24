@@ -10,6 +10,7 @@ services:
       MTX_WEBRTCADDITIONALHOSTS: ${WEBRTC_HOST:-127.0.0.1}
     ports:
       - "${MEDIAMTX_WEBRTC_PORT:-8889}:8889"
+      - "${MEDIAMTX_HLS_PORT:-8888}:8888"
       - "8189:8189/udp"
       - "8189:8189/tcp"
       - "${MEDIAMTX_RTSP_PORT:-8554}:8554"
@@ -24,8 +25,15 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-true}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me}
+      AUTH_ADMIN_LOGIN: ${AUTH_ADMIN_LOGIN:-admin}
+      AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD:-admin1234}
+      AUTH_VIEWER_LOGIN: ${AUTH_VIEWER_LOGIN:-viewer}
+      AUTH_VIEWER_PASSWORD: ${AUTH_VIEWER_PASSWORD:-viewer1234}
+      AUTH_SESSION_TTL_HOURS: ${AUTH_SESSION_TTL_HOURS:-12}
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
       MEDIAMTX_HOST: mediamtx
       MEDIAMTX_WEBRTC_PORT: ${MEDIAMTX_WEBRTC_PORT:-8889}
+      STREAM_CODEC: ${STREAM_CODEC:-h264}
     volumes:
       - ./data:/app/data
       - ./config.yaml:/app/config.yaml:ro
