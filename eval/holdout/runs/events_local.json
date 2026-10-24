@@ -1,0 +1,38 @@
+[
+  {
+    "video": "holdout_ceh1_worker_zone.mp4",
+    "duration": 75.8,
+    "fps": 6,
+    "required_ppe": [
+      "helmet",
+      "vest"
+    ],
+    "tiles": true,
+    "wall_s": 77.9,
+    "proc_fps": 5.34,
+    "events": []
+  },
+  {
+    "video": "holdout_test_lying_rotated.mp4",
+    "duration": 15.0,
+    "fps": 6,
+    "required_ppe": [
+      "helmet",
+      "vest"
+    ],
+    "tiles": true,
+    "wall_s": 16.1,
+    "proc_fps": 3.35,
+    "events": []
+  },
+  {
+    "video": "holdout_parking_car.mp4",
+    "duration": 53.916667,
+    "fps": 6,
+    "required_ppe": [],
+    "tiles": true,
+    "wall_s": 54.7,
+    "proc_fps": 5.0,
+    "events": []
+  }
+]

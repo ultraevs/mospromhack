@@ -137,18 +137,26 @@ def _nested(xyxy: np.ndarray, conf: np.ndarray, cls: np.ndarray, cover: float = 
     return drop
 
 
-# люди и техника из coco вместо своих, сизы оставляем от ppe
+# люди из coco вместо своих, сизы от ppe. техника из обеих: спецтехники (погрузчик, экскаватор) в coco нет,
+# на val ppe у coco vehicle mAP50 0.18 против 0.79 у своей (docs/METRICS.md)
 def merge_people(ppe: Detections, ppe_spec: ModelSpec, people: Detections, people_spec: ModelSpec) -> Detections:
-    replaced = {ppe_spec.class_id(c) for c in set(COCO_TO_PPE.values()) if c in ppe_spec.classes}
+    replaced = {ppe_spec.class_id("person")} if "person" in ppe_spec.classes else set()
     keep = ~np.isin(ppe.cls, list(replaced))
     mapped = [ppe_spec.class_id(COCO_TO_PPE[people_spec.classes[c]]) if people_spec.classes[c] in COCO_TO_PPE else -1
               for c in people.cls]
-    sel = np.array([m >= 0 for m in mapped], dtype=bool)
-    sel &= ~_nested(people.xyxy, people.conf, np.array(mapped, dtype=np.int64))
+    mapped_a = np.array(mapped, dtype=np.int64)
+    sel = mapped_a >= 0
+    sel &= ~_nested(people.xyxy, people.conf, mapped_a)
+    if "vehicle" in ppe_spec.classes:
+        vid = ppe_spec.class_id("vehicle")
+        own, coco = ppe.cls == vid, mapped_a == vid
+        if own.any() and coco.any():  # coco-машина поверх своей — дубль
+            dup = (iou_matrix(people.xyxy[coco], ppe.xyxy[own]) > 0.5).any(axis=1)
+            sel[np.flatnonzero(coco)[dup]] = False
     return Detections(
         np.concatenate([ppe.xyxy[keep], people.xyxy[sel]]).astype(np.float32),
         np.concatenate([ppe.conf[keep], people.conf[sel]]).astype(np.float32),
-        np.concatenate([ppe.cls[keep], np.array(mapped, dtype=np.int64)[sel]]).astype(np.int64),
+        np.concatenate([ppe.cls[keep], mapped_a[sel]]).astype(np.int64),
     )
 
 

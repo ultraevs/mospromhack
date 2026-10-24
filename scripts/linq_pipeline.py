@@ -184,6 +184,7 @@ def main() -> None:
     ap.add_argument("--no-raw", action="store_true", help="старый путь: float32, пакует облако")
     ap.add_argument("--inflight", type=int, default=1, help="пачек кадров в полёте (worker.inflight)")
     ap.add_argument("--tiles", action="store_true", help="каски с двух плиток кадра (worker.tiles)")
+    ap.add_argument("--no-hivis", action="store_true", help="без цветовой эвристики жилета (абляция)")
     ap.add_argument("--models", nargs="+", help="только эти модели из models/ (по умолчанию все)")
     ap.add_argument("--once", action="store_true", help="каждый ролик один проход, события со временем от начала ролика")
     ap.add_argument("--ppe", nargs="*", default=["helmet", "vest"], help="требуемые сиз (для --once)")
@@ -202,6 +203,7 @@ def main() -> None:
     config.worker.linq.raw = not args.no_raw
     config.worker.inflight = args.inflight
     config.worker.tiles = args.tiles
+    config.worker.hivis = not args.no_hivis
     specs = load_all_specs(settings.models_dir)
     if args.models:
         specs = {k: v for k, v in specs.items() if k in args.models}

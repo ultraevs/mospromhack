@@ -1,0 +1,528 @@
+{
+  "tol_s": 5,
+  "pre_s": 1,
+  "hours": 0.0535,
+  "videos": {
+    "factory_floor.mp4": {
+      "duration_s": 17.0,
+      "proc_fps": 2.32,
+      "types": {
+        "no_vest": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "dup": 0,
+          "ignored": 2,
+          "precision": null,
+          "recall": null,
+          "delay_p50_s": null,
+          "fp_per_hour": 0.0
+        },
+        "no_helmet": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 5,
+          "dup": 0,
+          "ignored": 0,
+          "precision": null,
+          "recall": 0.0,
+          "delay_p50_s": null,
+          "fp_per_hour": 0.0
+        }
+      },
+      "events": [
+        {
+          "type": "no_vest",
+          "t": 6.76,
+          "track": 10,
+          "verdict": "ignored"
+        },
+        {
+          "type": "no_vest",
+          "t": 8.91,
+          "track": 16,
+          "verdict": "ignored"
+        }
+      ],
+      "intervals": [
+        {
+          "type": "no_helmet",
+          "start_s": 0,
+          "end_s": 17,
+          "hits": [],
+          "missed": 5
+        }
+      ]
+    },
+    "fall_test.mp4": {
+      "duration_s": 71.36,
+      "proc_fps": 5.11,
+      "types": {
+        "fall": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 3,
+          "dup": 0,
+          "ignored": 0,
+          "precision": 1.0,
+          "recall": 0.25,
+          "delay_p50_s": 0.8,
+          "fp_per_hour": 0.0
+        },
+        "lying_immobile": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 2,
+          "dup": 0,
+          "ignored": 0,
+          "precision": 1.0,
+          "recall": 0.333,
+          "delay_p50_s": 2.1,
+          "fp_per_hour": 0.0
+        }
+      },
+      "events": [
+        {
+          "type": "fall",
+          "t": 3.32,
+          "track": 2,
+          "verdict": "tp"
+        },
+        {
+          "type": "lying_immobile",
+          "t": 44.14,
+          "track": 6,
+          "verdict": "tp"
+        }
+      ],
+      "intervals": [
+        {
+          "type": "fall",
+          "start_s": 2.5,
+          "end_s": 4.5,
+          "hits": [
+            3.32
+          ],
+          "missed": 0
+        },
+        {
+          "type": "lying_immobile",
+          "start_s": 4,
+          "end_s": 16.5,
+          "hits": [],
+          "missed": 1
+        },
+        {
+          "type": "fall",
+          "start_s": 24.5,
+          "end_s": 27,
+          "hits": [],
+          "missed": 1
+        },
+        {
+          "type": "lying_immobile",
+          "start_s": 27,
+          "end_s": 38.5,
+          "hits": [],
+          "missed": 1
+        },
+        {
+          "type": "fall",
+          "start_s": 40.5,
+          "end_s": 42.5,
+          "hits": [],
+          "missed": 1
+        },
+        {
+          "type": "lying_immobile",
+          "start_s": 42,
+          "end_s": 55.5,
+          "hits": [
+            44.14
+          ],
+          "missed": 0
+        },
+        {
+          "type": "fall",
+          "start_s": 56,
+          "end_s": 57.5,
+          "hits": [],
+          "missed": 1
+        }
+      ]
+    },
+    "fire-explosion.mp4": {
+      "duration_s": 14.716667,
+      "proc_fps": 3.78,
+      "types": {
+        "no_helmet": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "dup": 1,
+          "ignored": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "delay_p50_s": 2.3,
+          "fp_per_hour": 0.0
+        },
+        "no_vest": {
+          "tp": 3,
+          "fp": 0,
+          "fn": 0,
+          "dup": 0,
+          "ignored": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "delay_p50_s": 2.8,
+          "fp_per_hour": 0.0
+        },
+        "fire": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "dup": 0,
+          "ignored": 0,
+          "precision": null,
+          "recall": 0.0,
+          "delay_p50_s": null,
+          "fp_per_hour": 0.0
+        }
+      },
+      "events": [
+        {
+          "type": "no_helmet",
+          "t": 2.26,
+          "track": 1,
+          "verdict": "tp"
+        },
+        {
+          "type": "no_helmet",
+          "t": 2.26,
+          "track": 2,
+          "verdict": "dup"
+        },
+        {
+          "type": "no_vest",
+          "t": 2.75,
+          "track": 1,
+          "verdict": "tp"
+        },
+        {
+          "type": "no_vest",
+          "t": 2.75,
+          "track": 2,
+          "verdict": "tp"
+        },
+        {
+          "type": "no_vest",
+          "t": 2.75,
+          "track": 3,
+          "verdict": "tp"
+        }
+      ],
+      "intervals": [
+        {
+          "type": "no_helmet",
+          "start_s": 0,
+          "end_s": 14.7,
+          "hits": [
+            2.26
+          ],
+          "missed": 0
+        },
+        {
+          "type": "no_vest",
+          "start_s": 0,
+          "end_s": 14.7,
+          "hits": [
+            2.75,
+            2.75,
+            2.75
+          ],
+          "missed": 0
+        },
+        {
+          "type": "fire",
+          "start_s": 12.8,
+          "end_s": 14.7,
+          "hits": [],
+          "missed": 1
+        }
+      ]
+    },
+    "ptz_yard.mp4": {
+      "duration_s": 15.11619,
+      "proc_fps": 3.1,
+      "types": {
+        "no_helmet": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "dup": 1,
+          "ignored": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "delay_p50_s": 1.6,
+          "fp_per_hour": 0.0
+        },
+        "no_vest": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "dup": 1,
+          "ignored": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "delay_p50_s": 2.1,
+          "fp_per_hour": 0.0
+        }
+      },
+      "events": [
+        {
+          "type": "no_helmet",
+          "t": 1.63,
+          "track": 1,
+          "verdict": "tp"
+        },
+        {
+          "type": "no_helmet",
+          "t": 1.9,
+          "track": 2,
+          "verdict": "dup"
+        },
+        {
+          "type": "no_vest",
+          "t": 2.06,
+          "track": 1,
+          "verdict": "tp"
+        },
+        {
+          "type": "no_vest",
+          "t": 2.35,
+          "track": 2,
+          "verdict": "dup"
+        }
+      ],
+      "intervals": [
+        {
+          "type": "no_helmet",
+          "start_s": 0,
+          "end_s": 15.1,
+          "hits": [
+            1.63
+          ],
+          "missed": 0
+        },
+        {
+          "type": "no_vest",
+          "start_s": 0,
+          "end_s": 15.1,
+          "hits": [
+            2.06
+          ],
+          "missed": 0
+        }
+      ]
+    },
+    "solo-worker.mp4": {
+      "duration_s": 37.383333,
+      "proc_fps": 4.61,
+      "types": {
+        "no_helmet": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "dup": 1,
+          "ignored": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "delay_p50_s": 1.9,
+          "fp_per_hour": 0.0
+        },
+        "no_vest": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "dup": 1,
+          "ignored": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "delay_p50_s": 2.3,
+          "fp_per_hour": 0.0
+        }
+      },
+      "events": [
+        {
+          "type": "no_helmet",
+          "t": 1.85,
+          "track": 1,
+          "verdict": "tp"
+        },
+        {
+          "type": "no_vest",
+          "t": 2.3,
+          "track": 1,
+          "verdict": "tp"
+        },
+        {
+          "type": "no_helmet",
+          "t": 11.0,
+          "track": 2,
+          "verdict": "dup"
+        },
+        {
+          "type": "no_vest",
+          "t": 11.0,
+          "track": 2,
+          "verdict": "dup"
+        }
+      ],
+      "intervals": [
+        {
+          "type": "no_helmet",
+          "start_s": 0,
+          "end_s": 37.4,
+          "hits": [
+            1.85
+          ],
+          "missed": 0
+        },
+        {
+          "type": "no_vest",
+          "start_s": 0,
+          "end_s": 37.4,
+          "hits": [
+            2.3
+          ],
+          "missed": 0
+        }
+      ]
+    },
+    "warehouse.mp4": {
+      "duration_s": 37.0,
+      "proc_fps": 4.43,
+      "types": {
+        "no_helmet": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "dup": 0,
+          "ignored": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "delay_p50_s": 5.8,
+          "fp_per_hour": 0.0
+        },
+        "no_vest": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "dup": 0,
+          "ignored": 0,
+          "precision": null,
+          "recall": 0.0,
+          "delay_p50_s": null,
+          "fp_per_hour": 0.0
+        }
+      },
+      "events": [
+        {
+          "type": "no_helmet",
+          "t": 5.85,
+          "track": 5,
+          "verdict": "tp"
+        }
+      ],
+      "intervals": [
+        {
+          "type": "no_helmet",
+          "start_s": 0,
+          "end_s": 31.5,
+          "hits": [
+            5.85
+          ],
+          "missed": 0
+        },
+        {
+          "type": "no_vest",
+          "start_s": 0,
+          "end_s": 31.5,
+          "hits": [],
+          "missed": 1
+        }
+      ]
+    }
+  },
+  "skipped": {
+    "css_test.mp4": "нет прогона"
+  },
+  "total": {
+    "no_vest": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 1,
+      "dup": 2,
+      "ignored": 2,
+      "precision": 1.0,
+      "recall": 0.833,
+      "delay_p50_s": 2.8,
+      "fp_per_hour": 0.0
+    },
+    "no_helmet": {
+      "tp": 4,
+      "fp": 0,
+      "fn": 5,
+      "dup": 3,
+      "ignored": 0,
+      "precision": 1.0,
+      "recall": 0.444,
+      "delay_p50_s": 2.1,
+      "fp_per_hour": 0.0
+    },
+    "fall": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 3,
+      "dup": 0,
+      "ignored": 0,
+      "precision": 1.0,
+      "recall": 0.25,
+      "delay_p50_s": 0.8,
+      "fp_per_hour": 0.0
+    },
+    "lying_immobile": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 2,
+      "dup": 0,
+      "ignored": 0,
+      "precision": 1.0,
+      "recall": 0.333,
+      "delay_p50_s": 2.1,
+      "fp_per_hour": 0.0
+    },
+    "fire": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "dup": 0,
+      "ignored": 0,
+      "precision": null,
+      "recall": 0.0,
+      "delay_p50_s": null,
+      "fp_per_hour": 0.0
+    }
+  },
+  "all": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 12,
+    "dup": 5,
+    "ignored": 2,
+    "precision": 1.0,
+    "recall": 0.478,
+    "delay_p50_s": 2.3,
+    "fp_per_hour": 0.0
+  }
+}

@@ -204,6 +204,8 @@ class Worker:
             with self._timed("heads: ожидание (идёт параллельно с ppe)"):
                 heads = heads.result()
             all_dets = [merge_heads(d, spec, h, self.specs[heads_src]) for d, h in zip(all_dets, heads)]
+        if not self.config.worker.hivis:
+            return all_dets
         return [hivis_vests(frame.image, d, spec) for (_, frame), d in zip(fresh, all_dets)]
 
     def _infer_heads(self, model: str, images: list[np.ndarray]) -> list[Detections]:

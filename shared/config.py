@@ -61,6 +61,8 @@ class WorkerSection(BaseModel):
     # каски с двух квадратных плиток широкого кадра: голова на входе модели в ~1.8 раза крупнее.
     # на эталоне Цеха вердикт по каске 0.2 -> 0.67, цена — модель голов дважды на кадр
     tiles: bool = False
+    # жилет по цвету светоотражайки на торсе; выкл только для абляции
+    hivis: bool = True
     crop_pass: CropPass = Field(default_factory=CropPass)
     decode: DecodeSection = Field(default_factory=DecodeSection)
     overlay_delay_ms: int = 0

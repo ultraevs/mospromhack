@@ -1,0 +1,73 @@
+{
+  "tol_s": 5,
+  "pre_s": 1,
+  "hours": 0.0402,
+  "videos": {
+    "holdout_ceh1_worker_zone.mp4": {
+      "duration_s": 75.8,
+      "proc_fps": 5.34,
+      "types": {},
+      "events": [],
+      "intervals": []
+    },
+    "holdout_parking_car.mp4": {
+      "duration_s": 53.916667,
+      "proc_fps": 5.0,
+      "types": {},
+      "events": [],
+      "intervals": []
+    },
+    "holdout_test_lying_rotated.mp4": {
+      "duration_s": 15.0,
+      "proc_fps": 3.35,
+      "types": {
+        "lying_immobile": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "dup": 0,
+          "ignored": 0,
+          "precision": null,
+          "recall": 0.0,
+          "delay_p50_s": null,
+          "fp_per_hour": 0.0
+        }
+      },
+      "events": [],
+      "intervals": [
+        {
+          "type": "lying_immobile",
+          "start_s": 0,
+          "end_s": 11,
+          "hits": [],
+          "missed": 1
+        }
+      ]
+    }
+  },
+  "skipped": {},
+  "total": {
+    "lying_immobile": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "dup": 0,
+      "ignored": 0,
+      "precision": null,
+      "recall": 0.0,
+      "delay_p50_s": null,
+      "fp_per_hour": 0.0
+    }
+  },
+  "all": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "dup": 0,
+    "ignored": 0,
+    "precision": null,
+    "recall": 0.0,
+    "delay_p50_s": null,
+    "fp_per_hour": 0.0
+  }
+}
