@@ -177,37 +177,91 @@ def is_lying(o: Observation, lying_ratio: float) -> bool:
     return tallness(o) > 0 and 1 / tallness(o) >= lying_ratio
 
 
+def _median(values: Sequence[float]) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def _center(o: Observation) -> tuple[float, float]:
+    return o.bbox[0] + o.bbox[2] / 2, o.bbox[1] + o.bbox[3] / 2
+
+
 # стоял -> лег за window_s и центр рамки резко ушел вниз. эвристика по bbox, позы нет
 def check_fall(obs: Sequence[Observation], t: float, p: FallRule) -> RuleResult:
-    w = in_window(obs, t, p.window_s)
-    upright = [i for i, o in enumerate(w) if tallness(o) >= p.upright_ratio]
-    if not upright:
+    if not obs:
         return INACTIVE
-    stood = w[upright[-1]]
-    after = w[upright[-1] + 1:]
-    lying = [o for o in after if is_lying(o, p.lying_ratio)]
-    if not after or not lying or lying[-1] is not after[-1]:
+
+    # Берём небольшой запас истории: в начале падения последний «стоячий» кадр
+    # может оказаться чуть раньше окна правила из-за пропущенного кадра/очереди.
+    lookback = max(p.window_s * 2, 2.0)
+    w = [o for o in obs if t - lookback <= o.t <= t]
+    if len(w) < p.min_observations + 1:
         return INACTIVE
-    drop = ((w[-1].bbox[1] + w[-1].bbox[3] / 2) - (stood.bbox[1] + stood.bbox[3] / 2)) / stood.bbox[3]
-    fraction = len(lying) / len(after)
-    active = len(lying) >= p.min_observations and fraction >= 0.8 and drop >= p.drop_heights
-    return RuleResult(active, fraction, len(after), min(1.0, max(drop, 0.0) / (2 * p.drop_heights)), p.window_s)
+
+    lying_flags = [is_lying(o, p.lying_ratio) for o in w]
+    # Ищем переход в последнюю устойчивую лежачую серию. Последний кадр может
+    # быть шумным, поэтому допускаем короткий хвост не-lying.
+    for split in range(1, len(w) - p.min_observations + 1):
+        before, after = w[:split], w[split:]
+        lying = [o for o, flag in zip(after, lying_flags[split:]) if flag]
+        if len(lying) < p.min_observations:
+            continue
+        fraction = len(lying) / len(after)
+        if fraction < 0.6:
+            continue
+        last_lying_t = lying[-1].t
+        if t - last_lying_t > max(0.5, p.window_s * 0.35):
+            continue
+
+        # Нужна вертикальная/полувертикальная рамка до падения. Порог 0.75
+        # допускает посадку на стул и наклон перед падением, но не продолжение
+        # уже лежащего трека.
+        pre = [o for o in before[-4:] if tallness(o) >= p.upright_ratio * 0.75]
+        if not pre:
+            continue
+        baseline = pre[-min(3, len(pre)):]
+        base_y = _median([_center(o)[1] for o in baseline])
+        base_h = _median([o.bbox[3] for o in baseline])
+        if base_h <= 0:
+            continue
+        end = lying[-min(3, len(lying)):]
+        end_y = _median([_center(o)[1] for o in end])
+        drop = (end_y - base_y) / base_h
+        if drop < p.drop_heights:
+            continue
+        confidence = min(1.0, max(drop, 0.0) / max(2 * p.drop_heights, 1e-6))
+        return RuleResult(True, fraction, len(after), confidence, p.window_s)
+    return INACTIVE
 
 
 def check_lying_immobile(obs: Sequence[Observation], t: float, p: LyingImmobileRule) -> RuleResult:
     w = in_window(obs, t, p.window_s)
     n = len(w)
-    if n == 0 or w[-1].t - w[0].t < p.window_s * 0.9:
+    # При перегруженном TPU кадры приходят реже, поэтому оставляем небольшой
+    # запас к окну, но короткую сцену всё равно не принимаем за инцидент.
+    if n == 0 or w[-1].t - w[0].t < p.window_s * 0.75:
         return INACTIVE
     lying = [o for o in w if is_lying(o, p.lying_ratio)]
     fraction = len(lying) / n
     if not lying:
         return RuleResult(False, 0.0, n, 0.0, p.window_s)
-    a, b = lying[0], lying[-1]
-    size = max(b.bbox[2] * b.aspect, b.bbox[3])
-    dt = max(b.t - a.t, 1e-6)
-    (x0, y0), (x1, y1) = foot(a.bbox), foot(b.bbox)
-    speed = math.hypot((x1 - x0) * b.aspect, y1 - y0) / size / dt
+
+    # Медианы коротких крайних групп подавляют мерцание bbox. Для ползущего
+    # человека центры этих групп всё равно разойдутся.
+    group = max(2, min(4, len(lying) // 8))
+    first, last = lying[:group], lying[-group:]
+    x0 = _median([_center(o)[0] for o in first])
+    y0 = _median([_center(o)[1] for o in first])
+    x1 = _median([_center(o)[0] for o in last])
+    y1 = _median([_center(o)[1] for o in last])
+    size = _median([max(o.bbox[2] * o.aspect, o.bbox[3]) for o in lying])
+    dt = max(last[-1].t - first[0].t, 1e-6)
+    speed = math.hypot((x1 - x0) * last[-1].aspect, y1 - y0) / max(size, 1e-6) / dt
     active = n >= p.min_observations and fraction >= p.fraction and speed < p.max_speed
     return RuleResult(active, fraction, n, fraction, p.window_s)
 

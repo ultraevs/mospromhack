@@ -56,6 +56,13 @@ def test_distance_fallback_does_not_merge_far_or_differently_sized_people():
     assert small != b
 
 
+def test_distance_fallback_keeps_id_when_person_falls_and_box_turns_horizontal():
+    tr = IouTracker()
+    (person,) = tr.update(boxes([100, 100, 200, 400]), 0.0)
+    (same_person,) = tr.update(boxes([80, 250, 360, 400]), 0.17)
+    assert same_person == person
+
+
 def test_each_track_matches_at_most_one_detection():
     tr = IouTracker()
     (a,) = tr.update(boxes([100, 100, 200, 400]), 0.0)

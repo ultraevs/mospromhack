@@ -56,7 +56,15 @@ class IouTracker:
                     w, h = xyxy[j, 2] - xyxy[j, 0], xyxy[j, 3] - xyxy[j, 1]
                     ratio = (w * h) / max(float(pw * ph), 1e-6)
                     dist = float(np.linalg.norm((xyxy[j, :2] + xyxy[j, 2:]) / 2 - pc)) / max(float(min(pw, ph)), 1e-6)
-                    if dist <= self.max_center_shift and 0.5 <= ratio <= 2.0:
+                    # При падении рамка меняет форму: вертикальная рамка
+                    # превращается в широкую. Сохраняем ID только при близком
+                    # центре и явной смене ориентации; обычный fallback остаётся
+                    # строгим, чтобы не склеивать разных людей.
+                    old_w = self._tracks[i].xyxy[2] - self._tracks[i].xyxy[0]
+                    old_h = self._tracks[i].xyxy[3] - self._tracks[i].xyxy[1]
+                    posture_change = old_h > old_w * 1.5 and w > h * 1.1 and 0.2 <= ratio <= 4.0
+                    size_compatible = 0.5 <= ratio <= 2.0 or posture_change
+                    if dist <= self.max_center_shift and size_compatible:
                         pairs.append((dist, i, int(j)))
             for _, i, j in sorted(pairs):
                 if i in used_tracks or j in used_dets:

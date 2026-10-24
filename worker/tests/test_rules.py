@@ -435,6 +435,11 @@ def test_fall_fires():
     assert check_fall(o, o[-1].t, RULES.fall).active
 
 
+def test_fall_tolerates_bbox_flicker_after_transition():
+    o = frames([STAND] * 8 + [LIE, LIE, (0.31, 0.61, 0.38, 0.11), LIE, LIE, (0.31, 0.61, 0.38, 0.11)])
+    assert check_fall(o, o[-1].t, RULES.fall).active
+
+
 def test_crouch_or_brief_bend_is_not_fall():
     o = frames([STAND] * 6 + [CROUCH] * 6)
     assert not check_fall(o, o[-1].t, RULES.fall).active
@@ -452,6 +457,12 @@ def test_lying_immobile_long_fires_short_does_not():
 def test_lying_but_crawling_is_not_immobile():
     o = [obs(i / FPS, bbox=(0.1 + 0.05 * i / FPS, 0.6, 0.4, 0.1)) for i in range(11 * FPS)]
     assert not check_lying_immobile(o, o[-1].t, RULES.lying_immobile).active
+
+
+def test_lying_immobile_tolerates_intermittent_bbox_flicker():
+    boxes = [LIE if i % 5 else (0.31, 0.59, 0.38, 0.11) for i in range(11 * FPS)]
+    o = frames(boxes)
+    assert check_lying_immobile(o, o[-1].t, RULES.lying_immobile).active
 
 
 def test_lying_spot_survives_flicker():
