@@ -37,6 +37,7 @@ class ZoneRow(Base):
     type: Mapped[str] = mapped_column(String, nullable=False)
     polygon: Mapped[list] = mapped_column(JSON, default=list)
     required_ppe: Mapped[list] = mapped_column(JSON, default=list)
+    schedule: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)  # None - зона всегда активна
 
     camera: Mapped[CameraRow] = relationship(back_populates="zones")
 

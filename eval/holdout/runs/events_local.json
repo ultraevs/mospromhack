@@ -8,8 +8,8 @@
       "vest"
     ],
     "tiles": true,
-    "wall_s": 77.9,
-    "proc_fps": 5.34,
+    "wall_s": 76.4,
+    "proc_fps": 5.38,
     "events": []
   },
   {
@@ -21,8 +21,8 @@
       "vest"
     ],
     "tiles": true,
-    "wall_s": 16.1,
-    "proc_fps": 3.35,
+    "wall_s": 15.7,
+    "proc_fps": 3.71,
     "events": []
   },
   {
@@ -31,8 +31,8 @@
     "fps": 6,
     "required_ppe": [],
     "tiles": true,
-    "wall_s": 54.7,
-    "proc_fps": 5.0,
+    "wall_s": 54.1,
+    "proc_fps": 5.09,
     "events": []
   }
 ]

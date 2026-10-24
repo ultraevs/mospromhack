@@ -37,7 +37,8 @@ async def create_zone(camera_id: int, body: ZoneCreate, _user=Depends(require_ad
         raise HTTPException(404, "камера не найдена")
     _check_polygon(body.polygon)
     row = ZoneRow(camera_id=camera_id, name=body.name, type=body.type.value, polygon=body.polygon,
-                  required_ppe=[p.value for p in body.required_ppe])
+                  required_ppe=[p.value for p in body.required_ppe],
+                  schedule=body.schedule.model_dump() if body.schedule else None)
     db.add(row)
     bump_config_version(db)
     db.commit()
@@ -51,7 +52,7 @@ async def update_zone(zone_id: int, body: ZoneUpdate, _user=Depends(require_admi
     if data.get("polygon") is not None:
         _check_polygon(data["polygon"])
     for key, value in data.items():
-        if value is not None:
+        if value is not None or key == "schedule":  # schedule: null - снять расписание
             setattr(row, key, value)
     bump_config_version(db)
     db.commit()

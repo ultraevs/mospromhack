@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from shared.schemas import EventType, PpeItem, RuleSettings, Severity, SmokingRule, WorkerCamera, Zone, ZoneType
@@ -6,6 +7,7 @@ from worker.app.rules.checks import (check_fall, check_head_ppe, check_k_of_m, c
 from worker.app.rules.engine import RuleEngine, evaluate_track
 from worker.app.rules.state import Observation, TrackState
 from worker.app.rules.types import EventClose, EventOpen
+from worker.app.tracking import VehicleSpeeds
 
 RULES = RuleSettings()
 FPS = 6
@@ -14,9 +16,10 @@ HELMET = frozenset({PpeItem.helmet})
 ALL = frozenset({PpeItem.helmet, PpeItem.mask, PpeItem.vest})
 
 
-def obs(t, seen=(), required=HELMET, zones=(), bbox=BOX, height=300.0, vehicles=()):
+def obs(t, seen=(), required=HELMET, zones=(), bbox=BOX, height=300.0, vehicles=(), vehicle_speeds=()):
     return Observation(t=t, bbox=bbox, height_px=height, conf=0.9, seen={c: 0.6 for c in seen},
-                       zones=frozenset(zones), required=frozenset(required), vehicles=vehicles)
+                       zones=frozenset(zones), required=frozenset(required), vehicles=vehicles,
+                       vehicle_speeds=vehicle_speeds)
 
 
 def series(pattern, start=0.0, fps=FPS, **kw):
@@ -130,9 +133,9 @@ def test_zone_min_observations_boundary():
     assert not check_zone(old, 5.1, 3, RULES.zone_intrusion).active
 
 
-def test_default_smoking_rule_is_3_of_5_in_flammable_zones_only():
+def test_default_smoking_rule_is_3_of_5_everywhere():
     p = RULES.smoking
-    assert (p.k, p.m, p.upper_fraction, p.everywhere) == (3, 5, 0.33, False)
+    assert (p.k, p.m, p.upper_fraction, p.everywhere) == (3, 5, 0.33, True)
     hits = lambda n: [(i, i < n, 0.5) for i in range(5)]      # noqa: E731
     assert not check_k_of_m(hits(2), p).active and check_k_of_m(hits(3), p).active
 
@@ -324,16 +327,18 @@ def test_smoking_in_flammable_zone_is_high():
     assert not smoking_sim((9,), hits=2).opens()
 
 
-def test_smoking_outside_flammable_zone_needs_everywhere():
-    assert not smoking_sim(()).opens()
-    everywhere = RuleSettings(smoking=SmokingRule(everywhere=True))
-    ev = smoking_sim((), everywhere).opens()[0]
+FLAMMABLE_ONLY = RuleSettings(smoking=SmokingRule(everywhere=False))
+
+
+def test_smoking_outside_flammable_zone_only_with_everywhere():
+    assert not smoking_sim((), FLAMMABLE_ONLY).opens()
+    ev = smoking_sim(()).opens()[0]
     assert (ev.type, ev.severity, ev.zone_id) == (EventType.smoking, Severity.medium, None)
-    assert smoking_sim((9,), everywhere).opens()[0].severity == Severity.high
+    assert smoking_sim((9,)).opens()[0].severity == Severity.high
 
 
 def test_smoking_event_closes_after_person_leaves_flammable_zone():
-    sim = smoking_sim((9,))
+    sim = smoking_sim((9,), FLAMMABLE_ONLY)
     sim.run(102.2, 7, {7: {"required": (), "zones": ()}})
     assert len(sim.opens()) == 1 and len(sim.closes()) == 1
     assert sim.closes()[0].t == pytest.approx(107.0, abs=0.35)
@@ -380,21 +385,40 @@ def test_running_in_restricted_zone_is_high():
     assert cands[EventType.running].result.active and cands[EventType.running].severity == Severity.high
 
 
-def near(vehicle, seconds, start=0.0):
-    return [obs(start + i / FPS, bbox=(0.3, 0.3, 0.08, 0.2), vehicles=(vehicle,)) for i in range(int(seconds * FPS))]
+def near(vehicle, seconds, start=0.0, speed=1.0):
+    return [obs(start + i / FPS, bbox=(0.3, 0.3, 0.08, 0.2), vehicles=(vehicle,), vehicle_speeds=(speed,))
+            for i in range(int(seconds * FPS))]
 
 
-def test_vehicle_proximity_near_fires_far_does_not():
+def test_vehicle_proximity_moving_near_fires_far_does_not():
     o = near((0.42, 0.3, 0.3, 0.2), 3)  # рядом, ~0.4 роста
-    r = check_vehicle_proximity(o, o[-1].t, RULES.vehicle_proximity)
-    assert r.active
+    assert check_vehicle_proximity(o, o[-1].t, RULES.vehicle_proximity).active
     o = near((0.8, 0.3, 0.15, 0.2), 3)  # ~2.5 роста
     assert not check_vehicle_proximity(o, o[-1].t, RULES.vehicle_proximity).active
+
+
+def test_vehicle_proximity_standing_vehicle_does_not_fire():
+    o = near((0.42, 0.3, 0.3, 0.2), 3, speed=0.0)
+    assert not check_vehicle_proximity(o, o[-1].t, RULES.vehicle_proximity).active
+    p = RULES.vehicle_proximity.model_copy(update={"min_vehicle_speed": 0.0})  # 0 — и стоящая считается
+    assert check_vehicle_proximity(o, o[-1].t, p).active
+
+
+def test_vehicle_proximity_unknown_speed_uses_distance():  # stills
+    o = [obs(i / FPS, bbox=(0.3, 0.3, 0.08, 0.2), vehicles=((0.42, 0.3, 0.3, 0.2),)) for i in range(3 * FPS)]
+    assert check_vehicle_proximity(o, o[-1].t, RULES.vehicle_proximity).active
 
 
 def test_vehicle_proximity_short_episode_does_not_fire():
     o = near((0.8, 0.3, 0.15, 0.2), 2) + near((0.42, 0.3, 0.3, 0.2), 0.5, start=2.0)
     assert not check_vehicle_proximity(o, o[-1].t, RULES.vehicle_proximity).active
+
+
+def test_vehicle_speeds_estimate():
+    vs = VehicleSpeeds()
+    for i in range(20):  # едет 50 px/с при высоте 100 -> 0.5
+        ids, sp = vs.update(np.array([[100 + 5 * i, 100, 300 + 5 * i, 200], [600, 100, 800, 200]]), i / 10)
+    assert abs(sp[0] - 0.5) < 0.05 and sp[1] < 0.01 and ids[0] != ids[1]
 
 
 STAND = (0.4, 0.3, 0.1, 0.4)

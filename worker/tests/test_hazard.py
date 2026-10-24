@@ -15,6 +15,7 @@ from worker.tests.test_pipeline import THRESHOLDS, FakeClient, FakeReader, FakeS
 
 RULES = RuleSettings()
 EVERYWHERE = RuleSettings(smoking=SmokingRule(everywhere=True))
+FLAMMABLE_ONLY = RuleSettings(smoking=SmokingRule(everywhere=False))
 FLAMMABLE = Zone(id=9, camera_id=3, name="Склад ГСМ", type="flammable", polygon=[[0, 0], [1, 0], [1, 1], [0, 1]])
 HAZARD = {"fire": 0.34, "smoke": 0.31, "cigarette": 0.36}
 PERSON = FakeBox("person", (0.25, 0.25, 0.25, 0.5), 0.9)
@@ -154,17 +155,17 @@ def test_smoking_two_of_five_is_not_enough(specs, frozen_clock):
     assert worker.client.events == []
 
 
-def test_smoking_by_default_works_only_in_flammable_zones(specs, frozen_clock):
+def test_smoking_without_everywhere_works_only_in_flammable_zones(specs, frozen_clock):
     always = cigarette_scenario(lambda tick, item: True)
-    worker = make_worker(specs, always)
+    worker = make_worker(specs, always, rules=FLAMMABLE_ONLY)
     run_ticks(worker, 6, clock=frozen_clock)
     assert worker.client.events == [] and worker.stats()["crops_per_s"] == 0
     far = Zone(id=9, camera_id=3, name="Склад ГСМ", type="flammable", polygon=[[0.6, 0], [1, 0], [1, 1], [0.6, 1]])
-    worker = make_worker(specs, always, zones=[far])
+    worker = make_worker(specs, always, zones=[far], rules=FLAMMABLE_ONLY)
     run_ticks(worker, 6, clock=frozen_clock)
     assert worker.client.events == [] and worker.stats()["crops_per_s"] == 0
     restricted = FLAMMABLE.model_copy(update={"type": "restricted"})
-    worker = make_worker(specs, always, zones=[restricted])
+    worker = make_worker(specs, always, zones=[restricted], rules=FLAMMABLE_ONLY)
     run_ticks(worker, 6, clock=frozen_clock)
     assert [e.type.value for e in worker.client.events] == ["zone_intrusion"]
 

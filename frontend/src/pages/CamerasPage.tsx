@@ -154,6 +154,7 @@ function Focus({ camera, cameras, health, tick, isAdmin, onEdit }: {
     const body = {
       name: draft.name.trim(), type: draft.type, polygon: toPolygon(draft.polygon),
       required_ppe: draft.type === "ppe_required" ? draft.required_ppe : [],
+      schedule: draft.schedule,
     };
     setBusy(true);
     try {
@@ -255,8 +256,8 @@ function Focus({ camera, cameras, health, tick, isAdmin, onEdit }: {
             </div>
           ) : (
             <ZonePanel zones={zones} draft={draft} error={zoneError} busy={busy} canEdit={isAdmin && camera.enabled}
-              onNew={() => { setZoneError(null); setDraft({ name: "", type: "restricted", required_ppe: [], polygon: EMPTY_DRAFT }); }}
-              onEdit={(z) => { setZoneError(null); setDraft({ id: z.id, name: z.name, type: z.type, required_ppe: z.required_ppe, polygon: { points: z.polygon, closed: true } }); }}
+              onNew={() => { setZoneError(null); setDraft({ name: "", type: "restricted", required_ppe: [], schedule: null, polygon: EMPTY_DRAFT }); }}
+              onEdit={(z) => { setZoneError(null); setDraft({ id: z.id, name: z.name, type: z.type, required_ppe: z.required_ppe, schedule: z.schedule ?? null, polygon: { points: z.polygon, closed: true } }); }}
               onChange={setDraft} onSave={() => void saveZone()} onDelete={() => void deleteZone()} onCancel={() => setDraft(null)} />
           )}
         </aside>

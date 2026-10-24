@@ -102,6 +102,9 @@ def nms_per_class(xyxy: np.ndarray, scores: np.ndarray, cls: np.ndarray, iou_thr
 
 # выход yolov8: [4+nc, 8400], cx cy w h + скоры классов
 def decode(output: np.ndarray, spec: ModelSpec, info: LetterboxInfo, max_det: int = 300) -> Detections:
+    if output.shape[0] < 4 + spec.nc and spec.name == "people" and output.shape[0] >= 5:
+        # программа linq собрана под 5 классов без cell phone (он последний) — добиваем нулями, телефона просто нет
+        output = np.concatenate([output, np.zeros((4 + spec.nc - output.shape[0], output.shape[1]), output.dtype)])
     if output.shape[0] != 4 + spec.nc:
         raise ValueError(f"выход модели {spec.name}: {output.shape[0]} строк, ожидалось {4 + spec.nc}")
     scores = output[4:]
@@ -116,6 +119,36 @@ def decode(output: np.ndarray, spec: ModelSpec, info: LetterboxInfo, max_det: in
     conf, cls = conf[mask], cls[mask]
     keep = nms_per_class(xyxy, conf, cls, spec.nms_iou)[:max_det]
     return Detections(to_source(xyxy[keep], info), conf[keep].astype(np.float32), cls[keep].astype(np.int64))
+
+
+# выход yolov8-pose: [4 + 1 + 17*3, 8400], у точки x y видимость
+def decode_pose(output: np.ndarray, spec: ModelSpec, info: LetterboxInfo,
+                max_det: int = 100) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    k = spec.keypoints
+    if output.shape[0] != 4 + spec.nc + k * 3:
+        raise ValueError(f"выход позы {spec.name}: {output.shape[0]} строк, ожидалось {4 + spec.nc + k * 3}")
+    conf = output[4:4 + spec.nc].max(axis=0)
+    mask = conf >= spec.thresholds.min()
+    if not mask.any():
+        return np.zeros((0, 4), np.float32), np.zeros(0, np.float32), np.zeros((0, k, 3), np.float32)
+    cx, cy, w, h = output[:4, mask]
+    xyxy = np.stack([cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2], axis=1)
+    conf = conf[mask]
+    kpts = output[4 + spec.nc:, mask].T.reshape(-1, k, 3).astype(np.float32)
+    keep = nms(xyxy, conf, spec.nms_iou)[:max_det]
+    kpts = kpts[keep].copy()
+    kpts[..., 0] = ((kpts[..., 0] - info.pad_x) / info.scale).clip(0, info.src_w)
+    kpts[..., 1] = ((kpts[..., 1] - info.pad_y) / info.scale).clip(0, info.src_h)
+    return to_source(xyxy[keep], info), conf[keep].astype(np.float32), kpts
+
+
+PHONE = "cell phone"  # из coco people, в ppe-классы не маппится, идёт в Observation.phones отдельно
+
+
+def phone_boxes(people: Detections, people_spec: ModelSpec) -> np.ndarray:
+    if PHONE not in people_spec.classes:
+        return np.zeros((0, 4), np.float32)
+    return people.xyxy[people.cls == people_spec.class_id(PHONE)]
 
 
 COCO_TO_PPE = {"person": "person", "car": "vehicle", "truck": "vehicle", "bus": "vehicle", "motorcycle": "vehicle"}

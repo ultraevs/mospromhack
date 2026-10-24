@@ -23,13 +23,18 @@ rules:
   no_mask: {window_s: 4, min_observations: 12, fraction: 0.6}
   no_vest: {window_s: 6, min_observations: 15, max_fraction: 0.1, min_person_height_px: 120}
   zone_intrusion: {window_s: 1.5, fraction: 0.7, min_observations: 4}
-  smoking: {k: 3, m: 5, upper_fraction: 0.33, everywhere: false}
+  smoking: {k: 3, m: 5, upper_fraction: 0.33, everywhere: true}  # везде кроме курилок
   fire: {k: 3, m: 5}
   smoke: {k: 3, m: 5}
   running: {window_s: 2, min_observations: 6, fraction: 0.6, speed_heights_s: 1.5}
-  vehicle_proximity: {window_s: 1.5, min_observations: 4, fraction: 0.7, distance_heights: 1.0}
+  vehicle_proximity: {window_s: 1.5, min_observations: 4, fraction: 0.7, distance_heights: 1.0, min_vehicle_speed: 0.1}
   fall: {window_s: 1.5, min_observations: 2, upright_ratio: 1.3, lying_ratio: 1.0, drop_heights: 0.2}
   lying_immobile: {window_s: 6, min_observations: 12, fraction: 0.7, lying_ratio: 1.0, max_speed: 0.1}  # 10 с и 90% не ловили ни одного лежачего: рамка лежащего мерцает
+  phone_usage: {window_s: 3, min_observations: 6, fraction: 0.5, upper_fraction: 0.6}
+  barrier_crossing: {window_s: 3, min_observations: 3}
+  under_load: {window_s: 1.5, fraction: 0.7, min_observations: 4}
+  no_harness: {window_s: 4, min_observations: 8, max_fraction: 0.2}
+  unsafe_carry: {window_s: 2, min_observations: 6, fraction: 0.6, min_speed_heights_s: 0.3}
   lifecycle:
     close_after_s: 5
     cooldown_s: 60

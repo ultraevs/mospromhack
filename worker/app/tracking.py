@@ -85,3 +85,36 @@ class IouTracker:
             tr.velocity = self.smoothing * tr.velocity + (1 - self.smoothing) * (new_c - old_c) / dt
         tr.xyxy = box.copy()
         tr.last_t = t
+
+
+# скорость техники: сдвиг центра за ~1 с в своих высотах рамки в секунду, со сглаживанием.
+# id даёт тот же iou-трекер, отдельный экземпляр на камеру
+class VehicleSpeeds:
+    def __init__(self, span_s: float = 1.0, smoothing: float = 0.5):
+        self.tracker = IouTracker(max_age_s=2.0)
+        self.span_s = span_s
+        self.smoothing = smoothing
+        self._hist: dict[int, list[tuple[float, float, float]]] = {}  # id -> (t, cx, cy)
+        self._speed: dict[int, float] = {}
+
+    def update(self, xyxy: np.ndarray, t: float) -> tuple[np.ndarray, list[float]]:
+        xyxy = np.asarray(xyxy, dtype=np.float32).reshape(-1, 4)
+        ids = self.tracker.update(xyxy, t)
+        speeds = []
+        for box, tid in zip(xyxy, ids):
+            tid = int(tid)
+            cx, cy, h = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2, max(float(box[3] - box[1]), 1.0)
+            hist = self._hist.setdefault(tid, [])
+            hist.append((t, float(cx), float(cy)))
+            while len(hist) > 2 and hist[1][0] <= t - self.span_s:
+                hist.pop(0)
+            t0, x0, y0 = hist[0]
+            if t - t0 > 0:
+                raw = float(np.hypot(cx - x0, cy - y0)) / h / (t - t0)
+                prev = self._speed.get(tid)
+                self._speed[tid] = raw if prev is None else self.smoothing * prev + (1 - self.smoothing) * raw
+            speeds.append(self._speed.get(tid, 0.0))
+        alive = {int(i) for i in ids} | {tr.track_id for tr in self.tracker._tracks}
+        self._hist = {k: v for k, v in self._hist.items() if k in alive}
+        self._speed = {k: v for k, v in self._speed.items() if k in alive}
+        return ids, speeds

@@ -24,11 +24,12 @@ from worker.app.capture import CameraReader, open_capture
 from worker.app.client import BackendClient, DetectionsSender
 from worker.app.detector import Detector, create_detector
 from worker.app.evidence import (JPEG_QUALITY_SNAPSHOT, CameraEvidence, ClipBuilder, annotate, encode_jpeg)
-from worker.app.model_spec import ModelSpec, load_all_specs
+from worker.app.model_spec import ModelSpec, load_all_specs, load_pose_spec
 from worker.app.crops import crop_box, merge, only_classes, shift, tile_spans
 from worker.app.pipeline import CameraPipeline, check_classes, norm_box
 from worker.app.rules.state import CIGARETTE, HEAD_CLASSES, PERSON
-from worker.app.postprocess import Detections, decode, hivis_vests, merge_heads, merge_people, preprocess
+from worker.app.postprocess import (Detections, decode, decode_pose, hivis_vests, merge_heads, merge_people,
+                                    phone_boxes, preprocess)
 from worker.app.rules.types import EventClose, EventOpen
 
 log = logging.getLogger("worker")
@@ -50,6 +51,7 @@ class CameraState:
     last_seq: int = 0
     next_due: float = 0.0
     hazard_due: float = 0.0
+    pose_due: float = 0.0
     processed: deque = field(default_factory=lambda: deque(maxlen=120))
 
     def proc_fps(self) -> float:
@@ -60,8 +62,11 @@ class CameraState:
 # python -m worker.app.main из корня
 class Worker:
     def __init__(self, config: AppConfig, specs: dict[str, ModelSpec], detector: Detector, client: BackendClient,
-                 sender: DetectionsSender, reader_factory: Callable[[int, str], CameraReader] | None = None):
+                 sender: DetectionsSender, reader_factory: Callable[[int, str], CameraReader] | None = None,
+                 pose: tuple[ModelSpec, Detector] | None = None):
         self.config = config
+        self.pose = pose  # (spec, свой onnx-детектор) или None
+        self._phones: dict[int, np.ndarray] = {}  # id(кадра) -> телефоны из people, до _handle
         own = getattr(detector, "thresholds", {})  # у linq свои пороги под int8
         self.specs = {n: replace(s, thresholds=own[n]) if n in own else s for n, s in specs.items()}
         self.detector = detector
@@ -87,7 +92,7 @@ class Worker:
         self.clips_failed = 0
         self._pending: deque[EventOpen | EventClose] = deque()  # то что не ушло из-за обрыва
         self._captured: dict[int, int] = {}
-        self._infer_ms: dict[str, deque] = {name: deque(maxlen=300) for name in specs}
+        self._infer_ms: dict[str, deque] = {name: deque(maxlen=300) for name in [*specs, *(["pose"] if pose else [])]}
         self._batch: dict[str, int] = {}
         self._crop_times: deque = deque(maxlen=2000)
         self._hazard_checks: deque = deque(maxlen=4000)
@@ -199,6 +204,8 @@ class Worker:
         if people is not None:
             with self._timed("people: ожидание (идёт параллельно с ppe)"):
                 people = people.result()
+            for (_, frame), p in zip(fresh, people):
+                self._phones[id(frame)] = phone_boxes(p, self.specs["people"])
             all_dets = [merge_people(d, spec, p, self.specs["people"]) for d, p in zip(all_dets, people)]
         if heads is not None:
             with self._timed("heads: ожидание (идёт параллельно с ppe)"):
@@ -228,7 +235,8 @@ class Worker:
                     dets = self._head_pass(frame.image, dets, spec, getattr(frame, "px_scale", 1.0))
             with self._timed("буфер кадров: постановка в очередь"):
                 state.evidence.add_frame(frame.image, frame.ts_ms)
-            self._handle(state, frame, dets, spec)
+            poses = self._pose_due(state, frame)
+            self._handle(state, frame, dets, spec, self._phones.pop(id(frame), None), poses)
             state.processed.append(time.monotonic())
         return len(fresh)
 
@@ -421,12 +429,32 @@ class Worker:
                 state.evidence.start_clip(action.key, frame.ts_ms)
             self._pending.append((state.camera.id, action))
 
-    def _handle(self, state: CameraState, frame, dets: Detections, spec: ModelSpec) -> None:
+    # поза на том же кадре, что и ppe, но реже: pose_fps на камеру
+    def _pose_due(self, state: CameraState, frame) -> tuple[np.ndarray, np.ndarray] | None:
+        if self.pose is None:
+            return None
+        now = time.monotonic()
+        if now < state.pose_due:
+            return None
+        period = 1.0 / max(self.config.worker.pose_fps, 0.1)
+        state.pose_due = max(state.pose_due + period, now + period / 2)
+        spec, det = self.pose
+        with self._timed("pose: весь проход"):
+            batch = np.empty((1, 3, spec.input_size, spec.input_size), dtype=np.float32)
+            info = preprocess(frame.image, spec.input_size, out=batch[0])[1]
+            t0 = time.perf_counter()
+            out = det.infer("pose", batch)
+            self._infer_ms["pose"].append((time.perf_counter() - t0) * 1000)
+            boxes, _, kpts = decode_pose(out[0], spec, info)
+        return boxes, kpts
+
+    def _handle(self, state: CameraState, frame, dets: Detections, spec: ModelSpec,
+                phones: np.ndarray | None = None, poses: tuple[np.ndarray, np.ndarray] | None = None) -> None:
         assert self.remote is not None
         h, w = frame.image.shape[:2]
         with self._timed("трекер, привязка, правила"):
             msg, actions = state.pipeline.process_ppe(dets, spec, w, h, frame.ts_ms, state.camera, self.remote.rules,
-                                                      getattr(frame, "px_scale", 1.0))
+                                                      getattr(frame, "px_scale", 1.0), phones, poses)
         with self._timed("рамки: JSON и отправка"):
             self.sender.send(msg.model_dump_json())
         with self._timed("события: стоп-кадры"):
@@ -584,7 +612,17 @@ def build(settings: Settings, config: AppConfig) -> Worker:
     base = f"http://{settings.backend_host}:{settings.backend_port}"
     client = BackendClient(base, settings.internal_token)
     sender = DetectionsSender(base, settings.internal_token).start()
-    return Worker(config, specs, detector, client, sender)
+    return Worker(config, specs, detector, client, sender, pose=make_pose(settings, detector))
+
+
+# поза только локально на onnx: на linq программы под неё нет
+def make_pose(settings: Settings, detector: Detector) -> tuple[ModelSpec, Detector] | None:
+    spec = load_pose_spec(settings.models_dir)
+    if spec is None or detector.name != "onnx":
+        return None
+    from worker.app.detector.onnx_detector import OnnxDetector
+    log.info("поза: %s", spec.onnx_path)
+    return spec, OnnxDetector({"pose": spec}, prefer_dynamic=False)
 
 
 def main() -> None:

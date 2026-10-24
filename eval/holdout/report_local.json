@@ -5,21 +5,21 @@
   "videos": {
     "holdout_ceh1_worker_zone.mp4": {
       "duration_s": 75.8,
-      "proc_fps": 5.34,
+      "proc_fps": 5.38,
       "types": {},
       "events": [],
       "intervals": []
     },
     "holdout_parking_car.mp4": {
       "duration_s": 53.916667,
-      "proc_fps": 5.0,
+      "proc_fps": 5.09,
       "types": {},
       "events": [],
       "intervals": []
     },
     "holdout_test_lying_rotated.mp4": {
       "duration_s": 15.0,
-      "proc_fps": 3.35,
+      "proc_fps": 3.71,
       "types": {
         "lying_immobile": {
           "tp": 0,

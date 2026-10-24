@@ -73,7 +73,9 @@ async def list_events(
 TYPE_LABEL = {
     "no_helmet": "Без каски", "no_mask": "Без маски", "no_vest": "Без жилета", "zone_intrusion": "В запретной зоне",
     "smoking": "Курение", "fire": "Огонь", "smoke": "Дым", "running": "Бег", "vehicle_proximity": "Рядом с техникой",
-    "fall": "Падение", "lying_immobile": "Лежит неподвижно",
+    "fall": "Падение", "lying_immobile": "Лежит неподвижно", "phone_usage": "Телефон",
+    "barrier_crossing": "Перелез через ограждение", "under_load": "Под грузом", "no_harness": "Без привязи на высоте",
+    "unsafe_carry": "Опасная переноска груза",
 }
 SEVERITY_LABEL = {"high": "Высокая", "medium": "Средняя", "low": "Низкая"}
 STATUS_LABEL = {"open": "Идёт", "closed": "Закрыто"}

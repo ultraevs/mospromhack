@@ -56,6 +56,7 @@ class WorkerSection(BaseModel):
     precision: Literal["auto", "fp32", "fp16"] = "auto"
     ppe_fps: float = 6
     hazard_fps: float = 1
+    pose_fps: float = 6  # поза дешёвая (~8 мс на cuda), считаем каждый кадр ppe; models/pose на камеру, только с onnx; нет модели — не считается
     # сколько пачек кадров одновременно в инференсе; >1 когда модель далеко (облако linq) и цикл ждёт ответа
     inflight: int = Field(default=1, ge=1, le=8)
     # каски с двух квадратных плиток широкого кадра: голова на входе модели в ~1.8 раза крупнее.

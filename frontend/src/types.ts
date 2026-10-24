@@ -1,12 +1,14 @@
 // то же что shared/schemas.py. рамки [x, y, w, h] в долях кадра
 export type BBox = [number, number, number, number];
 export type EventType = "no_helmet" | "no_mask" | "no_vest" | "zone_intrusion" | "smoking" | "fire" | "smoke"
-  | "running" | "vehicle_proximity" | "fall" | "lying_immobile";
+  | "running" | "vehicle_proximity" | "fall" | "lying_immobile"
+  | "phone_usage" | "barrier_crossing" | "under_load" | "no_harness" | "unsafe_carry";
 export type Severity = "low" | "medium" | "high";
 export type Review = "none" | "confirmed" | "false_positive" | "forwarded";
 export type PpeItem = "helmet" | "mask" | "vest";
 export type Point = [number, number];
-export type ZoneType = "restricted" | "ppe_required" | "flammable";
+export type ZoneType = "restricted" | "ppe_required" | "flammable"
+  | "smoking_allowed" | "barrier" | "suspended_load" | "height";
 export type UserRole = "admin" | "viewer";
 
 export interface Zone {
@@ -16,7 +18,11 @@ export interface Zone {
   type: ZoneType;
   polygon: Point[];
   required_ppe: PpeItem[];
+  schedule: ZoneSchedule | null; // null — действует всегда
 }
+
+// когда зона действует, через полночь можно (22:00–06:00). days: 1 — пн .. 7 — вс
+export interface ZoneSchedule { start: string; end: string; days: number[] }
 
 export type ZoneInput = Omit<Zone, "id" | "camera_id">;
 
@@ -30,9 +36,14 @@ export interface RuleSettings {
   fire: { k: number; m: number };
   smoke: { k: number; m: number };
   running: { window_s: number; min_observations: number; fraction: number; speed_heights_s: number };
-  vehicle_proximity: { window_s: number; min_observations: number; fraction: number; distance_heights: number };
+  vehicle_proximity: { window_s: number; min_observations: number; fraction: number; distance_heights: number; min_vehicle_speed: number };
   fall: { window_s: number; min_observations: number; upright_ratio: number; lying_ratio: number; drop_heights: number };
   lying_immobile: { window_s: number; min_observations: number; fraction: number; lying_ratio: number; max_speed: number };
+  phone_usage: { window_s: number; min_observations: number; fraction: number; upper_fraction: number };
+  barrier_crossing: { window_s: number; min_observations: number };
+  under_load: { window_s: number; fraction: number; min_observations: number };
+  no_harness: { window_s: number; min_observations: number; max_fraction: number };
+  unsafe_carry: { window_s: number; min_observations: number; fraction: number; min_speed_heights_s: number };
   lifecycle: {
     close_after_s: number; cooldown_s: number; retrack_iou: number; retrack_window_s: number;
     camera_cooldown_s: number; track_lost_s: number;
@@ -238,6 +249,11 @@ export const EVENT_LABEL: Record<EventType, string> = {
   vehicle_proximity: "Рядом с техникой",
   fall: "Падение",
   lying_immobile: "Лежит неподвижно",
+  phone_usage: "Телефон",
+  barrier_crossing: "Перелез через ограждение",
+  under_load: "Под грузом",
+  no_harness: "Без привязи на высоте",
+  unsafe_carry: "Опасная переноска груза",
 };
 
 export const EVENT_TYPES = Object.keys(EVENT_LABEL) as EventType[];
@@ -256,17 +272,34 @@ export const SEVERITY_RANK: Record<Severity, number> = { low: 0, medium: 1, high
 export const EVENT_SEVERITY: Record<EventType, Severity> = {
   fire: "high", smoke: "high", zone_intrusion: "high",
   vehicle_proximity: "high", fall: "high", lying_immobile: "high", running: "medium",
-  no_helmet: "medium", no_mask: "medium", smoking: "medium",
+  barrier_crossing: "high", under_load: "high", no_harness: "high",
+  no_helmet: "medium", no_mask: "medium", smoking: "medium", phone_usage: "medium", unsafe_carry: "medium",
   no_vest: "low",
 };
 
 export const PPE_ITEMS: PpeItem[] = ["helmet", "mask", "vest"];
 export const PPE_LABEL: Record<PpeItem, string> = { helmet: "Каска", mask: "Маска", vest: "Жилет" };
 
-export const ZONE_TYPES: ZoneType[] = ["restricted", "ppe_required", "flammable"];
+export const ZONE_TYPES: ZoneType[] = ["restricted", "ppe_required", "flammable", "smoking_allowed", "barrier", "suspended_load", "height"];
 export const ZONE_TYPE_LABEL: Record<ZoneType, string> = {
   restricted: "Вход запрещён",
   ppe_required: "Обязательны СИЗ",
   flammable: "Горючие материалы",
+  smoking_allowed: "Курилка",
+  barrier: "Ограждение",
+  suspended_load: "Под грузом / конвейер",
+  height: "Работа на высоте",
 };
-export const ZONE_COLOR: Record<ZoneType, string> = { restricted: "#e5483b", ppe_required: "#3b82d0", flammable: "#f08c2a" };
+export const ZONE_TYPE_HINT: Record<ZoneType, string> = {
+  restricted: "Любой человек внутри — нарушение.",
+  ppe_required: "Внутри проверяем выбранные СИЗ.",
+  flammable: "Здесь курение — нарушение, даже если курение везде выключено.",
+  smoking_allowed: "Здесь курить можно, событие не создаётся.",
+  barrier: "Обведите полосу ограждения. Человек прошёл её насквозь — перелез.",
+  suspended_load: "Место под краном или конвейером. Человек стоит здесь — нарушение.",
+  height: "Участок работы на высоте. Без страховочной привязи — нарушение.",
+};
+export const ZONE_COLOR: Record<ZoneType, string> = {
+  restricted: "#e5483b", ppe_required: "#3b82d0", flammable: "#f08c2a",
+  smoking_allowed: "#3fae6a", barrier: "#c2409b", suspended_load: "#f4c430", height: "#8a63d2",
+};

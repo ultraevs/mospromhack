@@ -22,7 +22,9 @@ from shared.config import ROOT, get_settings, load_config  # noqa: E402
 from shared.schemas import WorkerCamera, WorkerConfig  # noqa: E402
 from shared.sync import loop_input  # noqa: E402
 from worker.app.detector import create_detector  # noqa: E402
-from worker.app.main import Worker  # noqa: E402
+from worker.app.main import Worker, make_pose  # noqa: E402
+
+POSE = None  # (spec, детектор) позы, ставит main
 from worker.app.model_spec import load_all_specs  # noqa: E402
 from worker.app.pipeline import check_classes  # noqa: E402
 
@@ -104,7 +106,7 @@ def run_once(config, specs, detector, videos: list[str], cams: int, fps: float, 
     cameras = [WorkerCamera(id=i + 1, name=f"cam{i + 1}", rtsp_url=f"{capture.SYNC_SCHEME}{videos[i % len(videos)]}",
                             required_ppe=["helmet", "vest"]) for i in range(cams)]
     backend = Backend(WorkerConfig(version=1, cameras=cameras, rules=config.rules))
-    worker = Worker(config, specs, detector, backend, Sender())
+    worker = Worker(config, specs, detector, backend, Sender(), pose=POSE)
     thread = threading.Thread(target=worker.run, daemon=True)
     thread.start()
     t0 = time.monotonic()
@@ -148,7 +150,7 @@ def run_video_once(config, specs, detector, video: str, fps: float, ppe: list[st
     config.worker.ppe_fps = fps
     cam = WorkerCamera(id=1, name="cam1", rtsp_url=f"{capture.SYNC_SCHEME}{video}", required_ppe=ppe)
     backend = Backend(WorkerConfig(version=1, cameras=[cam], rules=config.rules))
-    worker = Worker(config, specs, detector, backend, Sender())
+    worker = Worker(config, specs, detector, backend, Sender(), pose=POSE)
     thread = threading.Thread(target=worker.run, daemon=True)
     thread.start()
     t0 = time.monotonic()
@@ -186,6 +188,7 @@ def main() -> None:
     ap.add_argument("--tiles", action="store_true", help="каски с двух плиток кадра (worker.tiles)")
     ap.add_argument("--no-hivis", action="store_true", help="без цветовой эвристики жилета (абляция)")
     ap.add_argument("--models", nargs="+", help="только эти модели из models/ (по умолчанию все)")
+    ap.add_argument("--no-pose", action="store_true", help="без модели позы (для сравнения fps)")
     ap.add_argument("--once", action="store_true", help="каждый ролик один проход, события со временем от начала ролика")
     ap.add_argument("--ppe", nargs="*", default=["helmet", "vest"], help="требуемые сиз (для --once)")
     args = ap.parse_args()
@@ -211,6 +214,8 @@ def main() -> None:
     linq = config.worker.linq.model_dump()
     linq["program_dir"] = linq["program_dir"].replace("{login}", settings.linq_login or os.environ.get("LINQ_LOGIN", ""))
     detector = create_detector(args.detector, specs, None, config.worker.precision, linq)
+    global POSE
+    POSE = None if args.no_pose else make_pose(settings, detector)
     log.info("детектор %s, модели %s", detector.device.replace(settings.linq_login or "-", "<login>"), sorted(specs))
 
     if args.once:

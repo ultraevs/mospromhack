@@ -8,14 +8,15 @@ from shared.schemas import (DetectionsMessage, EventType, FrameSize, ObjectBox, 
                             RuleSettings, WorkerCamera, ZoneType)
 from worker.app.association import anchor, assign_items, point_in_polygon
 from worker.app.model_spec import ModelSpec
-from worker.app.postprocess import Detections
+from worker.app.postprocess import Detections, iou_matrix
 from worker.app.crops import crop_box
 from worker.app.rules.checks import check_k_of_m, in_upper_part, in_window
 from worker.app.rules.engine import Candidate, RuleEngine
-from worker.app.rules.state import (ATTACHABLE, CIGARETTE, HAZARD_EVENTS, HEAD_CLASSES, PERSON, PPE_CLASSES,
-                                    VEHICLE, Observation, TrackState)
+from worker.app.rules.state import (ATTACHABLE, CIGARETTE, HAZARD_EVENTS, HEAD_CLASSES, OPTIONAL_ATTACHABLE, PERSON,
+                                    PPE_CLASSES, VEHICLE, Observation, TrackState)
 from worker.app.rules.types import EventClose, EventOpen
-from worker.app.tracking import IouTracker
+from worker.app.rules.zones import active_camera
+from worker.app.tracking import IouTracker, VehicleSpeeds
 
 EVENT_ITEM = {EventType.no_helmet: PpeItem.helmet, EventType.no_mask: PpeItem.mask, EventType.no_vest: PpeItem.vest}
 
@@ -57,6 +58,7 @@ def ppe_status(track: TrackState, t: float, item: PpeItem, candidates: list[Cand
 class CameraPipeline:
     def __init__(self) -> None:
         self.tracker = IouTracker()
+        self.vehicle_speeds = VehicleSpeeds()
         self.tracks: dict[int, TrackState] = {}
         self.engine = RuleEngine()
         self.hazard_checks = {name: deque(maxlen=CHECKS_KEPT) for name in HAZARD_EVENTS}
@@ -121,21 +123,43 @@ class CameraPipeline:
 
 
     def process_ppe(self, dets: Detections, spec: ModelSpec, w: int, h: int, ts_ms: int, camera: WorkerCamera,
-                    rules: RuleSettings, px_scale: float = 1.0) -> tuple[DetectionsMessage, list[EventOpen | EventClose]]:
+                    rules: RuleSettings, px_scale: float = 1.0, phones: np.ndarray | None = None,
+                    poses: tuple[np.ndarray, np.ndarray] | None = None) -> tuple[DetectionsMessage, list[EventOpen | EventClose]]:
         t = ts_ms / 1000
+        camera = active_camera(camera)  # зоны с расписанием вне окна выкидываем
         names = [spec.classes[c] for c in dets.cls]
         person_idx = [i for i, n in enumerate(names) if n == PERSON]
-        item_idx = [i for i, n in enumerate(names) if n in ATTACHABLE]
+        item_idx = [i for i, n in enumerate(names) if n in ATTACHABLE or n in OPTIONAL_ATTACHABLE]
 
         people_xyxy = dets.xyxy[person_idx]
         track_ids = self.tracker.update(people_xyxy, t)
         owner = assign_items(people_xyxy, dets.xyxy[item_idx], [names[i] in HEAD_CLASSES for i in item_idx])
         owner_of = dict(zip(item_idx, owner))  # индекс сиз -> индекс человека или -1
-        vehicles = tuple(norm_box(dets.xyxy[i], w, h) for i, n in enumerate(names) if n == VEHICLE)
+        vehicle_idx = [i for i, n in enumerate(names) if n == VEHICLE]
+        vehicles = tuple(norm_box(dets.xyxy[i], w, h) for i in vehicle_idx)
+        vehicle_ids, speeds = self.vehicle_speeds.update(dets.xyxy[vehicle_idx], t)
+        vehicle_tid = {i: 1_000_000 + int(v) for i, v in zip(vehicle_idx, vehicle_ids)}  # свой счётчик, не путать с людьми
+        speeds = () if camera.stills else tuple(round(s, 3) for s in speeds)  # на картинках скорости нет
+
+        # поза к человеку по iou рамок, телефон — центром внутри рамки
+        pose_of = {}
+        if poses is not None and len(poses[0]) and person_idx:
+            ious = iou_matrix(people_xyxy, poses[0])
+            for p in range(len(person_idx)):
+                j = int(ious[p].argmax())
+                if ious[p, j] >= 0.4:
+                    kp = poses[1][j]
+                    pose_of[p] = tuple((round(float(x) / w, 4), round(float(y) / h, 4), round(float(v), 3)) for x, y, v in kp)
+        phone_cxy = ((phones[:, :2] + phones[:, 2:]) / 2) if phones is not None and len(phones) else None
 
         for p, det_i in enumerate(person_idx):
             bbox = norm_box(dets.xyxy[det_i], w, h)
             ax, ay = anchor(bbox)
+            mine = ()
+            if phone_cxy is not None:
+                x1, y1, x2, y2 = dets.xyxy[det_i]
+                inside = (phone_cxy[:, 0] >= x1) & (phone_cxy[:, 0] <= x2) & (phone_cxy[:, 1] >= y1) & (phone_cxy[:, 1] <= y2)
+                mine = tuple(norm_box(b, w, h) for b in phones[inside])
             zones = frozenset(z.id for z in camera.zones if point_in_polygon(ax, ay, z.polygon))
             required = set(camera.required_ppe)
             for z in camera.zones:
@@ -148,7 +172,8 @@ class CameraPipeline:
             track = self.tracks.setdefault(int(track_ids[p]), TrackState(int(track_ids[p])))
             track.add(Observation(t=t, bbox=bbox, height_px=float(dets.xyxy[det_i][3] - dets.xyxy[det_i][1]) * px_scale,
                                   conf=float(dets.conf[det_i]), seen=seen, zones=zones, required=frozenset(required),
-                                  vehicles=vehicles, aspect=w / h if h else 1.0))
+                                  vehicles=vehicles, vehicle_speeds=speeds, aspect=w / h if h else 1.0,
+                                  phones=mine, keypoints=pose_of.get(p)))
 
         actions, evaluated = self.engine.step(t, self.tracks, camera, rules)
         horizon = max(rules.lifecycle.track_lost_s, self.tracker.max_age_s)
@@ -171,7 +196,7 @@ class CameraPipeline:
                 continue
             own = owner_of.get(i, -1)
             objects.append(ObjectBox(cls=name, bbox=list(norm_box(dets.xyxy[i], w, h)), conf=round(float(dets.conf[i]), 3),
-                                     track_id=int(track_ids[own]) if own >= 0 else None))
+                                     track_id=int(track_ids[own]) if own >= 0 else vehicle_tid.get(i)))
 
         if t - self._hazard_t <= HAZARD_VISIBLE_S:
             objects += self._hazard_objects

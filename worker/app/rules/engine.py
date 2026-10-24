@@ -7,7 +7,9 @@ from shared.schemas import EventType, PpeItem, RuleSettings, Severity, WorkerCam
 from worker.app.association import iou_xywh
 from worker.app.rules.checks import (RuleResult, check_fall, check_head_ppe, check_k_of_m, check_lying_immobile,
                                      check_no_vest, check_running, check_vehicle_proximity, check_zone)
-from worker.app.rules.state import PPE_CLASSES, SEVERITY, TrackState
+from worker.app.rules.checks import check_barrier, check_harness
+from worker.app.rules.pose import check_phone, check_unsafe_carry
+from worker.app.rules.state import HARNESS, PPE_CLASSES, SEVERITY, TrackState
 from worker.app.rules.types import EventClose, EventOpen
 
 _keys = itertools.count(1)
@@ -42,6 +44,30 @@ def _requirement_zone(camera: WorkerCamera, track: TrackState, item: PpeItem) ->
     return None
 
 
+def _best(cands: list[Candidate]) -> list[Candidate]:
+    if not cands:
+        return []
+    return [max(cands, key=lambda c: (c.result.active, c.result.fraction))]
+
+
+# зоны 05/06: ограждение, под грузом, высота
+def _zone_candidates(track: TrackState, t: float, camera: WorkerCamera, rules: RuleSettings) -> list[Candidate]:
+    obs, bbox = track.obs, track.last.bbox
+    load, height, barrier = [], [], []
+    for zone in camera.zones:
+        if zone.type == ZoneType.suspended_load:
+            load.append(Candidate(EventType.under_load, check_zone(obs, t, zone.id, rules.under_load),
+                                  SEVERITY[EventType.under_load], bbox, zone.id))
+        elif zone.type == ZoneType.height:
+            height.append(Candidate(EventType.no_harness, check_harness(obs, t, zone.id, HARNESS, rules.no_harness),
+                                    SEVERITY[EventType.no_harness], bbox, zone.id))
+        elif zone.type == ZoneType.barrier and not camera.stills:
+            barrier.append(Candidate(EventType.barrier_crossing,
+                                     check_barrier(obs, t, zone.id, zone.polygon, rules.barrier_crossing),
+                                     SEVERITY[EventType.barrier_crossing], bbox, zone.id))
+    return _best(load) + _best(height) + _best(barrier)
+
+
 def evaluate_track(track: TrackState, t: float, camera: WorkerCamera, rules: RuleSettings) -> list[Candidate]:
     obs, bbox = track.obs, track.last.bbox
     out = []
@@ -65,13 +91,25 @@ def evaluate_track(track: TrackState, t: float, camera: WorkerCamera, rules: Rul
         out.append(best)
 
     flammable = {z.id for z in camera.zones if z.type == ZoneType.flammable}
-    if track.checks and (rules.smoking.everywhere or track.last.zones & flammable):
+    # everywhere: курить можно только в курилке (если она не пересекается с flammable)
+    smoke_ok = {z.id for z in camera.zones if z.type == ZoneType.smoking_allowed}
+    in_smoking_room = bool(track.last.zones & smoke_ok) and not track.last.zones & flammable
+    if track.checks and ((rules.smoking.everywhere and not in_smoking_room) or track.last.zones & flammable):
         severity = Severity.high if track.last.zones & flammable else SEVERITY[EventType.smoking]
         zone_id = next(iter(sorted(track.last.zones & flammable)), None)
         out.append(Candidate(EventType.smoking, check_k_of_m(track.checks, rules.smoking), severity, bbox, zone_id))
 
+    out.extend(_zone_candidates(track, t, camera, rules))
+
     out.append(Candidate(EventType.vehicle_proximity, check_vehicle_proximity(obs, t, rules.vehicle_proximity),
                          SEVERITY[EventType.vehicle_proximity], bbox))
+    # 03 телефон, 08 переноска (по позе). переноске нужна скорость, на stills не считаем
+    if track.last.phones:
+        out.append(Candidate(EventType.phone_usage, check_phone(obs, t, rules.phone_usage),
+                             SEVERITY.get(EventType.phone_usage, Severity.medium), bbox))
+    if track.last.keypoints and not camera.stills:
+        out.append(Candidate(EventType.unsafe_carry, check_unsafe_carry(obs, t, rules.unsafe_carry),
+                             SEVERITY.get(EventType.unsafe_carry, Severity.medium), bbox))
     if camera.stills:  # на картинке все неподвижны, движение не считаем
         return out
     restricted = {z.id for z in camera.zones if z.type == ZoneType.restricted}

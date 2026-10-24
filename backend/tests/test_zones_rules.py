@@ -16,7 +16,7 @@ def test_zone_crud(client, camera):
     assert r.status_code == 201
     zone = r.json()
     assert zone == {"id": zone["id"], "camera_id": camera["id"], "name": "Зона резки", "type": "ppe_required",
-                    "polygon": SQUARE, "required_ppe": ["helmet", "mask"]}
+                    "polygon": SQUARE, "required_ppe": ["helmet", "mask"], "schedule": None}
     assert client.get(base).json() == [zone]
 
     moved = [[0.1, 0.1], [0.5, 0.1], [0.3, 0.6]]
@@ -80,7 +80,7 @@ def test_rules_defaults_come_from_config_yaml(client):
     assert rules["no_mask"] == {"window_s": 4, "min_observations": 12, "fraction": 0.6}
     assert rules["no_vest"] == {"window_s": 6, "min_observations": 15, "max_fraction": 0.1, "min_person_height_px": 120}
     assert rules["zone_intrusion"] == {"window_s": 1.5, "fraction": 0.7, "min_observations": 4}
-    assert rules["smoking"] == {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": False}
+    assert rules["smoking"] == {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": True}
     assert rules["fire"] == rules["smoke"] == {"k": 3, "m": 5}
     assert rules["lifecycle"] == {"close_after_s": 5, "cooldown_s": 60, "retrack_iou": 0.3, "retrack_window_s": 120,
                                   "camera_cooldown_s": 60, "track_lost_s": 2}
@@ -148,7 +148,7 @@ def test_old_defaults_in_db_are_upgraded_once(settings):
     with TestClient(create_app(settings, run_sources=False)) as c:
         rules = c.get("/api/settings/rules").json()
         assert rules["zone_intrusion"]["min_observations"] == 4
-        assert rules["smoking"] == {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": False}
+        assert rules["smoking"] == {"k": 3, "m": 5, "upper_fraction": 0.33, "everywhere": True}
         assert rules["no_helmet"]["fraction"] == 0.5
         rules["zone_intrusion"]["min_observations"] = 1
         c.put("/api/settings/rules", json=rules)
@@ -164,3 +164,60 @@ def test_old_defaults_in_db_are_upgraded_once(settings):
     with TestClient(create_app(settings, run_sources=False)) as c:
         rules = c.get("/api/settings/rules").json()
         assert rules["zone_intrusion"]["min_observations"] == 2 and (rules["smoking"]["k"], rules["smoking"]["m"]) == (1, 3)
+
+
+def test_zone_schedule_stored_and_sent_to_worker(client, camera):
+    base = f"/api/cameras/{camera['id']}/zones"
+    sched = {"start": "08:00", "end": "12:00", "days": [1, 2, 3, 4, 5]}
+    zone = client.post(base, json={"name": "Стеллажи", "type": "restricted", "polygon": SQUARE, "schedule": sched}).json()
+    assert zone["schedule"] == sched
+    assert config(client)["cameras"][0]["zones"][0]["schedule"] == sched
+    night = {"start": "22:00", "end": "06:00", "days": [5]}
+    assert client.patch(f"/api/zones/{zone['id']}", json={"schedule": night}).json()["schedule"] == night
+    assert client.patch(f"/api/zones/{zone['id']}", json={"name": "x"}).json()["schedule"] == night
+    assert client.patch(f"/api/zones/{zone['id']}", json={"schedule": None}).json()["schedule"] is None
+    bad = {"name": "a", "type": "restricted", "polygon": SQUARE, "schedule": {"start": "25:00", "end": "12:00"}}
+    assert client.post(base, json=bad).status_code == 422
+
+
+def test_v2_rules_get_new_sections_and_smoking_everywhere(settings):
+    from fastapi.testclient import TestClient
+
+    from backend.app.db.models import SettingRow
+    from backend.app.main import create_app
+
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        with c.app.state.app.session_factory() as db:
+            row = db.get(SettingRow, "rules")
+            raw = {k: dict(v) for k, v in row.value.items() if k not in ("phone_usage", "no_harness")}
+            raw["smoking"]["everywhere"] = False
+            raw["zone_intrusion"]["min_observations"] = 1
+            row.value = raw
+            db.get(SettingRow, "rules_defaults_version").value = 2
+            db.commit()
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        rules = c.get("/api/settings/rules").json()
+        assert rules["smoking"]["everywhere"] is True
+        assert rules["zone_intrusion"]["min_observations"] == 1  # на v2 это уже ручная настройка
+        assert rules["phone_usage"]["window_s"] == 3 and rules["no_harness"]["max_fraction"] == 0.2
+        rules["smoking"]["everywhere"] = False
+        c.put("/api/settings/rules", json=rules)
+    with TestClient(create_app(settings, run_sources=False)) as c:
+        assert c.get("/api/settings/rules").json()["smoking"]["everywhere"] is False
+
+
+def test_old_db_gets_schedule_column(tmp_path):
+    import sqlite3
+
+    from backend.app.db.session import make_engine
+    db = tmp_path / "old.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE zones (id INTEGER PRIMARY KEY, camera_id INTEGER, name TEXT, type TEXT, "
+                "polygon JSON, required_ppe JSON)")
+    con.execute("INSERT INTO zones VALUES (1, 1, 'z', 'restricted', '[]', '[]')")
+    con.commit()
+    con.close()
+    make_engine(db).dispose()
+    con = sqlite3.connect(db)
+    assert con.execute("SELECT name, schedule FROM zones").fetchall() == [("z", None)]
+    con.close()

@@ -22,6 +22,11 @@ class EventType(str, Enum):
     vehicle_proximity = "vehicle_proximity"
     fall = "fall"
     lying_immobile = "lying_immobile"
+    phone_usage = "phone_usage"  # 03 телефон при работе / на ходу
+    barrier_crossing = "barrier_crossing"  # 05 перелез через ограждение
+    under_load = "under_load"  # 05 под подвешенным грузом / конвейером
+    no_harness = "no_harness"  # 06 на высоте без привязи
+    unsafe_carry = "unsafe_carry"  # 08 переноска груза с нарушением
 
 
 class Severity(str, Enum):
@@ -63,6 +68,10 @@ class ZoneType(str, Enum):
     restricted = "restricted"
     ppe_required = "ppe_required"
     flammable = "flammable"
+    smoking_allowed = "smoking_allowed"  # курилка: курение тут не нарушение
+    barrier = "barrier"  # полоса ограждения: пересёк — нарушение
+    suspended_load = "suspended_load"  # под краном / конвейером
+    height = "height"  # работа на высоте, нужна привязь
 
 
 class SourceType(str, Enum):
@@ -177,11 +186,22 @@ class Camera(CameraBase):
     open_events: int = 0
 
 
+HHMM = Annotated[str, Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")]
+
+
+# когда зона действует; через полночь можно (22:00–06:00). нет расписания — всегда
+class ZoneSchedule(BaseModel):
+    start: HHMM = "00:00"
+    end: HHMM = "23:59"
+    days: list[Annotated[int, Field(ge=1, le=7)]] = Field(default_factory=lambda: [1, 2, 3, 4, 5, 6, 7])  # 1 — пн
+
+
 class ZoneBase(BaseModel):
     name: str
     type: ZoneType
     polygon: list[Point] = Field(min_length=3)
     required_ppe: list[PpeItem] = Field(default_factory=list)
+    schedule: ZoneSchedule | None = None
 
 
 class ZoneCreate(ZoneBase):
@@ -193,6 +213,7 @@ class ZoneUpdate(BaseModel):
     type: ZoneType | None = None
     polygon: list[Point] | None = Field(default=None, min_length=3)
     required_ppe: list[PpeItem] | None = None
+    schedule: ZoneSchedule | None = None
 
 
 class Zone(ZoneBase):
@@ -241,7 +262,7 @@ class SmokingRule(KofMRule):
     k: Count = 3
     m: Count = 5
     upper_fraction: Share = 0.33
-    everywhere: bool = False
+    everywhere: bool = True  # везде кроме курилок (smoking_allowed); False — только в зонах flammable
 
 
 class RunningRule(BaseModel):
@@ -256,6 +277,7 @@ class VehicleProximityRule(BaseModel):
     min_observations: Count = 4
     fraction: Share = 0.7
     distance_heights: Annotated[float, Field(gt=0, le=100)] = 1.0
+    min_vehicle_speed: Annotated[float, Field(ge=0, le=100)] = 0.1  # своих высот рамки в секунду; 0 — и стоящая техника
 
 
 class FallRule(BaseModel):
@@ -272,6 +294,37 @@ class LyingImmobileRule(BaseModel):
     fraction: Share = 0.7
     lying_ratio: Annotated[float, Field(gt=0, le=10)] = 1.0
     max_speed: Annotated[float, Field(ge=0, le=10)] = 0.1
+
+
+class PhoneRule(BaseModel):
+    window_s: Seconds = 3
+    min_observations: Count = 6
+    fraction: Share = 0.5
+    upper_fraction: Share = 0.6  # телефон в верхней части фигуры (у уха, в руках перед собой)
+
+
+class BarrierRule(BaseModel):
+    window_s: Seconds = 3  # за сколько секунд ноги должны пройти полосу ограждения насквозь
+    min_observations: Count = 3
+
+
+class UnderLoadRule(BaseModel):
+    window_s: Seconds = 1.5
+    fraction: Share = 0.7
+    min_observations: Count = 4
+
+
+class HarnessRule(BaseModel):
+    window_s: Seconds = 4
+    min_observations: Count = 8
+    max_fraction: Share = 0.2  # привязь видна меньше чем в 20% кадров — нарушение
+
+
+class CarryRule(BaseModel):
+    window_s: Seconds = 2
+    min_observations: Count = 6
+    fraction: Share = 0.6
+    min_speed_heights_s: Annotated[float, Field(ge=0, le=100)] = 0.3  # несёт на ходу
 
 
 class LifecycleRule(BaseModel):
@@ -295,6 +348,11 @@ class RuleSettings(BaseModel):
     vehicle_proximity: VehicleProximityRule = Field(default_factory=VehicleProximityRule)
     fall: FallRule = Field(default_factory=FallRule)
     lying_immobile: LyingImmobileRule = Field(default_factory=LyingImmobileRule)
+    phone_usage: PhoneRule = Field(default_factory=PhoneRule)
+    barrier_crossing: BarrierRule = Field(default_factory=BarrierRule)
+    under_load: UnderLoadRule = Field(default_factory=UnderLoadRule)
+    no_harness: HarnessRule = Field(default_factory=HarnessRule)
+    unsafe_carry: CarryRule = Field(default_factory=CarryRule)
     lifecycle: LifecycleRule = Field(default_factory=LifecycleRule)
 
 

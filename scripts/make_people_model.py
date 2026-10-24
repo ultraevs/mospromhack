@@ -17,7 +17,8 @@ sys.path.insert(0, str(ROOT))
 
 from shared.config import get_settings  # noqa: E402
 
-KEEP = {"person": 0.5, "car": 0.6, "truck": 0.6, "bus": 0.6, "motorcycle": 0.6}
+# cell phone под правило телефона, порог 0.35 подобран вручную на глаз, на разметке не мерили
+KEEP = {"person": 0.5, "car": 0.6, "truck": 0.6, "bus": 0.6, "motorcycle": 0.6, "cell phone": 0.35}
 
 
 # из 80 классов coco оставляем только KEEP: режем выходные каналы последних conv в cv3.

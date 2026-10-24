@@ -21,7 +21,9 @@ def test_empty_summary(client):
     s = client.get("/api/analytics/summary").json()
     assert s["total"] == 0 and s["false_share"] is None and s["by_camera"] == [] and s["by_zone"] == [] and s["by_day"] == []
     assert [t["type"] for t in s["by_type"]] == ["no_helmet", "no_mask", "no_vest", "zone_intrusion", "smoking", "fire", "smoke",
-                                                 "running", "vehicle_proximity", "fall", "lying_immobile"]
+                                                 "running", "vehicle_proximity", "fall", "lying_immobile",
+                                                 "phone_usage", "barrier_crossing", "under_load", "no_harness",
+                                                 "unsafe_carry"]
     assert all(t["total"] == 0 for t in s["by_type"]) and len(s["by_hour"]) == 24
 
 

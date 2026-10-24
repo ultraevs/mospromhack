@@ -1,14 +1,28 @@
 import { Icon } from "../../components/Icons";
 import { Empty, Notice } from "../../components/Ui";
 import { closeDraft, isComplete, type PolygonDraft } from "../../lib/polygon";
-import { PPE_ITEMS, PPE_LABEL, ZONE_COLOR, ZONE_TYPE_LABEL, ZONE_TYPES, type PpeItem, type Zone, type ZoneType } from "../../types";
+import { PPE_ITEMS, PPE_LABEL, ZONE_COLOR, ZONE_TYPE_HINT, ZONE_TYPE_LABEL, ZONE_TYPES, type PpeItem, type Zone, type ZoneSchedule, type ZoneType } from "../../types";
 
 export interface ZoneDraft {
   id?: number;
   name: string;
   type: ZoneType;
   required_ppe: PpeItem[];
+  schedule: ZoneSchedule | null;
   polygon: PolygonDraft;
+}
+
+const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const DEFAULT_SCHEDULE: ZoneSchedule = { start: "08:00", end: "17:00", days: [1, 2, 3, 4, 5] };
+
+// "07:55–12:00, пн–пт"
+export function scheduleText(s: ZoneSchedule): string {
+  const d = [...s.days].sort((a, b) => a - b);
+  let days: string;
+  if (d.length === 7) days = "каждый день";
+  else if (d.length > 2 && d[d.length - 1] - d[0] === d.length - 1) days = `${DAYS[d[0] - 1]}–${DAYS[d[d.length - 1] - 1]}`.toLowerCase();
+  else days = d.map((x) => DAYS[x - 1].toLowerCase()).join(", ");
+  return `${s.start}–${s.end}, ${days}`;
 }
 
 interface Props {
@@ -43,6 +57,7 @@ export function ZonePanel({ zones, draft, error, busy, canEdit, onNew, onEdit, o
                     {ZONE_TYPE_LABEL[z.type]}
                     {z.type === "ppe_required" && z.required_ppe.length > 0 && `: ${z.required_ppe.map((p) => PPE_LABEL[p].toLowerCase()).join(", ")}`}
                   </small>
+                  {z.schedule && <small>{scheduleText(z.schedule)}</small>}
                   {canEdit && <Icon name="edit" size={15} />}
                 </button>
               </li>
@@ -76,7 +91,45 @@ export function ZonePanel({ zones, draft, error, busy, canEdit, onNew, onEdit, o
         <select value={draft.type} onChange={(e) => onChange({ ...draft, type: e.target.value as ZoneType })}>
           {ZONE_TYPES.map((t) => <option key={t} value={t}>{ZONE_TYPE_LABEL[t]}</option>)}
         </select>
+        <small>{ZONE_TYPE_HINT[draft.type]}</small>
       </label>
+      <fieldset className="field">
+        <legend>Когда действует</legend>
+        <div className="checks">
+          <label className="check">
+            <input type="radio" name="zone-when" checked={!draft.schedule} onChange={() => onChange({ ...draft, schedule: null })} />
+            Всегда
+          </label>
+          <label className="check">
+            <input type="radio" name="zone-when" checked={!!draft.schedule} onChange={() => onChange({ ...draft, schedule: draft.schedule ?? DEFAULT_SCHEDULE })} />
+            По расписанию
+          </label>
+        </div>
+        {draft.schedule && (() => {
+          const sch = draft.schedule;
+          const put = (patch: Partial<ZoneSchedule>) => onChange({ ...draft, schedule: { ...sch, ...patch } });
+          return (
+            <>
+              <div className="checks">
+                <label className="check">с <input type="time" required value={sch.start} onChange={(e) => put({ start: e.target.value })} /></label>
+                <label className="check">по <input type="time" required value={sch.end} onChange={(e) => put({ end: e.target.value })} /></label>
+              </div>
+              <div className="checks">
+                {DAYS.map((label, i) => (
+                  <label key={label} className="check">
+                    <input type="checkbox" checked={sch.days.includes(i + 1)} onChange={(e) => put({
+                      days: e.target.checked ? [...sch.days, i + 1].sort((a, b) => a - b) : sch.days.filter((x) => x !== i + 1),
+                    })} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              {sch.days.length === 0 && <small>Отметьте хотя бы один день.</small>}
+              {sch.start > sch.end && <small>Через полночь: с {sch.start} до {sch.end} следующего дня.</small>}
+            </>
+          );
+        })()}
+      </fieldset>
       {draft.type === "ppe_required" && (
         <fieldset className="field">
           <legend>Какие СИЗ обязательны в зоне</legend>
@@ -100,7 +153,8 @@ export function ZonePanel({ zones, draft, error, busy, canEdit, onNew, onEdit, o
         <span className="spacer" />
         <button type="button" className="btn btn-ghost" onClick={onCancel}>Отмена</button>
         <button type="submit" className="btn btn-primary"
-          disabled={busy || !complete || !draft.name.trim() || (draft.type === "ppe_required" && draft.required_ppe.length === 0)}>
+          disabled={busy || !complete || !draft.name.trim() || (draft.type === "ppe_required" && draft.required_ppe.length === 0)
+            || (!!draft.schedule && draft.schedule.days.length === 0)}>
           Сохранить
         </button>
       </div>

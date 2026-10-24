@@ -15,6 +15,7 @@ class ModelSpec:
     nms_iou: float
     input_size: int
     onnx_path: Path
+    keypoints: int = 0  # у позы 17, выход 4 + nc + 17*3
 
     @property
     def nc(self) -> int:
@@ -45,7 +46,8 @@ def load_model_spec(model_dir: Path) -> ModelSpec:
     shape = raw["input"]["shape"]
     if shape[2] != shape[3]:
         raise ValueError(f"{path}: ожидается квадратный вход, а в файле {shape}")
-    expected_out = [1, 4 + len(classes), raw["output"]["shape"][2]]
+    kpt = int(raw.get("keypoints", 0))
+    expected_out = [1, 4 + len(classes) + kpt * 3, raw["output"]["shape"][2]]
     if list(raw["output"]["shape"]) != expected_out:
         raise ValueError(f"{path}: выход {raw['output']['shape']} не согласуется с числом классов {len(classes)}")
 
@@ -56,6 +58,7 @@ def load_model_spec(model_dir: Path) -> ModelSpec:
         nms_iou=float(raw["nms_iou"]),
         input_size=int(shape[2]),
         onnx_path=model_dir / "best.onnx",
+        keypoints=kpt,
     )
 
 
@@ -64,5 +67,14 @@ def load_all_specs(models_dir: Path) -> dict[str, ModelSpec]:
     for sub in sorted(Path(models_dir).iterdir()) if Path(models_dir).exists() else []:
         if (sub / "model.yaml").exists():
             spec = load_model_spec(sub)
-            specs[spec.name] = spec
+            if not spec.keypoints:  # поза идёт мимо детекторов, см. load_pose_spec
+                specs[spec.name] = spec
     return specs
+
+
+def load_pose_spec(models_dir: Path) -> ModelSpec | None:
+    path = Path(models_dir) / "pose"
+    if not (path / "model.yaml").exists() or not (path / "best.onnx").exists():
+        return None
+    spec = load_model_spec(path)
+    return spec if spec.keypoints else None

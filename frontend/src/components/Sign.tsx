@@ -7,6 +7,8 @@ const FAMILY: Record<EventType, Family> = {
   no_helmet: "mandatory", no_mask: "mandatory", no_vest: "mandatory",
   zone_intrusion: "prohibition", smoking: "prohibition", running: "prohibition",
   fire: "warning", smoke: "warning", vehicle_proximity: "warning", fall: "warning", lying_immobile: "warning",
+  phone_usage: "prohibition", barrier_crossing: "prohibition", under_load: "warning",
+  no_harness: "mandatory", unsafe_carry: "warning",
 };
 
 const GLYPH: Record<EventType, string> = {
@@ -21,6 +23,16 @@ const GLYPH: Record<EventType, string> = {
   vehicle_proximity: "M7 15V10h4l1.5 3H15v2M7 15h8M8.5 16.5a1 1 0 1 0 0 .01M13.5 16.5a1 1 0 1 0 0 .01M15 9v6",
   fall: "M14.5 8a1.3 1.3 0 1 0 0 .01M13.5 10l-3.5 2.5 1 2.5M10 12.5 7.5 11M12 13l3 1.5M7 17h10",
   lying_immobile: "M8 13.5a1.3 1.3 0 1 0 0 .01M10 14h7M10 14l-.5 2M17 14v2M6.5 16.5h11",
+  // трубка телефона
+  phone_usage: "M9.5 6.5h5v11h-5zM9.5 15h5M11.5 8h1",
+  // человек над перилами
+  barrier_crossing: "M12 5.5a1.3 1.3 0 1 0 0 .01M12 7.5v4l-2.5 2M12 11.5l3 1M5.5 14h13M7 14v4M17 14v4",
+  // груз на тросе над человеком
+  under_load: "M12 5v3M9.5 8h5v2.5h-5zM12 13.3a1.2 1.2 0 1 0 0 .01M12 15v2.5m-2 0h4",
+  // страховочная привязь: лямки и строп вверх
+  no_harness: "M12 5.5a1.3 1.3 0 1 0 0 .01M9 8.5l3 4 3-4M9 8.5v6M15 8.5v6M8.5 14.5h7M12 12.5V18M15 8.5l2.5-3",
+  // человек с ящиком на ходу
+  unsafe_carry: "M10 6.5a1.3 1.3 0 1 0 0 .01M10 8.5v4l-2 3.5M10 12.5l2 3.5M12 8.5h4.5v4H12z",
 };
 
 export function Sign({ type, size = 26 }: { type: EventType; size?: number }) {

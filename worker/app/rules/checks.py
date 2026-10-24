@@ -117,12 +117,15 @@ def check_running(obs: Sequence[Observation], t: float, p: RunningRule) -> RuleR
 
 
 # от ног человека до нижней кромки рамки техники, в ростах. у длинной фуры центр далеко, поэтому до кромки
-def vehicle_distance(o: Observation) -> float | None:
+def vehicle_distance(o: Observation, min_speed: float = 0.0) -> float | None:
     if not o.vehicles or o.bbox[3] <= 0:
         return None
     fx, fy = foot(o.bbox)
     best = None
-    for vx, vy, vw, vh in o.vehicles:
+    for k, (vx, vy, vw, vh) in enumerate(o.vehicles):
+        # стоящая техника не опасна; скорость неизвестна (stills) — считаем по близости
+        if o.vehicle_speeds and o.vehicle_speeds[k] < min_speed:
+            continue
         dx = (min(max(fx, vx), vx + vw) - fx) * o.aspect
         d = math.hypot(dx, vy + vh - fy) / o.bbox[3]
         best = d if best is None else min(best, d)
@@ -134,7 +137,7 @@ def check_vehicle_proximity(obs: Sequence[Observation], t: float, p: VehicleProx
     n = len(w)
     if n == 0 or not obs[-1].vehicles:
         return INACTIVE
-    dists = [vehicle_distance(o) for o in w]
+    dists = [vehicle_distance(o, p.min_vehicle_speed) for o in w]
     close = [d for d in dists if d is not None and d < p.distance_heights]
     fraction = len(close) / n
     active = n >= p.min_observations and fraction >= p.fraction
@@ -147,6 +150,33 @@ def tallness(o: Observation) -> float:
     return o.bbox[3] / (o.bbox[2] * o.aspect) if o.bbox[2] > 0 else 0.0
 
 
+LYING_TORSO_DEG = 55.0
+
+
+# угол корпуса от вертикали: середина плеч -> середина бёдер, coco 5,6 / 11,12. None если точки не видны
+def torso_angle(o: Observation, min_vis: float = 0.5) -> float | None:
+    k = o.keypoints
+    if not k:
+        return None
+    sh = [k[i] for i in (5, 6) if k[i][2] >= min_vis]
+    hp = [k[i] for i in (11, 12) if k[i][2] >= min_vis]
+    if not sh or not hp:
+        return None
+    dx = (sum(p[0] for p in hp) / len(hp) - sum(p[0] for p in sh) / len(sh)) * o.aspect
+    dy = sum(p[1] for p in hp) / len(hp) - sum(p[1] for p in sh) / len(sh)
+    if dx == 0 and dy == 0:
+        return None
+    return math.degrees(math.atan2(abs(dx), dy))  # голова вниз = 180
+
+
+# лежит: по позе если есть, иначе по рамке как раньше
+def is_lying(o: Observation, lying_ratio: float) -> bool:
+    a = torso_angle(o)
+    if a is not None:
+        return a > LYING_TORSO_DEG
+    return tallness(o) > 0 and 1 / tallness(o) >= lying_ratio
+
+
 # стоял -> лег за window_s и центр рамки резко ушел вниз. эвристика по bbox, позы нет
 def check_fall(obs: Sequence[Observation], t: float, p: FallRule) -> RuleResult:
     w = in_window(obs, t, p.window_s)
@@ -155,7 +185,7 @@ def check_fall(obs: Sequence[Observation], t: float, p: FallRule) -> RuleResult:
         return INACTIVE
     stood = w[upright[-1]]
     after = w[upright[-1] + 1:]
-    lying = [o for o in after if tallness(o) > 0 and 1 / tallness(o) >= p.lying_ratio]
+    lying = [o for o in after if is_lying(o, p.lying_ratio)]
     if not after or not lying or lying[-1] is not after[-1]:
         return INACTIVE
     drop = ((w[-1].bbox[1] + w[-1].bbox[3] / 2) - (stood.bbox[1] + stood.bbox[3] / 2)) / stood.bbox[3]
@@ -169,7 +199,7 @@ def check_lying_immobile(obs: Sequence[Observation], t: float, p: LyingImmobileR
     n = len(w)
     if n == 0 or w[-1].t - w[0].t < p.window_s * 0.9:
         return INACTIVE
-    lying = [o for o in w if tallness(o) > 0 and 1 / tallness(o) >= p.lying_ratio]
+    lying = [o for o in w if is_lying(o, p.lying_ratio)]
     fraction = len(lying) / n
     if not lying:
         return RuleResult(False, 0.0, n, 0.0, p.window_s)
@@ -180,3 +210,55 @@ def check_lying_immobile(obs: Sequence[Observation], t: float, p: LyingImmobileR
     speed = math.hypot((x1 - x0) * b.aspect, y1 - y0) / size / dt
     active = n >= p.min_observations and fraction >= p.fraction and speed < p.max_speed
     return RuleResult(active, fraction, n, fraction, p.window_s)
+
+
+# ось полосы ограждения: самое длинное ребро, x в пикселях через aspect
+def _strip_axes(polygon, aspect: float):
+    pts = [(x * aspect, y) for x, y in polygon]
+    cx, cy = sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
+    best = max(range(len(pts)), key=lambda i: math.dist(pts[i], pts[(i + 1) % len(pts)]))
+    (x1, y1), (x2, y2) = pts[best], pts[(best + 1) % len(pts)]
+    L = math.hypot(x2 - x1, y2 - y1) or 1.0
+    ax, ay = (x2 - x1) / L, (y2 - y1) / L
+    along = [(p[0] - cx) * ax + (p[1] - cy) * ay for p in pts]
+    return (cx, cy), (ax, ay), (min(along), max(along))
+
+
+# перелез: ноги были по одну сторону полосы, потом по другую (в пределах длины полосы),
+# либо топчется внутри полосы >= min_observations кадров. проход вдоль - одна сторона, не считаем
+def check_barrier(obs: Sequence[Observation], t: float, zone_id: int, polygon, p) -> RuleResult:
+    w = in_window(obs, t, p.window_s)
+    n = len(w)
+    if n == 0:
+        return INACTIVE
+    (cx, cy), (ax, ay), (lo, hi) = _strip_axes(polygon, w[-1].aspect)
+    inside = sum(1 for o in w if zone_id in o.zones)
+    crossed, last_side = False, 0
+    for o in w:
+        if zone_id in o.zones:
+            continue
+        fx, fy = foot(o.bbox)
+        dx, dy = fx * o.aspect - cx, fy - cy
+        if not lo <= dx * ax + dy * ay <= hi:
+            continue  # обошел полосу с торца - не перелез
+        side = 1 if dx * -ay + dy * ax > 0 else -1
+        if last_side and side != last_side:
+            crossed = True
+        last_side = side
+    fraction = inside / n
+    active = crossed or inside >= p.min_observations
+    return RuleResult(active, fraction, n, 1.0 if crossed else fraction, p.window_s)
+
+
+# 06: человек в зоне высоты, привязь почти не видна.
+# моделей с классом harness пока нет -> по факту срабатывает на любого в зоне, это "контроль зоны высоты"
+def check_harness(obs: Sequence[Observation], t: float, zone_id: int, harness_cls: str, p) -> RuleResult:
+    if not obs or zone_id not in obs[-1].zones:
+        return INACTIVE
+    w = [o for o in in_window(obs, t, p.window_s) if zone_id in o.zones]
+    n = len(w)
+    if n == 0:
+        return INACTIVE
+    fraction = sum(1 for o in w if harness_cls in o.seen) / n
+    active = n >= p.min_observations and fraction < p.max_fraction
+    return RuleResult(active, fraction, n, 1.0 - fraction, p.window_s)
