@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { EventMessage } from "../types";
 import { wsUrl } from "../api";
+import type { EventMessage } from "../types";
 
-export function useLiveEvents(onMessage: (message: EventMessage) => void, enabled = true) {
+export interface LiveState {
+  connected: boolean;
+  lastSync: number | null;
+  attempt: number;
+  reconnect: () => void;
+}
+
+export function useLiveEvents(onMessage: (message: EventMessage) => void, enabled = true): LiveState {
   const callbackRef = useRef(onMessage);
   const socketRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -14,9 +21,15 @@ export function useLiveEvents(onMessage: (message: EventMessage) => void, enable
 
   callbackRef.current = onMessage;
 
-  const connect = useCallback(() => {
+  const stopTimers = () => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     if (heartbeatRef.current !== null) window.clearInterval(heartbeatRef.current);
+    timerRef.current = null;
+    heartbeatRef.current = null;
+  };
+
+  const connect = useCallback(() => {
+    stopTimers();
     reconnectRef.current = true;
     socketRef.current?.close();
     const socket = new WebSocket(wsUrl("/ws/events"));
@@ -36,15 +49,13 @@ export function useLiveEvents(onMessage: (message: EventMessage) => void, enable
         callbackRef.current(JSON.parse(event.data) as EventMessage);
         setLastSync(Date.now());
       } catch {
-        // Ignore malformed frames; the next REST refresh remains authoritative.
+        // битый кадр пропускаем, rest все равно перечитается
       }
     };
     socket.onclose = (event) => {
       if (socketRef.current !== socket) return;
-      if (heartbeatRef.current !== null) {
-        window.clearInterval(heartbeatRef.current);
-        heartbeatRef.current = null;
-      }
+      if (heartbeatRef.current !== null) window.clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
       setConnected(false);
       if (event.code === 4401 || event.code === 4403) {
         reconnectRef.current = false;
@@ -62,20 +73,13 @@ export function useLiveEvents(onMessage: (message: EventMessage) => void, enable
   }, []);
 
   useEffect(() => {
-    if (!enabled) {
-      reconnectRef.current = false;
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-      if (heartbeatRef.current !== null) window.clearInterval(heartbeatRef.current);
-      socketRef.current?.close();
-      setConnected(false);
-      return;
-    }
+    if (!enabled) return;
     connect();
     return () => {
       reconnectRef.current = false;
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-      if (heartbeatRef.current !== null) window.clearInterval(heartbeatRef.current);
+      stopTimers();
       socketRef.current?.close();
+      setConnected(false);
     };
   }, [connect, enabled]);
 

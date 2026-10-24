@@ -360,7 +360,7 @@ def run_local(args) -> None:
     import pika
 
     token = args.token or os.environ.get("INTERNAL_TOKEN", "") or _env_token()
-    http = httpx.Client(base_url=args.backend.rstrip("/"), timeout=60.0)
+    http = httpx.Client(base_url=args.backend.rstrip("/"), timeout=60.0, headers={"X-Internal-Token": token})
     cams = CameraSources(http)
     fwd = WsForwarder(ws_url(args.backend), token).start()
     pool = ThreadPoolExecutor(max_workers=4)

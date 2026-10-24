@@ -16,7 +16,7 @@ from backend.app.services.telegram import AiogramSender, TelegramNotifier, load_
 from backend.app.services.webhooks import WebhookDispatcher
 from backend.app.services.rules import seed_rules
 from backend.app.services.sources import SourceManager
-from backend.app.state import AppState, get_state, require_admin
+from backend.app.state import AppState, get_current_user, get_state
 from shared.config import ROOT, Settings, get_settings, load_config
 
 log = logging.getLogger("backend")
@@ -96,7 +96,7 @@ def create_app(settings: Settings | None = None, run_sources: bool = True, teleg
     for module in (auth, cameras, zones, events, analytics, notifications, internal, public):
         app.include_router(module.router)
     @app.get("/media/{file_path:path}", include_in_schema=False)
-    async def media_file(file_path: str, _user=Depends(require_admin), state: AppState = Depends(get_state)):
+    async def media_file(file_path: str, _user=Depends(get_current_user), state: AppState = Depends(get_state)):
         path = (media_dir / file_path).resolve()
         if media_dir.resolve() not in path.parents or not path.is_file():
             raise HTTPException(status_code=404, detail="файл не найден")

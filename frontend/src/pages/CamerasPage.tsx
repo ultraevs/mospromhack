@@ -1,98 +1,301 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { api } from "../api";
-import { EmptyState, PageHeader, PageLoader } from "../App";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { api, errorText } from "../api";
 import { Icon } from "../components/Icons";
-import { LiveVideo } from "../components/LiveVideo";
-import type { Camera, PpeItem, Zone, ZoneType } from "../types";
-import type { PageProps } from "./types";
+import { LivePlayer } from "../components/LivePlayer";
+import { Sign } from "../components/Sign";
+import { Dot, Empty, Loading, Notice, PageHeader, Segmented } from "../components/Ui";
+import { usePoll } from "../hooks/usePoll";
+import { CAM_STATE_LABEL, camState } from "../lib/cameras";
+import { formatTime } from "../lib/format";
+import type { Rect } from "../lib/geometry";
+import { DEFAULT_LAYERS, drawDraft, drawZones, type Layers } from "../lib/overlay";
+import { clickDraft, EMPTY_DRAFT, hitVertex, moveVertex, removeVertex, toPolygon } from "../lib/polygon";
+import { linkHandler, navigate, setQuery, useLocation } from "../lib/router";
+import { EVENT_LABEL, PPE_LABEL, ZONE_COLOR, type Camera, type Health, type SafetyEvent, type Zone } from "../types";
+import { CameraForm } from "./cameras/CameraForm";
+import { ZonePanel, type ZoneDraft } from "./cameras/ZonePanel";
 
-const ppeOptions: { value: PpeItem; label: string }[] = [{ value: "helmet", label: "Каска" }, { value: "mask", label: "Маска" }, { value: "vest", label: "Жилет" }];
+const LAYER_LABELS: [keyof Layers, string][] = [["people", "Люди"], ["ppe", "СИЗ"], ["zones", "Зоны"], ["labels", "Подписи"]];
 
-export function CamerasPage({ refreshKey, userRole }: PageProps) {
-  const canManage = userRole === "admin";
-  const [cameras, setCameras] = useState<Camera[]>([]);
-  const [selected, setSelected] = useState<Camera | null>(null);
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [viewMode, setViewMode] = useState<"focus" | "grid">("focus");
-  const [showForm, setShowForm] = useState(false);
-  const [showZoneForm, setShowZoneForm] = useState(false);
-  const [loading, setLoading] = useState(true);
+export function CamerasPage({ tick, isAdmin }: { tick: number; isAdmin: boolean }) {
+  const { search } = useLocation();
+  const q = useMemo(() => new URLSearchParams(search), [search]);
+  const mode = q.get("mode") === "wall" ? "wall" : "focus";
+  const [cameras, setCameras] = useState<Camera[] | null>(null);
+  const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const hasLoadedRef = useRef(false);
+  const [form, setForm] = useState<Camera | "new" | null>(null);
 
-  const load = useCallback(() => {
-    setLoading(!hasLoadedRef.current);
-    api.cameras().then((items) => {
-      setCameras(items);
-      setSelected((current) => current ? items.find((item) => item.id === current.id) ?? null : items.find((item) => item.status === "online") ?? items[0] ?? null);
-      setError(null);
-    }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Не удалось загрузить камеры")).finally(() => {
-      hasLoadedRef.current = true;
-      setLoading(false);
-    });
-  }, []);
-  useEffect(() => { void load(); }, [load, refreshKey]);
+  usePoll(() => {
+    api.cameras().then((list) => { setCameras(list); setError(null); }).catch((e) => setError(errorText(e, "Не удалось загрузить камеры")));
+  }, 3000);
+  usePoll(() => {
+    api.health().then(setHealth).catch(() => undefined);
+  }, 5000);
+
+  const requested = Number(q.get("camera"));
+  const selected = cameras?.find((c) => c.id === requested) ?? cameras?.find((c) => c.enabled) ?? cameras?.[0] ?? null;
+
+  const saved = (camera: Camera) => {
+    setCameras((list) => (list?.some((c) => c.id === camera.id) ? list.map((c) => (c.id === camera.id ? camera : c)) : [...(list ?? []), camera]));
+    setForm(null);
+    setQuery({ camera: camera.id });
+  };
+
+  return (
+    <div className="page page-wide">
+      <PageHeader title="Камеры" actions={<>
+        <Segmented label="Вид" value={mode} onChange={(v) => setQuery({ mode: v === "wall" ? "wall" : null })}
+          options={[{ value: "focus", label: <><Icon name="focus" size={15} />Одна камера</> }, { value: "wall", label: <><Icon name="wall" size={15} />Видеостена</> }]} />
+        {isAdmin && <button type="button" className="btn btn-primary" onClick={() => setForm("new")}><Icon name="plus" size={16} />Добавить камеру</button>}
+      </>} />
+      {error && <Notice>{error}</Notice>}
+      {cameras === null ? <Loading label="Загружаем камеры…" /> : cameras.length === 0 ? (
+        <div className="panel">
+          <Empty title="Камер пока нет" action={isAdmin ? <button type="button" className="btn btn-primary" onClick={() => setForm("new")}>Добавить камеру</button> : undefined}>
+            {isAdmin ? "Подключите RTSP-камеру или видеофайл из data/videos." : "Администратор ещё не подключил камеры."}
+          </Empty>
+        </div>
+      ) : mode === "wall" ? (
+        <Wall cameras={cameras} health={health} onOpen={(id) => setQuery({ mode: null, camera: id })} />
+      ) : selected && (
+        <Focus key={selected.id} camera={selected} cameras={cameras} health={health} tick={tick} isAdmin={isAdmin} onEdit={() => setForm(selected)} />
+      )}
+      {form && (
+        <CameraForm camera={form === "new" ? null : form} onClose={() => setForm(null)} onSaved={saved}
+          onDeleted={(id) => { setCameras((list) => list?.filter((c) => c.id !== id) ?? null); setForm(null); setQuery({ camera: null }); }} />
+      )}
+    </div>
+  );
+}
+
+function Switcher({ cameras, health, current }: { cameras: Camera[]; health: Health | null; current: number }) {
+  return (
+    <nav className="switcher" aria-label="Выбор камеры">
+      {cameras.map((c) => {
+        const state = camState(c, health);
+        return (
+          <button key={c.id} type="button" aria-pressed={c.id === current} title={CAM_STATE_LABEL[state]} onClick={() => setQuery({ camera: c.id })}>
+            <Dot state={state} />
+            <span>{c.name}</span>
+            {c.open_events > 0 && <b className="count-hot" title="Открытых нарушений">{c.open_events}</b>}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function Focus({ camera, cameras, health, tick, isAdmin, onEdit }: {
+  camera: Camera; cameras: Camera[]; health: Health | null; tick: number; isAdmin: boolean; onEdit: () => void;
+}) {
+  const { search } = useLocation();
+  const tab = new URLSearchParams(search).get("tab") === "zones" ? "zones" : "events";
+  const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [events, setEvents] = useState<SafetyEvent[] | null>(null);
+  const [draft, setDraft] = useState<ZoneDraft | null>(null);
+  const [zoneError, setZoneError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const rectRef = useRef<Rect | null>(null);
+  const dragging = useRef(-1);
+  const state = camState(camera, health);
+
+  const loadZones = useCallback(() => {
+    api.zones(camera.id).then(setZones).catch((e) => setZoneError(errorText(e, "Не удалось загрузить зоны")));
+  }, [camera.id]);
+  useEffect(loadZones, [loadZones]);
+
   useEffect(() => {
-    const timer = window.setInterval(() => void load(), 3000);
-    return () => window.clearInterval(timer);
-  }, [load]);
-  useEffect(() => { if (!selected) { setZones([]); return; } api.zones(selected.id).then(setZones).catch(() => setZones([])); }, [selected?.id]);
+    let alive = true;
+    api.events({ camera_id: camera.id, limit: 12 }).then((p) => alive && setEvents(p.items)).catch(() => alive && setEvents([]));
+    return () => {
+      alive = false;
+    };
+  }, [camera.id, tick]);
 
-  async function removeCamera(camera: Camera) {
-    if (!window.confirm(`Удалить камеру «${camera.name}» вместе с зонами?`)) return;
-    try { await api.deleteCamera(camera.id); setSelected(null); load(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось удалить камеру"); }
-  }
-  async function toggleCamera(camera: Camera) {
-    try { const updated = await api.updateCamera(camera.id, { enabled: !camera.enabled }); setCameras((items) => items.map((item) => item.id === updated.id ? updated : item)); setSelected(updated); } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось изменить камеру"); }
-  }
-  async function removeZone(zone: Zone) {
-    try { await api.deleteZone(zone.id); setZones((items) => items.filter((item) => item.id !== zone.id)); } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось удалить зону"); }
-  }
+  const drawExtra = useCallback((ctx: CanvasRenderingContext2D, rect: Rect) => {
+    if (layers.zones || draft) drawZones(ctx, zones, rect, draft?.id);
+    if (draft) drawDraft(ctx, draft.polygon, rect, ZONE_COLOR[draft.type]);
+  }, [zones, draft, layers.zones]);
 
-  const online = cameras.filter((camera) => camera.status === "online").length;
-  const selectedCamera = selected ?? cameras[0] ?? null;
+  const local = (e: PointerEvent | MouseEvent): [number, number] => {
+    const box = e.currentTarget.getBoundingClientRect();
+    return [e.clientX - box.left, e.clientY - box.top];
+  };
+  const onPointerDown = (e: PointerEvent) => {
+    if (!draft || !rectRef.current || e.button !== 0) return;
+    const [x, y] = local(e);
+    if (draft.polygon.closed) {
+      const hit = hitVertex(draft.polygon.points, x, y, rectRef.current);
+      if (hit >= 0) {
+        dragging.current = hit;
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+    } else {
+      setDraft({ ...draft, polygon: clickDraft(draft.polygon, x, y, rectRef.current) });
+    }
+  };
+  const onPointerMove = (e: PointerEvent) => {
+    if (!draft || !rectRef.current || dragging.current < 0) return;
+    const [x, y] = local(e);
+    setDraft({ ...draft, polygon: moveVertex(draft.polygon, dragging.current, x, y, rectRef.current) });
+  };
+  const onContextMenu = (e: MouseEvent) => {
+    e.preventDefault();
+    if (!draft || !rectRef.current) return;
+    const [x, y] = local(e);
+    const hit = hitVertex(draft.polygon.points, x, y, rectRef.current);
+    if (hit >= 0) setDraft({ ...draft, polygon: removeVertex(draft.polygon, hit) });
+  };
 
-  return <div className="page-stack camera-page">
-    <PageHeader title="Мониторинг камер" description="Главный экран оператора: live-кадр, угрозы и состояние источников в одном рабочем поле." action={<div className="camera-page-actions"><div className="camera-view-switch" role="group" aria-label="Режим просмотра камер"><button className={viewMode === "focus" ? "camera-view-button is-active" : "camera-view-button"} type="button" aria-pressed={viewMode === "focus"} onClick={() => setViewMode("focus")}><Icon name="camera" size={15} />Фокус</button><button className={viewMode === "grid" ? "camera-view-button is-active" : "camera-view-button"} type="button" aria-pressed={viewMode === "grid"} onClick={() => setViewMode("grid")}><Icon name="grid" size={15} />Сетка</button></div>{canManage && <button className="button button-primary" type="button" onClick={() => setShowForm(true)}><Icon name="plus" size={16} />Добавить камеру</button>}</div>} />
-    {error && <div className="error-notice" role="alert"><Icon name="alert" size={17} /><span>{error}</span></div>}
-    <section className="camera-command-status" aria-label="Состояние видеоконтура"><span className="camera-command-live"><span className="status-dot status-dot-live" />Live-контур</span><span><strong>{online}</strong> из {cameras.length} источников в сети</span><span className="camera-command-hint">{viewMode === "grid" ? "Нажмите на кадр, чтобы открыть его в фокусе" : "Выберите источник справа, чтобы сменить основной кадр"}</span></section>
-    {loading ? <PageLoader kind="camera" label="Подключаем видеостену…" /> : viewMode === "grid" ? <CameraGrid cameras={cameras} selectedCameraId={selectedCamera?.id ?? null} canManage={canManage} onSelect={setSelected} onToggle={toggleCamera} /> : selectedCamera ? <section className="camera-command-center">
-      <div className="primary-camera">
-        <header className="primary-camera-header"><div><h2>{selectedCamera.name}</h2><span>{selectedCamera.source_type === "rtsp" ? "RTSP-поток" : selectedCamera.source}</span></div><span className={selectedCamera.status === "online" ? "camera-state-online" : "camera-state-offline"}><span className="camera-row-dot is-online" />{selectedCamera.status === "online" ? "В сети" : selectedCamera.enabled ? "Подключение" : "Отключена"}</span></header>
-        <div className="primary-camera-stage">{selectedCamera.enabled ? <LiveVideo cameraId={selectedCamera.id} zones={zones} /> : <div className="primary-camera-offline"><Icon name="camera" size={32} /><span>Камера отключена</span></div>}<span className="primary-camera-label">КАДР В РЕАЛЬНОМ ВРЕМЕНИ</span></div>
-        <footer className="primary-camera-footer"><div><span>Источник</span><strong>{selectedCamera.source}</strong></div><div><span>Зоны контроля</span><strong>{zones.length ? `${zones.length} настроено` : "Не настроены"}</strong></div><div><span>Открытые угрозы</span><strong className={selectedCamera.open_events ? "text-danger" : "text-green"}>{selectedCamera.open_events || "Нет"}</strong></div>{canManage && <div className="primary-camera-actions"><button className="button button-secondary" type="button" onClick={() => setShowZoneForm(true)}><Icon name="plus" size={14} />Добавить зону</button><button className="button button-danger-ghost" type="button" onClick={() => removeCamera(selectedCamera)}><Icon name="trash" size={14} />Удалить</button></div>}</footer>
+  const saveZone = async () => {
+    if (!draft) return;
+    const body = {
+      name: draft.name.trim(), type: draft.type, polygon: toPolygon(draft.polygon),
+      required_ppe: draft.type === "ppe_required" ? draft.required_ppe : [],
+    };
+    setBusy(true);
+    try {
+      if (draft.id) await api.updateZone(draft.id, body);
+      else await api.createZone(camera.id, body);
+      setDraft(null);
+      setZoneError(null);
+      loadZones();
+    } catch (e) {
+      setZoneError(errorText(e, "Не удалось сохранить зону"));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const deleteZone = async () => {
+    if (!draft?.id || !window.confirm(`Удалить зону «${draft.name}»?`)) return;
+    setBusy(true);
+    try {
+      await api.deleteZone(draft.id);
+      setDraft(null);
+      loadZones();
+    } catch (e) {
+      setZoneError(errorText(e, "Не удалось удалить зону"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openTab = (next: "events" | "zones") => {
+    if (next === "events") setDraft(null);
+    setQuery({ tab: next === "zones" ? "zones" : null });
+  };
+
+  return (
+    <>
+      <Switcher cameras={cameras} health={health} current={camera.id} />
+      <div className="focus">
+        <section className="stage">
+          <div className="stage-video">
+            {camera.enabled ? (
+              <LivePlayer cameraId={camera.id} layers={layers} drawExtra={drawExtra} rectRef={rectRef}>
+                {draft && (
+                  <div className={`zone-editor ${draft.polygon.closed ? "is-closed" : ""}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+                    onPointerUp={() => { dragging.current = -1; }} onContextMenu={onContextMenu} />
+                )}
+              </LivePlayer>
+            ) : (
+              <div className="player player-off">
+                <span>Камера выключена</span>
+                {isAdmin && <button type="button" className="btn btn-ghost" onClick={onEdit}>Включить в настройках камеры</button>}
+              </div>
+            )}
+          </div>
+          <div className="stage-bar">
+            <div className="stage-title">
+              <h2>{camera.name}</h2>
+              <span><Dot state={state} />{CAM_STATE_LABEL[state]}</span>
+            </div>
+            <fieldset className="layers">
+              <legend className="sr-only">Что рисовать поверх видео</legend>
+              {LAYER_LABELS.map(([key, label]) => (
+                <label key={key} className="check">
+                  <input type="checkbox" checked={layers[key]} onChange={(e) => setLayers({ ...layers, [key]: e.target.checked })} />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
+            {isAdmin && <button type="button" className="btn btn-ghost" onClick={onEdit}><Icon name="settings" size={15} />Настроить камеру</button>}
+          </div>
+          <p className="stage-meta">
+            {camera.source_type === "rtsp" ? "RTSP" : "Файл"}: {camera.source}
+            {camera.required_ppe.length > 0 && <> · Обязательно: {camera.required_ppe.map((p) => PPE_LABEL[p].toLowerCase()).join(", ")}</>}
+          </p>
+        </section>
+
+        <aside className="side panel">
+          <div className="tabs" role="tablist">
+            <button type="button" role="tab" aria-selected={tab === "events"} onClick={() => openTab("events")}>Нарушения</button>
+            <button type="button" role="tab" aria-selected={tab === "zones"} onClick={() => openTab("zones")}>Зоны{zones.length ? ` · ${zones.length}` : ""}</button>
+          </div>
+          {tab === "events" ? (
+            <div className="side-events">
+              {events === null ? <Loading /> : events.length === 0 ? (
+                <Empty title="Нарушений на этой камере нет" />
+              ) : (
+                <ul className="mini-events">
+                  {events.map((e) => (
+                    <li key={e.id}>
+                      <a href={`/events?event=${e.id}`} onClick={linkHandler(`/events?event=${e.id}`)} className={`sev-row sev-row-${e.severity}`}>
+                        <Sign type={e.type} size={24} />
+                        <span><strong>{EVENT_LABEL[e.type]}</strong><small>{e.zone_name ?? "вне зон"}</small></span>
+                        <span className="num">{e.status === "open" ? <b className="state-open">идёт</b> : formatTime(e.started_at)}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button type="button" className="btn btn-ghost" onClick={() => navigate(`/events?camera=${camera.id}`)}>Все нарушения камеры</button>
+            </div>
+          ) : (
+            <ZonePanel zones={zones} draft={draft} error={zoneError} busy={busy} canEdit={isAdmin && camera.enabled}
+              onNew={() => { setZoneError(null); setDraft({ name: "", type: "restricted", required_ppe: [], polygon: EMPTY_DRAFT }); }}
+              onEdit={(z) => { setZoneError(null); setDraft({ id: z.id, name: z.name, type: z.type, required_ppe: z.required_ppe, polygon: { points: z.polygon, closed: true } }); }}
+              onChange={setDraft} onSave={() => void saveZone()} onDelete={() => void deleteZone()} onCancel={() => setDraft(null)} />
+          )}
+        </aside>
       </div>
-      <aside className="camera-wall-rail"><div className="camera-wall-rail-header"><div><span className="table-caption">Видеостена</span><h2>Источники</h2></div><span>{cameras.length}</span></div><div className="camera-wall-list">{cameras.map((camera) => <CameraWallRow key={camera.id} camera={camera} active={selectedCamera.id === camera.id} canManage={canManage} onSelect={() => setSelected(camera)} onToggle={() => toggleCamera(camera)} />)}</div><div className="camera-zone-list"><div className="camera-zone-list-head"><span>Зоны выбранной камеры</span>{canManage && <button className="icon-button" type="button" aria-label="Добавить зону" onClick={() => setShowZoneForm(true)}><Icon name="plus" size={14} /></button>}</div>{zones.length ? zones.map((zone) => <div className="camera-zone-row" key={zone.id}><span className={`zone-symbol zone-${zone.type}`} /><span>{zone.name}</span>{canManage && <button className="icon-button" type="button" aria-label={`Удалить зону ${zone.name}`} onClick={() => removeZone(zone)}><Icon name="trash" size={13} /></button>}</div>) : <p>{canManage ? "Нет зон — добавьте контур прямо в рабочее поле." : "Для этой камеры зоны не настроены."}</p>}</div><div className="camera-wall-legend"><span><i className="legend-threat" />угроза</span><span><i className="legend-zone" />зона</span><span><i className="legend-live" />поток</span></div></aside>
-    </section> : <section className="panel"><EmptyState icon="camera" title="Контур пока пуст" description={canManage ? "Подключите RTSP-камеру или загрузите видеофайл для первого тестового потока." : "Администратор ещё не подключил источники видео."} action={canManage ? <button className="button button-primary" type="button" onClick={() => setShowForm(true)}><Icon name="plus" size={15} />Подключить источник</button> : undefined} /></section>}
-    {showForm && <CameraForm onClose={() => setShowForm(false)} onCreated={(camera) => { setShowForm(false); setCameras((items) => [...items, camera]); setSelected(camera); }} onError={setError} />}
-    {showZoneForm && selectedCamera && <ZoneForm camera={selectedCamera} onClose={() => setShowZoneForm(false)} onCreated={(zone) => { setZones((items) => [...items, zone]); setShowZoneForm(false); }} onError={setError} />}
-  </div>;
+    </>
+  );
 }
 
-function CameraGrid({ cameras, selectedCameraId, canManage, onSelect, onToggle }: { cameras: Camera[]; selectedCameraId: number | null; canManage: boolean; onSelect: (camera: Camera) => void; onToggle: (camera: Camera) => void }) {
-  if (!cameras.length) {
-    return <section className="camera-grid-empty panel"><Icon name="camera" size={24} /><strong>Нет источников для видеостены</strong><span>Добавьте камеру, чтобы открыть сеточный просмотр.</span></section>;
-  }
-
-  return <section className="camera-grid-view" aria-label="Сетка камер">
-    <header className="camera-grid-header"><div><span className="table-caption">Видеостена</span><h2>Все источники</h2></div><span>{cameras.length} камер · {cameras.filter((camera) => camera.enabled).length} включено</span></header>
-    <div className="camera-grid-list">{cameras.map((camera) => <article className={`camera-grid-tile ${selectedCameraId === camera.id ? "is-selected" : ""}`} key={camera.id}>
-      <button className="camera-grid-frame" type="button" onClick={() => onSelect(camera)} aria-label={`Открыть камеру ${camera.name}`}>
-        {camera.enabled ? <LiveVideo cameraId={camera.id} className="camera-grid-video" overlays={false} /> : <div className="camera-grid-offline"><Icon name="camera" size={22} /><span>Источник отключён</span></div>}
-        <span className="camera-grid-frame-label">{camera.source_type === "rtsp" ? "RTSP" : "ФАЙЛ"}</span>
-      </button>
-      <div className="camera-grid-tile-meta"><div><strong>{camera.name}</strong><span>{camera.source}</span></div><div className="camera-grid-tile-actions"><span className={`camera-grid-status ${camera.status === "online" ? "is-online" : camera.enabled ? "is-connecting" : "is-offline"}`}><i />{camera.status === "online" ? "В сети" : camera.enabled ? "Подключается" : "Отключена"}</span>{canManage && <button className={`toggle ${camera.enabled ? "toggle-on" : ""}`} type="button" aria-label={`${camera.enabled ? "Отключить" : "Включить"} камеру ${camera.name}`} aria-pressed={camera.enabled} onClick={() => onToggle(camera)}><span /></button>}</div></div>
-      <button className="camera-grid-open" type="button" onClick={() => onSelect(camera)}>Открыть в фокусе <Icon name="arrow" size={14} /></button>
-    </article>)}</div>
-  </section>;
+function Wall({ cameras, health, onOpen }: { cameras: Camera[]; health: Health | null; onOpen: (id: number) => void }) {
+  const on = cameras.filter((c) => c.enabled);
+  const off = cameras.filter((c) => !c.enabled);
+  return (
+    <>
+      {on.length === 0 ? <div className="panel"><Empty title="Все камеры выключены">Включите камеру в её настройках.</Empty></div> : (
+        <div className="wall">
+          {on.map((c) => {
+            const state = camState(c, health);
+            return (
+              <article key={c.id} className="wall-tile">
+                <button type="button" className="wall-open" onClick={() => onOpen(c.id)} aria-label={`Открыть камеру ${c.name}`}>
+                  <LivePlayer cameraId={c.id} layers={{ ...DEFAULT_LAYERS, zones: false }} />
+                </button>
+                <footer>
+                  <Dot state={state} />
+                  <strong>{c.name}</strong>
+                  <small>{CAM_STATE_LABEL[state]}</small>
+                  {c.open_events > 0 && <b className="count-hot">{c.open_events}</b>}
+                </footer>
+              </article>
+            );
+          })}
+        </div>
+      )}
+      {off.length > 0 && (
+        <p className="wall-off">
+          <span>Выключены:</span>
+          {off.map((c) => <button key={c.id} type="button" className="link-btn" onClick={() => onOpen(c.id)}>{c.name}</button>)}
+        </p>
+      )}
+    </>
+  );
 }
-
-function CameraWallRow({ camera, active, canManage, onSelect, onToggle }: { camera: Camera; active: boolean; canManage: boolean; onSelect: () => void; onToggle: () => void }) {
-  return <article className={`camera-wall-row ${active ? "camera-wall-row-active" : ""}`}><button className="camera-wall-row-main" type="button" onClick={onSelect}><span className={`camera-wall-thumb ${camera.status === "online" ? "camera-wall-thumb-live" : ""}`}>{camera.enabled ? <LiveVideo cameraId={camera.id} className="camera-wall-preview" overlays={false} /> : <><span className="camera-wall-thumb-grid" /><Icon name="camera" size={17} /></>}</span><span><strong>{camera.name}</strong><small>{camera.source_type === "rtsp" ? "RTSP" : "Видео-файл"}</small></span></button><div className="camera-wall-row-meta"><span className={camera.status === "online" ? "camera-state-online" : "camera-state-offline"}>{camera.status === "online" ? "Live" : camera.enabled ? "Подключение" : "Offline"}</span><span className={camera.open_events ? "camera-events camera-events-hot" : "camera-events"}>{camera.open_events || "—"}</span>{canManage && <button className={`toggle ${camera.enabled ? "toggle-on" : ""}`} type="button" aria-label={`${camera.enabled ? "Отключить" : "Включить"} камеру ${camera.name}`} aria-pressed={camera.enabled} onClick={onToggle}><span /></button>}</div></article>;
-}
-
-function ZoneForm({ camera, onClose, onCreated, onError }: { camera: Camera; onClose: () => void; onCreated: (zone: Zone) => void; onError: (message: string) => void }) { const [form, setForm] = useState({ name: "", type: "restricted" as ZoneType, required_ppe: [] as PpeItem[] }); const submit = async (event: FormEvent) => { event.preventDefault(); try { onCreated(await api.createZone(camera.id, { ...form, polygon: [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]] })); } catch (reason) { onError(reason instanceof Error ? reason.message : "Не удалось создать зону"); } }; return <Modal title={`Новая зона · ${camera.name}`} onClose={onClose}><form className="form-stack" onSubmit={submit}><label className="field"><span>Название зоны</span><input name="name" required value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Например, линия резки…" autoComplete="off" /></label><label className="field"><span>Назначение</span><select name="type" value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as ZoneType }))}><option value="restricted">Вход запрещён</option><option value="ppe_required">Обязательные СИЗ</option><option value="flammable">Горючие материалы</option></select></label><p className="form-hint">Зона будет подсвечиваться прямо поверх live-кадра.</p><div className="modal-actions"><button className="button button-secondary" type="button" onClick={onClose}>Отмена</button><button className="button button-primary" type="submit">Создать зону</button></div></form></Modal>; }
-
-function CameraForm({ onClose, onCreated, onError }: { onClose: () => void; onCreated: (camera: Camera) => void; onError: (message: string) => void }) { const [form, setForm] = useState({ name: "", source_type: "rtsp" as "rtsp" | "file", source: "", required_ppe: [] as PpeItem[] }); const [saving, setSaving] = useState(false); const set = (key: "name" | "source", value: string) => setForm((current) => ({ ...current, [key]: value })); const togglePpe = (item: PpeItem) => setForm((current) => ({ ...current, required_ppe: current.required_ppe.includes(item) ? current.required_ppe.filter((value) => value !== item) : [...current.required_ppe, item] })); const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); try { onCreated(await api.createCamera({ ...form, enabled: true })); } catch (reason) { onError(reason instanceof Error ? reason.message : "Не удалось создать камеру"); } finally { setSaving(false); } }; return <Modal title="Новый источник" onClose={onClose}><form className="form-stack" onSubmit={submit}><label className="field"><span>Название камеры</span><input name="name" required value={form.name} onChange={(event) => set("name", event.target.value)} placeholder="Например, Цех 2 · ворота…" autoComplete="off" /></label><div className="field"><span>Тип источника</span><div className="segmented-control"><button type="button" className={form.source_type === "rtsp" ? "segment-active" : ""} onClick={() => setForm((current) => ({ ...current, source_type: "rtsp" }))}>RTSP</button><button type="button" className={form.source_type === "file" ? "segment-active" : ""} onClick={() => setForm((current) => ({ ...current, source_type: "file" }))}>Видео-файл</button></div></div><label className="field"><span>{form.source_type === "rtsp" ? "RTSP-адрес" : "Имя видеофайла"}</span><input name="source" required value={form.source} onChange={(event) => set("source", event.target.value)} placeholder={form.source_type === "rtsp" ? "rtsp://…" : "factory_floor.mp4"} autoComplete="off" /></label><fieldset className="field"><legend>Обязательные СИЗ</legend><div className="check-grid">{ppeOptions.map((item) => <label className="check-pill" key={item.value}><input type="checkbox" checked={form.required_ppe.includes(item.value)} onChange={() => togglePpe(item.value)} /><span>{item.label}</span></label>)}</div></fieldset><div className="modal-actions"><button className="button button-secondary" type="button" onClick={onClose}>Отмена</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? "Сохраняем…" : "Добавить камеру"}</button></div></form></Modal>; }
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { return <div className="modal-layer"><button className="drawer-backdrop" type="button" aria-label="Закрыть окно" onClick={onClose} /><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="drawer-header"><h2 id="modal-title">{title}</h2><button className="icon-button" type="button" aria-label="Закрыть" onClick={onClose}><Icon name="close" /></button></div>{children}</section></div>; }

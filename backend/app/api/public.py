@@ -72,7 +72,7 @@ async def client_config(_user=Depends(get_current_user), state: AppState = Depen
 @router.websocket("/ws/detections")
 async def ws_detections(ws: WebSocket, camera_id: int):
     state = get_state_ws(ws)
-    if websocket_user(ws, state.session_factory, state.settings.auth_enabled) is None:
+    if websocket_user(ws, state.session_factory, state.settings.auth_enabled, state.settings.internal_token) is None:
         await ws.close(code=4401)
         return
     await ws.accept()
@@ -89,12 +89,8 @@ async def ws_detections(ws: WebSocket, camera_id: int):
 @router.websocket("/ws/events")
 async def ws_events(ws: WebSocket):
     state = get_state_ws(ws)
-    user = websocket_user(ws, state.session_factory, state.settings.auth_enabled)
-    if user is None:
+    if websocket_user(ws, state.session_factory, state.settings.auth_enabled, state.settings.internal_token) is None:
         await ws.close(code=4401)
-        return
-    if user.role != "admin":
-        await ws.close(code=4403)
         return
     await ws.accept()
     state.hub.subscribe_events(ws)

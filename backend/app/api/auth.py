@@ -34,7 +34,7 @@ class UserPatch(BaseModel):
 
 
 def require_admin_user(request: Request, state: AppState = Depends(get_state)) -> UserRow:
-    user = auth.current_user(request, state.session_factory, state.settings.auth_enabled)
+    user = auth.current_user(request, state.session_factory, state.settings.auth_enabled, state.settings.internal_token)
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="требуются права администратора")
     return user

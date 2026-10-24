@@ -1,49 +1,182 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api } from "../api";
+import { api, errorText } from "../api";
 import { Icon } from "../components/Icons";
-import { PageHeader } from "../App";
+import { Loading, Modal, Notice, PageHeader } from "../components/Ui";
+import { formatDateTime } from "../lib/format";
 import type { AuthUser, UserRole } from "../types";
-import type { PageProps } from "./types";
 
-export function UsersPage(_props: PageProps) {
-  const [users, setUsers] = useState<AuthUser[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [passwordUser, setPasswordUser] = useState<AuthUser | null>(null);
+const ROLE_LABEL: Record<UserRole, string> = { admin: "Администратор", viewer: "Оператор" };
+const ROLE_HINT: Record<UserRole, string> = {
+  admin: "всё: камеры, зоны, правила, уведомления, пользователи",
+  viewer: "камеры и журнал, разбор нарушений",
+};
+
+export function UsersPage({ me }: { me: AuthUser }) {
+  const [users, setUsers] = useState<AuthUser[] | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [passwordFor, setPasswordFor] = useState<AuthUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function load() {
-    try { setUsers(await api.authUsers()); setError(null); } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось загрузить пользователей"); }
-  }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    api.users().then(setUsers).catch((e) => setError(errorText(e, "Не удалось загрузить пользователей")));
+  }, []);
 
-  async function update(user: AuthUser, body: Partial<{ role: UserRole; active: boolean }>) {
-    try { const updated = await api.updateAuthUser(user.id, body); setUsers((items) => items.map((item) => item.id === updated.id ? updated : item)); setMessage("Доступ обновлён"); setError(null); } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось обновить доступ"); }
-  }
+  const replace = (u: AuthUser) => setUsers((list) => list?.map((x) => (x.id === u.id ? u : x)) ?? null);
 
-  return <div className="page-stack users-page"><PageHeader kicker="Контур / доступ" title="Пользователи" description="Управляйте ролями и доступом к рабочей зоне без общих учётных записей." action={<button className="button button-primary" type="button" onClick={() => { setShowForm(true); setMessage(null); }}><Icon name="plus" size={16} />Добавить пользователя</button>} />{error && <div className="error-notice" role="alert"><Icon name="alert" size={17} /><span>{error}</span></div>}{message && <div className="success-notice" role="status"><Icon name="check" size={16} /><span>{message}</span></div>}<section className="users-panel"><div className="users-panel-heading"><div><span className="panel-kicker">Учетные записи</span><h2>Доступ к системе</h2></div><span>{users.length} пользователей</span></div><div className="users-list">{users.map((user) => <article className={`user-row ${user.active ? "" : "is-disabled"}`} key={user.id}><div className="user-avatar">{initials(user.display_name)}</div><div className="user-main"><strong>{user.display_name}</strong><span>{user.login}</span></div><span className={`user-role user-role-${user.role}`}>{user.role === "admin" ? "Администратор" : "Просмотр камер"}</span><span className={`user-state ${user.active ? "is-active" : ""}`}><i />{user.active ? "Активен" : "Отключён"}</span><div className="user-actions"><button className="text-button" type="button" onClick={() => void update(user, { active: !user.active })}>{user.active ? "Отключить" : "Включить"}</button><button className="text-button" type="button" onClick={() => void update(user, { role: user.role === "admin" ? "viewer" : "admin" })}>{user.role === "admin" ? "Сделать viewer" : "Сделать админом"}</button><button className="text-button" type="button" onClick={() => setPasswordUser(user)}>Пароль</button></div></article>)}</div></section>{showForm && <UserForm onClose={() => setShowForm(false)} onCreated={(user) => { setUsers((items) => [...items, user]); setShowForm(false); setMessage("Пользователь создан"); setError(null); }} onError={setError} />}{passwordUser && <PasswordForm user={passwordUser} onClose={() => setPasswordUser(null)} onUpdated={(user) => { setUsers((items) => items.map((item) => item.id === user.id ? user : item)); setPasswordUser(null); setMessage("Пароль обновлён"); }} onError={setError} />}</div>;
+  const update = async (user: AuthUser, body: Partial<{ role: UserRole; active: boolean }>, question: string, done: string) => {
+    if (!window.confirm(question)) return;
+    try {
+      replace(await api.updateUser(user.id, body));
+      setMessage(done);
+      setError(null);
+    } catch (e) {
+      setError(errorText(e, "Не удалось изменить доступ"));
+    }
+  };
+
+  return (
+    <div className="page">
+      <PageHeader title="Пользователи"
+        description={<>Администратор: {ROLE_HINT.admin}. Оператор: {ROLE_HINT.viewer}.</>}
+        actions={<button type="button" className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" size={16} />Добавить пользователя</button>} />
+      {error && <Notice onClose={() => setError(null)}>{error}</Notice>}
+      {message && <Notice tone="ok" onClose={() => setMessage(null)}>{message}</Notice>}
+      {users === null ? <Loading /> : (
+        <section className="panel">
+          <table className="table users">
+            <thead><tr><th>Имя</th><th>Логин</th><th>Роль</th><th>Доступ</th><th>Создан</th><th /></tr></thead>
+            <tbody>
+              {users.map((u) => {
+                const self = u.id === me.id;
+                return (
+                  <tr key={u.id} className={u.active ? "" : "is-off"}>
+                    <td>{u.display_name}{self && <small>это вы</small>}</td>
+                    <td>{u.login}</td>
+                    <td>{ROLE_LABEL[u.role]}</td>
+                    <td>{u.active ? "Есть" : <span className="text-bad">Отключён</span>}</td>
+                    <td className="tnum">{formatDateTime(u.created_at)}</td>
+                    <td><div className="row-actions">
+                      {!self && (
+                        <>
+                          <button type="button" className="btn btn-ghost"
+                            onClick={() => void update(u, { role: u.role === "admin" ? "viewer" : "admin" },
+                              u.role === "admin" ? `Сделать ${u.display_name} оператором? Настройки станут недоступны.` : `Дать ${u.display_name} права администратора?`,
+                              "Роль изменена")}>
+                            {u.role === "admin" ? "Сделать оператором" : "Сделать администратором"}
+                          </button>
+                          <button type="button" className="btn btn-ghost"
+                            onClick={() => void update(u, { active: !u.active },
+                              u.active ? `Отключить ${u.display_name}? Текущие сессии закроются при следующем запросе.` : `Вернуть доступ ${u.display_name}?`,
+                              u.active ? "Пользователь отключён" : "Доступ возвращён")}>
+                            {u.active ? "Отключить" : "Включить"}
+                          </button>
+                        </>
+                      )}
+                      <button type="button" className="btn btn-ghost" onClick={() => setPasswordFor(u)}>Сменить пароль</button>
+                    </div></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
+      {creating && (
+        <UserForm onClose={() => setCreating(false)}
+          onCreated={(u) => { setUsers((list) => [...(list ?? []), u]); setCreating(false); setMessage(`Пользователь ${u.login} создан`); }} />
+      )}
+      {passwordFor && (
+        <PasswordForm user={passwordFor} onClose={() => setPasswordFor(null)}
+          onDone={(u) => { replace(u); setPasswordFor(null); setMessage(`Пароль для ${u.login} изменён`); }} />
+      )}
+    </div>
+  );
 }
 
-function UserForm({ onClose, onCreated, onError }: { onClose: () => void; onCreated: (user: AuthUser) => void; onError: (message: string) => void }) {
+function UserForm({ onClose, onCreated }: { onClose: () => void; onCreated: (u: AuthUser) => void }) {
   const [form, setForm] = useState({ login: "", display_name: "", role: "viewer" as UserRole, password: "" });
-  const [saving, setSaving] = useState(false);
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    try { onCreated(await api.createAuthUser(form)); } catch (reason) { onError(reason instanceof Error ? reason.message : "Не удалось создать пользователя"); } finally { setSaving(false); }
-  }
-  return <div className="modal-layer"><button className="drawer-backdrop" type="button" aria-label="Закрыть форму" onClick={onClose} /><section className="modal user-form-modal" role="dialog" aria-modal="true" aria-labelledby="user-form-title"><div className="drawer-header"><div><span className="panel-kicker">Новая учётная запись</span><h2 id="user-form-title">Добавить пользователя</h2></div><button className="icon-button" type="button" aria-label="Закрыть" onClick={onClose}><Icon name="close" /></button></div><form className="form-stack" onSubmit={submit}><label className="field"><span>Имя пользователя</span><input name="display_name" required value={form.display_name} onChange={(event) => setForm((current) => ({ ...current, display_name: event.target.value }))} autoComplete="name" placeholder="Например, Иван Петров" /></label><label className="field"><span>Логин</span><input name="login" required pattern="[a-zA-Z0-9._-]+" value={form.login} onChange={(event) => setForm((current) => ({ ...current, login: event.target.value }))} autoComplete="username" placeholder="ivan.petrov" /></label><label className="field"><span>Роль</span><select name="role" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as UserRole }))}><option value="viewer">Просмотр камер</option><option value="admin">Администратор</option></select></label><label className="field"><span>Пароль <small>минимум 8 символов</small></span><input name="password" type="password" minLength={8} required value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} autoComplete="new-password" /></label><div className="modal-actions"><button className="button button-secondary" type="button" onClick={onClose}>Отмена</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? "Создаём…" : "Создать пользователя"}</button></div></form></section></div>;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      onCreated(await api.createUser({ ...form, login: form.login.trim(), display_name: form.display_name.trim() }));
+    } catch (err) {
+      setError(errorText(err, "Не удалось создать пользователя"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title="Новый пользователь" onClose={onClose}>
+      <form className="form" onSubmit={submit}>
+        <label className="field">
+          <span>Имя</span>
+          <input required value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} placeholder="Иван Петров" autoComplete="off" />
+        </label>
+        <label className="field">
+          <span>Логин</span>
+          <input required minLength={3} pattern="[a-zA-Z0-9._\-]+" title="Латиница, цифры, точка, дефис, подчёркивание"
+            value={form.login} onChange={(e) => setForm({ ...form, login: e.target.value })} placeholder="i.petrov" autoComplete="off" />
+        </label>
+        <label className="field">
+          <span>Роль</span>
+          <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}>
+            <option value="viewer">{ROLE_LABEL.viewer}: {ROLE_HINT.viewer}</option>
+            <option value="admin">{ROLE_LABEL.admin}: {ROLE_HINT.admin}</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>Пароль, от 8 символов</span>
+          <input type="password" required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
+        </label>
+        {error && <Notice>{error}</Notice>}
+        <div className="form-actions">
+          <span className="spacer" />
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Отмена</button>
+          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Создаём…" : "Создать"}</button>
+        </div>
+      </form>
+    </Modal>
+  );
 }
 
-function PasswordForm({ user, onClose, onUpdated, onError }: { user: AuthUser; onClose: () => void; onUpdated: (user: AuthUser) => void; onError: (message: string) => void }) {
+function PasswordForm({ user, onClose, onDone }: { user: AuthUser; onClose: () => void; onDone: (u: AuthUser) => void }) {
   const [password, setPassword] = useState("");
-  const [saving, setSaving] = useState(false);
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    try { onUpdated(await api.updateAuthUser(user.id, { password })); } catch (reason) { onError(reason instanceof Error ? reason.message : "Не удалось обновить пароль"); } finally { setSaving(false); }
-  }
-  return <div className="modal-layer"><button className="drawer-backdrop" type="button" aria-label="Закрыть форму" onClick={onClose} /><section className="modal user-form-modal" role="dialog" aria-modal="true" aria-labelledby="password-form-title"><div className="drawer-header"><div><span className="panel-kicker">{user.login}</span><h2 id="password-form-title">Новый пароль</h2></div><button className="icon-button" type="button" aria-label="Закрыть" onClick={onClose}><Icon name="close" /></button></div><form className="form-stack" onSubmit={submit}><label className="field"><span>Пароль <small>минимум 8 символов</small></span><input name="password" type="password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" autoFocus /></label><div className="modal-actions"><button className="button button-secondary" type="button" onClick={onClose}>Отмена</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? "Сохраняем…" : "Обновить пароль"}</button></div></form></section></div>;
-}
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "??"; }
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      onDone(await api.updateUser(user.id, { password }));
+    } catch (err) {
+      setError(errorText(err, "Не удалось сменить пароль"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title={`Пароль для ${user.login}`} onClose={onClose}>
+      <form className="form" onSubmit={submit}>
+        <label className="field">
+          <span>Новый пароль, от 8 символов</span>
+          <input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+          <small>Все сессии пользователя закроются, войти нужно будет заново.</small>
+        </label>
+        {error && <Notice>{error}</Notice>}
+        <div className="form-actions">
+          <span className="spacer" />
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Отмена</button>
+          <button type="submit" className="btn btn-primary" disabled={busy}>Сменить пароль</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

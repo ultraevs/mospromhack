@@ -83,9 +83,16 @@ def user_from_token(db: Session, token: str | None) -> UserRow | None:
     return row.user
 
 
-def current_user(request: Request, session_factory, enabled: bool = True) -> UserRow:
+def _service_admin() -> UserRow:
+    return UserRow(id=0, login="service", display_name="Служебный клиент", role="admin", active=True)
+
+
+def current_user(request: Request, session_factory, enabled: bool = True, internal_token: str | None = None) -> UserRow:
     if not enabled:
         return UserRow(id=0, login="test-admin", display_name="Тестовый администратор", role="admin", active=True)
+    header = request.headers.get("x-internal-token")
+    if internal_token and header and hmac.compare_digest(header, internal_token):
+        return _service_admin()
     with session_factory() as db:
         user = user_from_token(db, request.cookies.get(SESSION_COOKIE))
     if user is None:
@@ -93,8 +100,11 @@ def current_user(request: Request, session_factory, enabled: bool = True) -> Use
     return user
 
 
-def websocket_user(ws: WebSocket, session_factory, enabled: bool = True) -> UserRow | None:
+def websocket_user(ws: WebSocket, session_factory, enabled: bool = True, internal_token: str | None = None) -> UserRow | None:
     if not enabled:
         return UserRow(id=0, login="test-admin", display_name="Тестовый администратор", role="admin", active=True)
+    header = ws.headers.get("x-internal-token")
+    if internal_token and header and hmac.compare_digest(header, internal_token):
+        return _service_admin()
     with session_factory() as db:
         return user_from_token(db, ws.cookies.get(SESSION_COOKIE))

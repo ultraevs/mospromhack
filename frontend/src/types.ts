@@ -7,6 +7,7 @@ export type Review = "none" | "confirmed" | "false_positive" | "forwarded";
 export type PpeItem = "helmet" | "mask" | "vest";
 export type Point = [number, number];
 export type ZoneType = "restricted" | "ppe_required" | "flammable";
+export type UserRole = "admin" | "viewer";
 
 export interface Zone {
   id: number;
@@ -56,8 +57,6 @@ export interface TelegramStatus {
   errors: number;
   pending: number;
 }
-
-export const PPE_LABEL: Record<PpeItem, string> = { helmet: "каска", mask: "маска", vest: "жилет" };
 
 export type PpeStatus = "ok" | "violation" | "unknown" | "not_required";
 
@@ -123,7 +122,7 @@ export interface Camera {
   open_events: number;
 }
 
-export type UserRole = "admin" | "viewer";
+export type CameraInput = Pick<Camera, "name" | "source_type" | "source" | "required_ppe" | "enabled">;
 
 export interface AuthUser {
   id: number;
@@ -141,6 +140,8 @@ export interface EventPage {
   offset: number;
 }
 
+export interface LatencySummary { avg_ms: number; p95_ms: number; events: number }
+
 export interface Stats {
   worker_alive: boolean;
   detector?: string;
@@ -154,10 +155,15 @@ export interface Stats {
   inference?: Record<string, { avg_ms: number; p95_ms: number; batch: number }>;
   cameras?: Record<string, { online: boolean; error: string | null; read_fps: number; proc_fps: number }>;
   clips?: { built: number; failed: number; pending: number };
-  latency?: {
-    capture_to_event: { avg_ms: number; p95_ms: number; events: number } | null;
-    capture_to_telegram?: { avg_ms: number; p95_ms: number; events: number } | null;
-  };
+  latency?: { capture_to_event: LatencySummary | null; capture_to_telegram?: LatencySummary | null };
+}
+
+export interface SourceHealth {
+  kind?: string;
+  publishing?: boolean;
+  ffmpeg_running?: boolean;
+  online?: boolean;
+  error?: string | null;
 }
 
 export interface Health {
@@ -166,7 +172,7 @@ export interface Health {
   backend?: { ok: boolean };
   mediamtx?: { ok: boolean; error?: string | null };
   worker?: { ok: boolean; detector?: string | null; device?: string | null };
-  sources?: Record<string, { online: boolean; error?: string | null }>;
+  sources?: Record<string, SourceHealth>;
 }
 
 export interface Webhook {
@@ -221,28 +227,46 @@ export interface ClientConfig {
 }
 
 export const EVENT_LABEL: Record<EventType, string> = {
-  no_helmet: "без каски",
-  no_mask: "без маски",
-  no_vest: "без жилета",
-  zone_intrusion: "в запретной зоне",
-  smoking: "курение",
-  fire: "огонь",
-  smoke: "дым",
-  running: "бег",
-  vehicle_proximity: "сближение с техникой",
-  fall: "падение",
-  lying_immobile: "лежит неподвижно",
+  no_helmet: "Без каски",
+  no_mask: "Без маски",
+  no_vest: "Без жилета",
+  zone_intrusion: "В запретной зоне",
+  smoking: "Курение",
+  fire: "Огонь",
+  smoke: "Дым",
+  running: "Бег",
+  vehicle_proximity: "Рядом с техникой",
+  fall: "Падение",
+  lying_immobile: "Лежит неподвижно",
 };
 
 export const EVENT_TYPES = Object.keys(EVENT_LABEL) as EventType[];
-export const REVIEW_LABEL: Record<Review, string> = { none: "не размечено", confirmed: "подтверждено", false_positive: "ложное", forwarded: "передано мастеру" };
 
-export const SEVERITY_LABEL: Record<Severity, string> = { high: "высокая", medium: "средняя", low: "низкая" };
-export const SEVERITY_ICON: Record<Severity, string> = { high: "▲", medium: "◆", low: "●" };
-export const SEVERITY_COLOR: Record<Severity, string> = { high: "#f28f86", medium: "#e27d75", low: "#cc716b" };
+export const REVIEW_LABEL: Record<Review, string> = {
+  none: "Не разобрано",
+  confirmed: "Подтверждено",
+  false_positive: "Ложное",
+  forwarded: "Передано мастеру",
+};
+
+export const SEVERITY_LABEL: Record<Severity, string> = { high: "Высокая", medium: "Средняя", low: "Низкая" };
+export const SEVERITY_COLOR: Record<Severity, string> = { high: "#e5483b", medium: "#f08c2a", low: "#f4c430" };
+export const SEVERITY_RANK: Record<Severity, number> = { low: 0, medium: 1, high: 2 };
+
 export const EVENT_SEVERITY: Record<EventType, Severity> = {
   fire: "high", smoke: "high", zone_intrusion: "high",
   vehicle_proximity: "high", fall: "high", lying_immobile: "high", running: "medium",
   no_helmet: "medium", no_mask: "medium", smoking: "medium",
   no_vest: "low",
 };
+
+export const PPE_ITEMS: PpeItem[] = ["helmet", "mask", "vest"];
+export const PPE_LABEL: Record<PpeItem, string> = { helmet: "Каска", mask: "Маска", vest: "Жилет" };
+
+export const ZONE_TYPES: ZoneType[] = ["restricted", "ppe_required", "flammable"];
+export const ZONE_TYPE_LABEL: Record<ZoneType, string> = {
+  restricted: "Вход запрещён",
+  ppe_required: "Обязательны СИЗ",
+  flammable: "Горючие материалы",
+};
+export const ZONE_COLOR: Record<ZoneType, string> = { restricted: "#e5483b", ppe_required: "#3b82d0", flammable: "#f08c2a" };

@@ -60,7 +60,7 @@ def get_db(state: AppState = Depends(get_state)):
 
 
 def get_current_user(request: Request, state: AppState = Depends(get_state)) -> UserRow:
-    return auth.current_user(request, state.session_factory, state.settings.auth_enabled)
+    return auth.current_user(request, state.session_factory, state.settings.auth_enabled, state.settings.internal_token)
 
 
 def require_admin(user: UserRow = Depends(get_current_user)) -> UserRow:

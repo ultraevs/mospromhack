@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -12,6 +14,7 @@ from shared.schemas import Camera, CameraCreate, CameraUpdate, EventStatus, Sour
 router = APIRouter(prefix="/api", tags=["cameras"])
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".ts"}
+USERINFO = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*://)[^/@]+@")
 
 
 def sync_sources(db: Session, state: AppState) -> None:
@@ -23,6 +26,12 @@ def to_schema(row: CameraRow, state: AppState, open_events: int = 0) -> Camera:
     return Camera(id=row.id, name=row.name, source_type=row.source_type, source=row.source,
                   required_ppe=row.required_ppe or [], enabled=row.enabled,
                   status="online" if state.camera_online(row.id) else "offline", open_events=open_events)
+
+
+def _masked(cam: Camera, user) -> Camera:
+    if user.role == "admin":
+        return cam
+    return cam.model_copy(update={"source": USERINFO.sub(r"\1***@", cam.source)})
 
 
 def _open_counts(db: Session) -> dict[int, int]:
@@ -49,10 +58,10 @@ def _get(db: Session, camera_id: int) -> CameraRow:
 
 
 @router.get("/cameras", response_model=list[Camera])
-async def list_cameras(_user=Depends(get_current_user), db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+async def list_cameras(user=Depends(get_current_user), db: Session = Depends(get_db), state: AppState = Depends(get_state)):
     counts = _open_counts(db)
     rows = db.execute(select(CameraRow).order_by(CameraRow.id)).scalars().all()
-    return [to_schema(r, state, counts.get(r.id, 0)) for r in rows]
+    return [_masked(to_schema(r, state, counts.get(r.id, 0)), user) for r in rows]
 
 
 @router.post("/cameras", response_model=Camera, status_code=201)
@@ -68,8 +77,8 @@ async def create_camera(body: CameraCreate, _user=Depends(require_admin), db: Se
 
 
 @router.get("/cameras/{camera_id}", response_model=Camera)
-async def get_camera(camera_id: int, _user=Depends(get_current_user), db: Session = Depends(get_db), state: AppState = Depends(get_state)):
-    return to_schema(_get(db, camera_id), state, _open_counts(db).get(camera_id, 0))
+async def get_camera(camera_id: int, user=Depends(get_current_user), db: Session = Depends(get_db), state: AppState = Depends(get_state)):
+    return _masked(to_schema(_get(db, camera_id), state, _open_counts(db).get(camera_id, 0)), user)
 
 
 @router.patch("/cameras/{camera_id}", response_model=Camera)

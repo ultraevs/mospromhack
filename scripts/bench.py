@@ -29,7 +29,7 @@ def main() -> int:
     ap.add_argument("--url", default=f"http://127.0.0.1:{settings.backend_port}")
     args = ap.parse_args()
 
-    http = httpx.Client(base_url=args.url, timeout=10)
+    http = httpx.Client(base_url=args.url, timeout=10, headers={"X-Internal-Token": settings.internal_token})
     try:
         health = http.get("/api/health").json()
     except httpx.HTTPError as e:

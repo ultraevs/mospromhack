@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src"
   },
   "devDependencies": {
     "@playwright/test": "1.52.0",
@@ -18,9 +19,11 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^7.0.2",
-    "vite": "^5.4.14"
+    "vite": "^5.4.14",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
+    "@fontsource/golos-text": "^5.3.0",
     "hls.js": "^1.7.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

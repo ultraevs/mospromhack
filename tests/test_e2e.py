@@ -88,7 +88,7 @@ def test_video_to_event_to_websocket_to_webhook(backend, video, tmp_path):
     import httpx
 
     base, settings = backend
-    http = httpx.Client(base_url=base, timeout=5)
+    http = httpx.Client(base_url=base, timeout=5, headers={"X-Internal-Token": TOKEN})
     receiver = Receiver()
     worker = None
     try:
@@ -108,7 +108,8 @@ def test_video_to_event_to_websocket_to_webhook(backend, video, tmp_path):
                         reader_factory=lambda cam_id, url: CameraReader(cam_id, url, open_fn=lambda _u: LoopingFile(video)))
 
         ws_base = base.replace("http://", "ws://")
-        with connect(f"{ws_base}/ws/events") as events_ws, connect(f"{ws_base}/ws/detections?camera_id={camera['id']}") as det_ws:
+        auth = {"X-Internal-Token": TOKEN}
+        with connect(f"{ws_base}/ws/events", additional_headers=auth) as events_ws, connect(f"{ws_base}/ws/detections?camera_id={camera['id']}", additional_headers=auth) as det_ws:
             thread = threading.Thread(target=worker.run, daemon=True)
             thread.start()
 

@@ -1,65 +1,150 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "../api";
-import { EmptyState, PageHeader } from "../App";
-import { Icon } from "../components/Icons";
-import { eventLabel, formatCount, formatPercent } from "../lib/format";
-import type { AnalyticsSummary, Camera } from "../types";
-import type { PageProps } from "./types";
+import { useEffect, useState } from "react";
+import { api, errorText } from "../api";
+import { Sign } from "../components/Sign";
+import { Empty, Figure, Loading, Notice, PageHeader, Segmented } from "../components/Ui";
+import { formatCount, formatDay, formatPercent, localDayStart, timezoneLabel } from "../lib/format";
+import { linkHandler } from "../lib/router";
+import { EVENT_LABEL, type AnalyticsSummary, type Camera } from "../types";
 
-export function AnalyticsPage({ refreshKey }: PageProps) {
-  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [cameras, setCameras] = useState<Camera[]>([]);
-  const [camera, setCamera] = useState("");
-  const [range, setRange] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const requestIdRef = useRef(0);
+type Period = "today" | "7" | "30" | "all";
 
-  useEffect(() => {
-    let cancelled = false;
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    const period = range === "all" ? {} : { days: Number(range) };
-    Promise.all([api.analytics({ ...period, camera_id: camera || undefined, tz_offset_min: -new Date().getTimezoneOffset() }), api.cameras()]).then(([next, cameraList]) => { if (!cancelled && requestId === requestIdRef.current) { setSummary(next); setCameras(cameraList); setError(null); } }).catch((reason: unknown) => { if (!cancelled && requestId === requestIdRef.current) setError(reason instanceof Error ? reason.message : "Не удалось загрузить аналитику"); }).finally(() => { if (!cancelled && requestId === requestIdRef.current) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [camera, range, refreshKey]);
-
-  const peakHour = useMemo(() => summary?.by_hour.reduce((peak, item) => item.total > peak.total ? item : peak, { hour: 0, total: 0 }), [summary]);
-  const maxHour = Math.max(...(summary?.by_hour.map((item) => item.total) ?? [0]), 1);
-  const topTypes = summary?.by_type.filter((item) => item.total).sort((a, b) => b.total - a.total).slice(0, 5) ?? [];
-  const rangeLabel = range === "all" ? "всё время" : `${range} дней`;
-  const cameraLabel = cameras.find((item) => String(item.id) === camera)?.name ?? "все камеры";
-
-  return <div className={`page-stack analytics-page ${loading ? "is-loading" : ""}`}><PageHeader kicker="Сигналы / закономерности" title="Аналитика" description="Не просто количество событий — точки напряжения, которые помогают менять процесс." action={<div className="range-control"><button type="button" aria-pressed={range === "all"} className={range === "all" ? "range-active" : ""} onClick={() => setRange("all")}>Всё время</button><button type="button" aria-pressed={range === "30"} className={range === "30" ? "range-active" : ""} onClick={() => setRange("30")}>30 дней</button><button type="button" aria-pressed={range === "7"} className={range === "7" ? "range-active" : ""} onClick={() => setRange("7")}>7 дней</button></div>} />{error && <div className="error-notice" role="alert"><Icon name="alert" size={17} /><span>{error}</span></div>}<section className="analytics-filters"><AnalyticsCameraSelect value={camera} cameras={cameras} onChange={setCamera} /><span className="analytics-note"><Icon name="clock" size={15} />Москва (UTC+3)</span><span className="analytics-filter-summary" aria-live="polite">Срез: {rangeLabel} · {cameraLabel}{loading && " · обновляем"}</span></section>{summary && summary.total ? <><section className="analytics-kpis"><AnalyticsKpi label="Всего событий" value={formatCount(summary.total)} note="за выбранный период" /><AnalyticsKpi label="Подтверждено" value={formatCount(summary.confirmed)} note={`${formatPercent(summary.total ? summary.confirmed / summary.total : 0)} от всех`} tone="green" /><AnalyticsKpi label="Ложные срабатывания" value={formatCount(summary.false_positive)} note={`${formatPercent(summary.false_share)} среди размеченных`} tone="danger" /><AnalyticsKpi label="Пик активности" value={peakHour ? `${String(peakHour.hour).padStart(2, "0")}:00` : "—"} note={peakHour ? `${peakHour.total} событий в час` : "нет данных"} tone="amber" /></section><div className="analytics-grid"><section className="panel chart-panel"><div className="panel-heading"><div><span className="panel-kicker">Ритм смены</span><h2>События по часам</h2></div><span className="chart-unit">событий / час</span></div><div className="bar-chart" aria-label="График событий по часам">{summary.by_hour.map((item) => <div className="bar-column" key={item.hour}><div className="bar-track"><span className="bar-fill" style={{ height: `${Math.max(item.total ? (item.total / maxHour) * 100 : 3, 3)}%` }} title={`${item.hour}:00 · ${item.total}`} /></div><span>{item.hour % 4 === 0 ? String(item.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="panel ranking-panel"><div className="panel-heading"><div><span className="panel-kicker">Распределение</span><h2>Типы сигналов</h2></div><Icon name="activity" size={18} /></div>{topTypes.length ? <div className="ranking-list">{topTypes.map((item, index) => <div className="ranking-row" key={item.type}><span className="ranking-index">{String(index + 1).padStart(2, "0")}</span><div className="ranking-name"><strong>{eventLabel(item.type)}</strong><span className="ranking-track"><i style={{ width: `${(item.total / topTypes[0].total) * 100}%` }} /></span></div><strong className="ranking-value">{item.total}</strong></div>)}</div> : <EmptyState title="Данных пока мало" description="Распределение появится после первых событий." />}</section></div><section className="panel camera-ranking"><div className="panel-heading"><div><span className="panel-kicker">Нагрузка</span><h2>Камеры и зоны</h2></div><button className="text-button" type="button" onClick={() => setCamera("")}>Сбросить источник <Icon name="refresh" size={14} /></button></div><div className="camera-ranking-grid"><div><span className="ranking-subtitle">Камеры</span>{summary.by_camera.length ? summary.by_camera.slice(0, 5).map((item) => <RankingLine key={item.camera_id} label={item.camera_name} value={item.total} max={summary.by_camera[0].total} />) : <span className="muted-copy">Нет данных</span>}</div><div><span className="ranking-subtitle">Зоны</span>{summary.by_zone.length ? summary.by_zone.slice(0, 5).map((item) => <RankingLine key={item.zone_id} label={item.zone_name ?? "Без названия"} detail={item.camera_name} value={item.total} max={summary.by_zone[0].total} />) : <span className="muted-copy">События вне зон: {summary.without_zone}</span>}</div></div></section></> : <section className="panel"><EmptyState icon="activity" title="За выбранный срез событий нет" description="Измените период или источник, чтобы посмотреть другой срез." /></section>}</div>;
+function todayIso(): string {
+  const d = new Date();
+  return localDayStart(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
 }
 
-function AnalyticsKpi({ label, value, note, tone = "neutral" }: { label: string; value: string; note: string; tone?: "neutral" | "green" | "danger" | "amber" }) { return <div className={`analytics-kpi kpi-${tone}`}><span className="metric-label">{label}</span><strong>{value}</strong><span>{note}</span></div>; }
-function RankingLine({ label, detail, value, max }: { label: string; detail?: string; value: number; max: number }) { return <div className="ranking-line"><div><strong>{label}</strong>{detail && <small>{detail}</small>}</div><span className="ranking-line-track"><i style={{ width: `${(value / Math.max(max, 1)) * 100}%` }} /></span><b>{value}</b></div>; }
-
-function AnalyticsCameraSelect({ value, cameras, onChange }: { value: string; cameras: Camera[]; onChange: (value: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const selected = cameras.find((item) => String(item.id) === value)?.name ?? "Все камеры";
-  const options = [{ value: "", label: "Все камеры" }, ...cameras.map((item) => ({ value: String(item.id), label: item.name }))];
+export function AnalyticsPage({ tick }: { tick: number }) {
+  const [period, setPeriod] = useState<Period>("7");
+  const [camera, setCamera] = useState("");
+  const [cameras, setCameras] = useState<Camera[]>([]);
+  const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
+    api.cameras().then(setCameras).catch(() => undefined);
   }, []);
 
-  return <div className="analytics-select" ref={rootRef}>
-    <span className="analytics-select-label">Источник</span>
-    <button className="analytics-select-trigger" type="button" aria-label="Источник камеры" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}><span>{selected}</span><Icon name="chevron" size={14} /></button>
-    {open && <div className="analytics-select-menu" role="listbox" aria-label="Источник камеры">{options.map((option) => <button className="analytics-select-option" key={option.value || "all"} type="button" role="option" aria-selected={option.value === value} onClick={() => { onChange(option.value); setOpen(false); }}>{option.label}</button>)}</div>}
-  </div>;
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    const range = period === "all" ? {} : period === "today" ? { from: todayIso() } : { days: Number(period) };
+    api.analytics({ ...range, camera_id: camera || undefined, tz_offset_min: -new Date().getTimezoneOffset() })
+      .then((d) => { if (alive) { setData(d); setError(null); } })
+      .catch((e) => alive && setError(errorText(e, "Не удалось загрузить аналитику")))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [period, camera, tick]);
+
+  const reviewed = data ? data.total - data.unreviewed : 0;
+  const types = data?.by_type.filter((t) => t.total > 0).sort((a, b) => b.total - a.total) ?? [];
+
+  return (
+    <div className="page">
+      <PageHeader title="Аналитика" description={`Время по часовому поясу браузера, ${timezoneLabel()}`} actions={<>
+        <label className="field field-inline-label">
+          <span>Камера</span>
+          <select value={camera} onChange={(e) => setCamera(e.target.value)}>
+            <option value="">Все камеры</option>
+            {cameras.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+        <Segmented label="Период" value={period} onChange={setPeriod}
+          options={[{ value: "today", label: "Сегодня" }, { value: "7", label: "7 дней" }, { value: "30", label: "30 дней" }, { value: "all", label: "Всё время" }]} />
+      </>} />
+      {error && <Notice>{error}</Notice>}
+      {!data ? <Loading /> : data.total === 0 ? (
+        <div className="panel"><Empty title="За этот период нарушений нет">Выберите период длиннее или другую камеру.</Empty></div>
+      ) : (
+        <div className={`analytics ${loading ? "is-loading" : ""}`}>
+          <section className="figures" aria-label="Итоги периода">
+            <Figure label="Нарушений" value={formatCount(data.total)} />
+            <Figure label="Разобрано" value={formatCount(reviewed)} note={formatPercent(reviewed / data.total)} />
+            <Figure label="Подтверждено" value={formatCount(data.confirmed)} />
+            <Figure label="Ложных" value={formatCount(data.false_positive)} note={data.false_share !== null ? `${formatPercent(data.false_share)} от разобранных` : "ещё не размечали"} />
+            <Figure label="Передано мастеру" value={formatCount(data.forwarded)} />
+          </section>
+
+          <section className="panel">
+            <h2 className="panel-title">По часам</h2>
+            <Bars items={data.by_hour.map((h) => ({ key: String(h.hour), value: h.total, label: h.hour % 3 === 0 ? String(h.hour).padStart(2, "0") : "", title: `${h.hour}:00–${h.hour + 1}:00` }))} />
+          </section>
+
+          {data.by_day.length > 1 && (
+            <section className="panel">
+              <h2 className="panel-title">По дням</h2>
+              <Bars items={data.by_day.map((d, i) => ({ key: d.day, value: d.total, label: data.by_day.length <= 14 || i % 3 === 0 ? formatDay(d.day) : "", title: formatDay(d.day) }))} />
+            </section>
+          )}
+
+          <section className="panel">
+            <h2 className="panel-title">Типы нарушений и ложные срабатывания</h2>
+            <table className="table">
+              <thead><tr><th>Нарушение</th><th className="num">Всего</th><th className="num">Подтверждено</th><th className="num">Ложных</th><th className="num">Доля ложных</th></tr></thead>
+              <tbody>
+                {types.map((t) => (
+                  <tr key={t.type}>
+                    <td><a className="event-name" href={`/events?type=${t.type}`} onClick={linkHandler(`/events?type=${t.type}`)}><Sign type={t.type} size={20} />{EVENT_LABEL[t.type]}</a></td>
+                    <td className="num">{formatCount(t.total)}</td>
+                    <td className="num">{formatCount(t.confirmed)}</td>
+                    <td className="num">{formatCount(t.false_positive)}</td>
+                    <td className="num">{formatPercent(t.false_share)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <div className="analytics-pair">
+            <section className="panel">
+              <h2 className="panel-title">Камеры</h2>
+              <Ranking items={data.by_camera.map((c) => ({ key: String(c.camera_id), label: c.camera_name, value: c.total }))} />
+            </section>
+            <section className="panel">
+              <h2 className="panel-title">Зоны</h2>
+              {data.by_zone.length === 0 ? <Empty title="В зонах нарушений не было">Вне зон: {formatCount(data.without_zone)}</Empty> : (
+                <Ranking items={[
+                  ...data.by_zone.map((z) => ({ key: String(z.zone_id), label: `${z.zone_name ?? "без названия"}, ${z.camera_name}`, value: z.total })),
+                  ...(data.without_zone ? [{ key: "none", label: "Вне зон", value: data.without_zone }] : []),
+                ]} />
+              )}
+            </section>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function Bars({ items }: { items: { key: string; value: number; label: string; title: string }[] }) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <div className="bars" role="img" aria-label={items.map((i) => `${i.title}: ${i.value}`).join(", ")}>
+      {items.map((i) => (
+        <div key={i.key} className="bar" title={`${i.title}: ${i.value}`}>
+          <span className="bar-value num">{i.value || ""}</span>
+          <i style={{ height: `${(i.value / max) * 100}%` }} />
+          <small>{i.label}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Ranking({ items }: { items: { key: string; label: string; value: number }[] }) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <ul className="ranking">
+      {items.map((i) => (
+        <li key={i.key}>
+          <span>{i.label}</span>
+          <i style={{ width: `${(i.value / max) * 100}%` }} />
+          <b className="num">{formatCount(i.value)}</b>
+        </li>
+      ))}
+    </ul>
+  );
 }
