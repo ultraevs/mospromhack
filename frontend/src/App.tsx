@@ -96,7 +96,6 @@ function Workspace({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       <aside className={`sidebar ${menuOpen ? "is-open" : ""}`}>
         <div className="brand">
           <strong>Контроль безопасности</strong>
-          <span>видеоаналитика цеха</span>
         </div>
         <nav aria-label="Разделы">
           {routes.map((r) => (
@@ -143,7 +142,7 @@ function Page({ path, tick, user }: { path: string; tick: number; user: AuthUser
 }
 
 function Connection({ live }: { live: LiveState }) {
-  if (live.connected) return <div className="conn conn-ok"><span className="dot dot-live" />Связь с сервером есть</div>;
+  if (live.connected) return <div className="conn conn-ok"><span className="dot dot-live" />Активно</div>;
   return (
     <div className="conn conn-bad">
       <span className="dot dot-down" />

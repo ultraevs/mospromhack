@@ -34,7 +34,6 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: (user: AuthUser) => void
           <Sign type="fire" size={30} />
         </div>
         <h1>Контроль безопасности</h1>
-        <p>Нарушения на производстве по видео с камер: каски, жилеты, запретные зоны, огонь и дым.</p>
         <label className="field">
           <span>Логин</span>
           <input name="login" value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" autoFocus required />

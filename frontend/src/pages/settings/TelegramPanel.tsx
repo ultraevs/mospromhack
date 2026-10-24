@@ -62,7 +62,6 @@ export function TelegramPanel() {
       <div className="settings-head">
         <div>
           <h2>Telegram</h2>
-          <p>Нарушения высокой важности приходят сразу с кадром и клипом, остальные — сводкой.</p>
         </div>
         <div className="field-inline">
           <Toggle checked={status.enabled} disabled={busy || status.reason === "no_token"} onChange={(v) => void toggle(v)} label="Бот включён" />

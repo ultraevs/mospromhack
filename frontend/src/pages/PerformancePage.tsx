@@ -31,7 +31,7 @@ export function PerformancePage() {
 
   return (
     <div className="page">
-      <PageHeader title="Производительность" description="Обновляется каждые 2 секунды." />
+      <PageHeader title="Производительность" />
       {!stats.worker_alive && <Notice tone="warn">Воркер не отвечает: анализа нет, ниже последние известные задержки событий.</Notice>}
       {(stats.warnings ?? []).map((w) => <Notice key={w} tone="warn">{w}</Notice>)}
       {health?.mediamtx && !health.mediamtx.ok && <Notice>Видеосервер MediaMTX недоступен{health.mediamtx.error ? `: ${health.mediamtx.error}` : ""}</Notice>}
