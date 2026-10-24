@@ -188,7 +188,7 @@ async def report_events(conds: list = Depends(_filters), camera_id: int | None =
                "<th>Разбор</th><th>Комментарий</th><th>Кадр</th></tr>")
     for i, r in enumerate(rows, 1):
         place = r.camera_name + (f" / {r.zone_name}" if r.zone_name else "")
-        note = r.details.get("comment", "") if isinstance(r.details, dict) else ""  # отдельного поля пока нет
+        note = r.details.get("comment", "") if isinstance(r.details, dict) else ""  # комментарий оператора лежит в details
         img = f"<img src='{e(r.snapshot_url)}' alt=''>" if r.snapshot_url else ""
         out.append(f"<tr><td>{i}</td><td>{e(_local(r.started_at))}</td><td>{e(TYPE_LABEL.get(r.type, r.type))}</td>"
                    f"<td>{e(place)}</td><td>{e(REVIEW_LABEL.get(r.review, r.review))}</td><td>{e(note)}</td>"
